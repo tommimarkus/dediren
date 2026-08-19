@@ -234,7 +234,7 @@ class DrawioDocumentBuilderTest {
   void recordsTheProvenanceOfEveryGroupAsAGroupRole() {
     var document =
         DrawioDocumentBuilder.build(
-            source(List.of(), List.of()),
+            source(List.of(node("pkg", "Grouping")), List.of()),
             layout(
                 List.of(),
                 List.of(),
@@ -270,6 +270,310 @@ class DrawioDocumentBuilderTest {
     assertThat(cellCarrying(document, "visual").object().attributes())
         .containsEntry(DrawioIdentity.GROUP_ROLE, DrawioIdentity.GROUP_ROLE_VISUAL)
         .doesNotContainKey(DrawioIdentity.SEMANTIC_SOURCE_ID);
+  }
+
+  /**
+   * A semantic boundary stands for a real element, and the element is often not laid out as a box
+   * of its own — a UML package drawn only as its boundary is the standard shape. The reference
+   * alone is therefore not enough: the exported file has to carry the element, or Dediren's own
+   * artifact names an id that nothing in it declares and cannot be re-imported.
+   */
+  @Test
+  void aSemanticBoundaryCarriesTheElementItStandsForEvenWhenNothingLaysItOut() {
+    var document =
+        DrawioDocumentBuilder.build(
+            source(
+                List.of(
+                    new SourceNode("pkg-orders", "Package", "Orders", Map.of()),
+                    node("component-order-api", "Component")),
+                List.of()),
+            layout(
+                List.of(laidOut("component-order-api", 20, 20, 160, 80)),
+                List.of(),
+                List.of(
+                    new LaidOutGroup(
+                        "orders-package-boundary",
+                        "pkg-orders",
+                        null,
+                        GroupProvenance.semanticBacked("pkg-orders"),
+                        0,
+                        0,
+                        400,
+                        300,
+                        List.of("component-order-api"),
+                        "Orders"))),
+            POLICY);
+
+    assertThat(cellCarrying(document, "orders-package-boundary").object().attributes())
+        .containsEntry(DrawioIdentity.SEMANTIC_SOURCE_ID, "pkg-orders")
+        .containsEntry(DrawioIdentity.SEMANTIC_SOURCE_TYPE, "Package")
+        .containsEntry(DrawioIdentity.SEMANTIC_SOURCE_LABEL, "Orders");
+  }
+
+  /**
+   * {@code SceneProjection} gives a semantic-boundary group that declares no {@code
+   * semantic_source_id} a provenance naming the group itself, and the layout result carries that
+   * back verbatim. Writing it out would manufacture a reference to an element the model does not
+   * have: the file re-imports green and the next command rejects the model. The group stays
+   * semantic — that is its declared role — and simply names nothing.
+   */
+  @Test
+  void aSemanticGroupBackedByNoSourceElementNamesNothingRatherThanItself() {
+    var document =
+        DrawioDocumentBuilder.build(
+            source(List.of(node("web-app", "ApplicationComponent")), List.of()),
+            layout(
+                List.of(laidOut("web-app", 20, 20, 160, 80)),
+                List.of(),
+                List.of(
+                    new LaidOutGroup(
+                        "application-services",
+                        "application-services",
+                        null,
+                        GroupProvenance.semanticBacked("application-services"),
+                        0,
+                        0,
+                        400,
+                        300,
+                        List.of("web-app"),
+                        "Application Services"))),
+            POLICY);
+
+    assertThat(cellCarrying(document, "application-services").object().attributes())
+        .containsEntry(DrawioIdentity.GROUP_ROLE, DrawioIdentity.GROUP_ROLE_SEMANTIC)
+        .doesNotContainKey(DrawioIdentity.SEMANTIC_SOURCE_ID)
+        .doesNotContainKey(DrawioIdentity.SEMANTIC_SOURCE_TYPE);
+    // Silently, because this is the ordinary shape of a boundary that declares no source — not a
+    // broken reference. The broken one is the next test.
+    assertThat(diagnostic(document, DiagnosticCode.DRAWIO_LAYOUT_REFERENCE_MISSING)).isEmpty();
+  }
+
+  /** A boundary naming some <em>other</em> element the model does not declare is a stale layout. */
+  @Test
+  void aSemanticBoundaryNamingAnUndeclaredElementIsDisclosed() {
+    var document =
+        DrawioDocumentBuilder.build(
+            source(List.of(node("web-app", "ApplicationComponent")), List.of()),
+            layout(
+                List.of(laidOut("web-app", 20, 20, 160, 80)),
+                List.of(),
+                List.of(
+                    new LaidOutGroup(
+                        "orders-package-boundary",
+                        "pkg-orders",
+                        null,
+                        GroupProvenance.semanticBacked("pkg-orders"),
+                        0,
+                        0,
+                        400,
+                        300,
+                        List.of("web-app"),
+                        "Orders"))),
+            POLICY);
+
+    assertThat(diagnostic(document, DiagnosticCode.DRAWIO_LAYOUT_REFERENCE_MISSING))
+        .hasValueSatisfying(
+            reported -> assertThat(reported.message()).contains("pkg-orders", "does not declare"));
+    assertThat(cellCarrying(document, "orders-package-boundary").object().attributes())
+        .doesNotContainKey(DrawioIdentity.SEMANTIC_SOURCE_ID);
+  }
+
+  // ---------------------------------------------------------------- model properties
+
+  /**
+   * A Message without {@code properties.uml.sequence} is not a Message: {@code
+   * UmlSequenceValidation} rejects it outright. mxGraph has nowhere to put element properties, so
+   * the ordering rides the wrapper as a custom attribute — the same mechanism the identity
+   * vocabulary uses, and one draw.io preserves through an editing session.
+   */
+  @Test
+  void carriesAMessageOrderingOnTheEdgeWrapper() {
+    var document =
+        DrawioDocumentBuilder.build(
+            umlSequenceSource(),
+            layout(
+                List.of(laidOut("customer", 0, 0, 10, 10), laidOut("service", 60, 0, 10, 10)),
+                List.of(
+                    new LaidOutEdge(
+                        "m1", "customer", "service", "m1", null, List.of(), List.of(),
+                        "placeOrder")),
+                List.of()),
+            POLICY);
+
+    assertThat(cellCarrying(document, "m1").object().attributes())
+        .containsEntry(DrawioIdentity.UML_SEQUENCE, "3");
+  }
+
+  /**
+   * The other half of the same defect, and the worse one: everything else under {@code properties}
+   * is dropped, and it used to be dropped in silence. A file that will not re-import as a valid
+   * model has to say so at the moment it is written.
+   */
+  @Test
+  void namesTheModelPropertiesTheFormatCannotCarry() {
+    var document =
+        DrawioDocumentBuilder.build(
+            umlSequenceSource(),
+            layout(
+                List.of(laidOut("customer", 0, 0, 10, 10), laidOut("service", 60, 0, 10, 10)),
+                List.of(
+                    new LaidOutEdge(
+                        "m1", "customer", "service", "m1", null, List.of(), List.of(),
+                        "placeOrder")),
+                List.of()),
+            POLICY);
+
+    Diagnostic dropped =
+        diagnostic(document, DiagnosticCode.DRAWIO_PROPERTIES_DROPPED)
+            .orElseThrow(() -> new AssertionError("no properties-dropped diagnostic"));
+    assertThat(dropped.severity()).isEqualTo(DiagnosticSeverity.WARNING);
+    assertThat(dropped.message())
+        .contains("uml.interaction")
+        .contains("uml.message_sort")
+        .describedAs("the one property this export does carry is not reported as lost")
+        .doesNotContain("uml.sequence");
+  }
+
+  /** A model with no element properties says nothing, so the warning keeps its signal. */
+  @Test
+  void saysNothingAboutPropertiesWhenTheModelCarriesNone() {
+    var document =
+        DrawioDocumentBuilder.build(
+            source(List.of(node("orders", "ApplicationComponent")), List.of()),
+            layout(List.of(laidOut("orders", 0, 0, 10, 10)), List.of(), List.of()),
+            POLICY);
+
+    assertThat(diagnostic(document, DiagnosticCode.DRAWIO_PROPERTIES_DROPPED)).isEmpty();
+  }
+
+  // ---------------------------------------------------------------- view metadata
+
+  /**
+   * Layout preferences decide the geometry, so a view that loses them comes back drawn
+   * differently: same graph, different picture, and no structural comparison can see it. They ride
+   * the hidden metadata cell as the model's own JSON.
+   */
+  @Test
+  void carriesTheViewsLayoutPreferencesOnTheMetadataCell() {
+    var document =
+        DrawioDocumentBuilder.build(
+            sourceWithView(
+                """
+                {
+                  "semantic_profile": "archimate",
+                  "views": [{
+                    "id": "main", "label": "Main", "kind": "archimate",
+                    "layout_preferences": {
+                      "direction": "down", "density": "spacious",
+                      "routing": { "style": "orthogonal", "endpoint_merging": "off" }
+                    }
+                  }]
+                }
+                """),
+            layout(List.of(laidOut("orders", 0, 0, 10, 10)), List.of(), List.of()),
+            POLICY);
+
+    assertThat(metadataCell(document).object().attributes())
+        .hasEntrySatisfying(
+            DrawioIdentity.LAYOUT_PREFERENCES,
+            json ->
+                assertThat(json)
+                    .contains("\"direction\":\"down\"")
+                    .contains("\"density\":\"spacious\"")
+                    .contains("\"endpoint_merging\":\"off\""));
+  }
+
+  /**
+   * The <em>effective</em> kind and profile, not only the declared ones. A view that leaves {@code
+   * kind} implicit still has one — the importer materializes {@code generic} — so omitting it made
+   * a second export differ from the first over Dediren's own file.
+   */
+  @Test
+  void writesTheEffectiveViewKindAndProfileWhenTheModelLeavesThemImplicit() {
+    var document =
+        DrawioDocumentBuilder.build(
+            sourceWithView("{ \"views\": [{ \"id\": \"main\", \"label\": \"Main\" }] }"),
+            layout(List.of(laidOut("orders", 0, 0, 10, 10)), List.of(), List.of()),
+            POLICY);
+
+    assertThat(metadataCell(document).object().attributes())
+        .containsEntry(DrawioIdentity.VIEW_KIND, "generic")
+        .containsEntry(DrawioIdentity.SEMANTIC_PROFILE, "generic-graph");
+  }
+
+  private static SourceDocument sourceWithView(String pluginJson) {
+    return new SourceDocument(
+        "model.schema.v1",
+        List.of(),
+        List.of(),
+        List.of(node("orders", "ApplicationComponent")),
+        List.of(),
+        Map.of("generic-graph", JsonSupport.readTree(pluginJson)));
+  }
+
+  private static MxCell metadataCell(DrawioDocumentBuilder.Document document) {
+    return page(document).cells().stream()
+        .filter(cell -> cell.object() != null)
+        .filter(
+            cell ->
+                DrawioIdentity.VIEW_TYPE.equals(
+                    cell.object().attributes().get(DrawioIdentity.TYPE)))
+        .findFirst()
+        .orElseThrow(() -> new AssertionError("no dediren.view metadata cell"));
+  }
+
+  // ---------------------------------------------------------------- labels
+
+  /**
+   * Every cell this export writes is styled {@code html=1}, and an HTML label collapses a newline
+   * to a space. A raw newline in an XML attribute does not even survive that far: attribute-value
+   * normalization (XML 1.0 §3.3.3) turns it into a space before draw.io ever sees it, so the break
+   * was lost from the model too. The importer decodes {@code <br>}; this is the other half.
+   */
+  @Test
+  void encodesALineBreakInALabelAsMarkupDrawioActuallyRenders() {
+    var document =
+        DrawioDocumentBuilder.build(
+            source(List.of(new SourceNode("ingest", "ApplicationComponent", "Ingest\nGateway",
+                Map.of())), List.of()),
+            layout(
+                List.of(
+                    new LaidOutNode("ingest", "ingest", null, 0, 0, 10, 10, "Ingest\nGateway")),
+                List.of(),
+                List.of()),
+            POLICY);
+
+    MxCell cell = cellCarrying(document, "ingest");
+    assertThat(cell.object().attributes()).containsEntry("label", "Ingest<br>Gateway");
+    assertThat(cell.value()).isEqualTo("Ingest<br>Gateway");
+  }
+
+  private static SourceDocument umlSequenceSource() {
+    return source(
+        List.of(
+            new SourceNode(
+                "customer",
+                "Lifeline",
+                "Customer",
+                Map.of("uml", JsonSupport.readTree("{\"interaction\": \"i1\"}"))),
+            new SourceNode(
+                "service",
+                "Lifeline",
+                "Service",
+                Map.of("uml", JsonSupport.readTree("{\"interaction\": \"i1\"}")))),
+        List.of(
+            new SourceRelationship(
+                "m1",
+                "Message",
+                "customer",
+                "service",
+                "placeOrder",
+                Map.of(
+                    "uml",
+                    JsonSupport.readTree(
+                        "{\"interaction\": \"i1\", \"sequence\": 3, \"message_sort\":"
+                            + " \"synchCall\"}")))),
+        "uml-sequence");
   }
 
   // ---------------------------------------------------------------- identity

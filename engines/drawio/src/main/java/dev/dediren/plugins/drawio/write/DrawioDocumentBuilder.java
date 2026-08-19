@@ -13,6 +13,7 @@ import dev.dediren.contracts.layout.LayoutNodeRole;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.layout.Point;
 import dev.dediren.contracts.source.GenericGraphPluginData;
+import dev.dediren.contracts.source.GenericGraphSemanticProfile;
 import dev.dediren.contracts.source.GenericGraphView;
 import dev.dediren.contracts.source.GenericGraphViewKind;
 import dev.dediren.contracts.source.SourceDocument;
@@ -38,7 +39,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 
@@ -107,6 +110,9 @@ public final class DrawioDocumentBuilder {
 
   /** The mxCell id of the hidden metadata cell, claimed before any element can take it. */
   private static final String METADATA_CELL_ID = "dediren-view";
+
+  /** The one model property path this export carries, spelled once so writer and disclosure agree. */
+  private static final String UML_SEQUENCE_PATH = "uml.sequence";
 
   /**
    * Inert and unlabelled: the metadata cell is hidden, and if a curious user ever un-hides it, it
@@ -207,6 +213,7 @@ public final class DrawioDocumentBuilder {
       cells.add(edgeCell(edge));
     }
     reportOmittedOrnaments();
+    reportDroppedProperties();
 
     var page = new MxDiagram(pageId(), pageName(), false, List.copyOf(cells));
     return new Document(new MxFile(List.of(page)), List.copyOf(diagnostics));
@@ -311,20 +318,31 @@ public final class DrawioDocumentBuilder {
    *
    * <p>It carries no {@link DrawioIdentity#ID}, which is how a consumer tells it apart from a cell
    * standing for a model element without having to special-case its style or its visibility.
+   *
+   * <p>Every value it carries is the <strong>effective</strong> one, not only the explicitly
+   * declared one. A source view that leaves {@code kind} implicit still has a kind — the importer
+   * materializes {@code generic} — so omitting it made the first export differ from the second: a
+   * re-imported model states what the original left unsaid, and export stopped being idempotent
+   * over its own output. Writing the effective value loses nothing.
    */
   private MxCell metadataCell() {
     var attributes = new LinkedHashMap<String, String>();
     attributes.put(DrawioIdentity.TYPE, DrawioIdentity.VIEW_TYPE);
     putIfPresent(attributes, DrawioIdentity.VIEW_ID, layout.viewId());
     GenericGraphPluginData pluginData = genericGraphData();
-    putIfPresent(attributes, DrawioIdentity.VIEW_KIND, declaredViewKind(pluginData));
+    putIfPresent(attributes, DrawioIdentity.VIEW_KIND, effectiveViewKind(pluginData));
     putIfPresent(
         attributes,
         DrawioIdentity.SEMANTIC_PROFILE,
-        pluginData == null || pluginData.semanticProfile() == null
+        pluginData == null
             ? null
-            : jsonName(pluginData.semanticProfile()));
+            : jsonName(
+                pluginData.semanticProfile() == null
+                    ? GenericGraphSemanticProfile.GENERIC_GRAPH
+                    : pluginData.semanticProfile()));
     putIfPresent(attributes, DrawioIdentity.MODEL_SCHEMA_VERSION, source.modelSchemaVersion());
+    putIfPresent(
+        attributes, DrawioIdentity.LAYOUT_PREFERENCES, layoutPreferencesJson(pluginData));
     attributes.put("id", METADATA_CELL_ID);
 
     return new MxCell(
@@ -341,12 +359,44 @@ public final class DrawioDocumentBuilder {
         new MxObject("object", attributes));
   }
 
+  /**
+   * The container cell for one laid-out group, plus the element it stands for.
+   *
+   * <p><strong>The reference alone is not enough.</strong> A semantic boundary's element need only
+   * be a node of the <em>document</em> — {@code SemanticsRouterEngine} and {@code SceneProjection}
+   * both resolve {@code semantic_source_id} against {@code source.nodes()}, never against the
+   * view's own node list — so the standard shape of a UML package boundary is an element with no
+   * box of its own. Writing only its id would name something the file does not contain, and
+   * Dediren's own artifact would fail its own re-import. The element's type and label ride the
+   * container instead, and the importer rebuilds the node from them.
+   *
+   * <p><strong>A group naming itself names nothing.</strong> {@code SceneProjection} gives a
+   * semantic-boundary group that declares no {@code semantic_source_id} a provenance pointing at
+   * the group's own id, and the layout result carries that fallback back verbatim. Emitting it
+   * would manufacture a reference to an element the model does not have — a file that re-imports
+   * green and fails the next command. The discriminator is the source document: an id no node
+   * declares is not an element, whatever the provenance says.
+   */
   private MxCell groupCell(LaidOutGroup group) {
     String cellId = cellIdFor(group.id());
     String semanticSourceId = LaidOutGroups.semanticSourceId(group);
+    SourceNode backing =
+        semanticSourceId == null ? null : sourceNodeById().get(semanticSourceId);
+    if (semanticSourceId != null && backing == null && !semanticSourceId.equals(group.id())) {
+      // Silent for the self-naming fallback above, which is ordinary; loud for a boundary that
+      // names some other element, which is a stale layout result against a changed model.
+      warnMissingReference(
+          "group '"
+              + group.id()
+              + "' stands for source element '"
+              + semanticSourceId
+              + "', which the source model does not declare; the container is emitted without a "
+              + DrawioIdentity.SEMANTIC_SOURCE_ID,
+          "layout_result.groups");
+    }
 
     var attributes = new LinkedHashMap<String, String>();
-    putIfPresent(attributes, "label", group.label());
+    putIfPresent(attributes, "label", htmlLabel(group.label()));
     attributes.put(DrawioIdentity.ID, group.id());
     attributes.put(DrawioIdentity.TYPE, DrawioIdentity.GROUP_TYPE);
     attributes.put(
@@ -354,14 +404,18 @@ public final class DrawioDocumentBuilder {
         semanticSourceId == null
             ? DrawioIdentity.GROUP_ROLE_VISUAL
             : DrawioIdentity.GROUP_ROLE_SEMANTIC);
-    putIfPresent(attributes, DrawioIdentity.SEMANTIC_SOURCE_ID, semanticSourceId);
+    if (backing != null) {
+      attributes.put(DrawioIdentity.SEMANTIC_SOURCE_ID, semanticSourceId);
+      putIfPresent(attributes, DrawioIdentity.SEMANTIC_SOURCE_TYPE, backing.type());
+      putIfPresent(attributes, DrawioIdentity.SEMANTIC_SOURCE_LABEL, htmlLabel(backing.label()));
+    }
     attributes.put("id", cellId);
 
     Point origin = containerOrigin(group.id());
     return new MxCell(
         cellId,
         parentCellId(group.id()),
-        group.label(),
+        htmlLabel(group.label()),
         GROUP_STYLE,
         true,
         false,
@@ -397,7 +451,7 @@ public final class DrawioDocumentBuilder {
     String type = sourceNode == null ? null : sourceNode.type();
 
     var attributes = new LinkedHashMap<String, String>();
-    putIfPresent(attributes, "label", node.label());
+    putIfPresent(attributes, "label", htmlLabel(node.label()));
     attributes.put(DrawioIdentity.ID, node.id());
     putIfPresent(attributes, DrawioIdentity.TYPE, type);
     putIfPresent(attributes, DrawioIdentity.SEMANTIC_SOURCE_ID, node.sourceId());
@@ -407,7 +461,7 @@ public final class DrawioDocumentBuilder {
     return new MxCell(
         cellId,
         parentCellId(node.id()),
-        node.label(),
+        htmlLabel(node.label()),
         nodeStyle(node, type),
         true,
         false,
@@ -444,13 +498,14 @@ public final class DrawioDocumentBuilder {
     String targetCellId = endpointCellId(edge, edge.target(), "target");
 
     var attributes = new LinkedHashMap<String, String>();
-    putIfPresent(attributes, "label", edge.label());
+    putIfPresent(attributes, "label", htmlLabel(edge.label()));
     attributes.put(DrawioIdentity.ID, edge.id());
     putIfPresent(
         attributes, DrawioIdentity.TYPE, relationship == null ? null : relationship.type());
     putIfPresent(attributes, DrawioIdentity.SEMANTIC_SOURCE_ID, edge.sourceId());
     putIfPresent(attributes, DrawioIdentity.SOURCE, edge.source());
     putIfPresent(attributes, DrawioIdentity.TARGET, edge.target());
+    putIfPresent(attributes, DrawioIdentity.UML_SEQUENCE, messageSequence(relationship));
     attributes.put("id", cellId);
 
     return new MxCell(
@@ -458,7 +513,7 @@ public final class DrawioDocumentBuilder {
         // Always the layer: waypoints are read against the edge's own parent, and the route
         // points below are absolute.
         LAYER_CELL_ID,
-        edge.label(),
+        htmlLabel(edge.label()),
         edgeStyle(edge, relationship == null ? null : relationship.type()),
         false,
         true,
@@ -654,6 +709,110 @@ public final class DrawioDocumentBuilder {
             "layout_result.nodes"));
   }
 
+  /**
+   * Names every {@code properties} entry this export cannot carry.
+   *
+   * <p>mxGraph has one extension point — the {@code <object>} wrapper's attribute set — and putting
+   * a model's whole property tree through it would show a user opaque JSON in draw.io's Edit Data
+   * dialog. Exactly one property is carried instead ({@link DrawioIdentity#UML_SEQUENCE}), because
+   * a Message without it is not a valid model at all; the rest are declared lost here. Silence was
+   * the worse half of that defect: the artifact re-imported green and the next command rejected
+   * the model with nothing to connect the two.
+   *
+   * <p>One diagnostic per view, counting property paths rather than elements, for the same reason
+   * {@link #reportOmittedOrnaments()} aggregates: a fifty-message sequence diagram would otherwise
+   * bury every other diagnostic in the envelope.
+   */
+  private void reportDroppedProperties() {
+    var dropped = new TreeMap<String, Integer>();
+    for (LaidOutNode node : layout.nodes()) {
+      collectDroppedProperties(sourceNodeById().get(node.sourceId()), null, dropped);
+    }
+    for (LaidOutEdge edge : layout.edges()) {
+      SourceRelationship relationship = sourceRelationshipById().get(edge.sourceId());
+      collectDroppedProperties(
+          relationship == null ? null : relationship.properties(),
+          relationship != null && messageSequence(relationship) != null ? UML_SEQUENCE_PATH : null,
+          dropped);
+    }
+    if (dropped.isEmpty()) {
+      return;
+    }
+    diagnostics.add(
+        new Diagnostic(
+            DiagnosticCode.DRAWIO_PROPERTIES_DROPPED.code(),
+            DiagnosticSeverity.WARNING,
+            "draw.io has nowhere to keep element properties, so these are not in the exported"
+                + " file and will not come back if it is re-imported: "
+                + dropped.entrySet().stream()
+                    .map(entry -> entry.getKey() + " (" + entry.getValue() + ")")
+                    .collect(Collectors.joining(", "))
+                + "; keep the source model as the record of truth and re-import only to recover"
+                + " structure, geometry and identity",
+            "source"));
+  }
+
+  private void collectDroppedProperties(
+      SourceNode node, String carriedPath, Map<String, Integer> dropped) {
+    collectDroppedProperties(node == null ? null : node.properties(), carriedPath, dropped);
+  }
+
+  private static void collectDroppedProperties(
+      Map<String, JsonNode> properties, String carriedPath, Map<String, Integer> dropped) {
+    if (properties == null) {
+      return;
+    }
+    properties.forEach(
+        (namespace, value) -> {
+          if (value == null || !value.isObject()) {
+            return;
+          }
+          value
+              .propertyNames()
+              .forEach(
+                  key -> {
+                    String path = namespace + "." + key;
+                    if (!path.equals(carriedPath)) {
+                      dropped.merge(path, 1, Integer::sum);
+                    }
+                  });
+        });
+  }
+
+  /**
+   * A Message's {@code properties.uml.sequence} as the attribute value to write, or {@code null}
+   * when this relationship declares none. Only an integral, positive ordering is carried, matching
+   * what {@code UmlSequenceValidation.validateMessageProperties} will accept back.
+   */
+  private static String messageSequence(SourceRelationship relationship) {
+    if (relationship == null) {
+      return null;
+    }
+    JsonNode uml = relationship.properties().get("uml");
+    if (uml == null || !uml.isObject()) {
+      return null;
+    }
+    JsonNode sequence = uml.get("sequence");
+    return sequence != null && sequence.isIntegralNumber() && sequence.bigIntegerValue().signum() > 0
+        ? sequence.bigIntegerValue().toString()
+        : null;
+  }
+
+  /**
+   * A label as draw.io will actually render it: every cell here is styled {@code html=1}, and an
+   * HTML label collapses whitespace, so a line break has to be {@code <br>}.
+   *
+   * <p>A raw newline does not even reach the renderer. XML attribute-value normalization (XML 1.0
+   * §3.3.3) replaces a literal {@code #xA} in an attribute with a space before any parser hands the
+   * value on, so writing the newline through lost the break from the model too — a re-import read
+   * back {@code "Ingest Gateway"}. {@link
+   * dev.dediren.plugins.drawio.read.DrawioSourceMapper} decodes the three {@code <br>} spellings on
+   * the way in; this is the other half of that pair.
+   */
+  private static String htmlLabel(String label) {
+    return label == null ? null : label.replace("\r\n", "<br>").replace("\n", "<br>");
+  }
+
   private void warnMissingReference(String message, String path) {
     diagnostics.add(
         new Diagnostic(
@@ -762,22 +921,45 @@ public final class DrawioDocumentBuilder {
     }
   }
 
-  private String declaredViewKind(GenericGraphPluginData pluginData) {
-    GenericGraphViewKind kind = declaredViewKindEnum(pluginData);
-    return kind == null ? null : jsonName(kind);
+  /** The declared view kind, or the {@code generic} the importer would materialize in its place. */
+  private String effectiveViewKind(GenericGraphPluginData pluginData) {
+    GenericGraphView view = exportedView(pluginData);
+    if (view == null) {
+      return null;
+    }
+    return jsonName(view.kind() == null ? GenericGraphViewKind.GENERIC : view.kind());
   }
 
-  /** The kind this layout's view declares, or {@code null} if it declares none. */
-  private GenericGraphViewKind declaredViewKindEnum(GenericGraphPluginData pluginData) {
+  /**
+   * The exported view's {@code layout_preferences} as compact JSON, or {@code null} when it
+   * declares none. Serialized with the model's own mapper, so what comes back out of a re-import is
+   * the same block that went in rather than a re-spelling of it.
+   */
+  private String layoutPreferencesJson(GenericGraphPluginData pluginData) {
+    GenericGraphView view = exportedView(pluginData);
+    if (view == null || view.layoutPreferences() == null) {
+      return null;
+    }
+    return JsonSupport.objectMapper().writeValueAsString(view.layoutPreferences());
+  }
+
+  /** The source view this layout result belongs to, or {@code null} when it names none. */
+  private GenericGraphView exportedView(GenericGraphPluginData pluginData) {
     if (pluginData == null || layout.viewId() == null) {
       return null;
     }
     for (GenericGraphView view : pluginData.views()) {
-      if (layout.viewId().equals(view.id()) && view.kind() != null) {
-        return view.kind();
+      if (layout.viewId().equals(view.id())) {
+        return view;
       }
     }
     return null;
+  }
+
+  /** The kind this layout's view declares, or {@code null} if it declares none. */
+  private GenericGraphViewKind declaredViewKindEnum(GenericGraphPluginData pluginData) {
+    GenericGraphView view = exportedView(pluginData);
+    return view == null ? null : view.kind();
   }
 
   /**

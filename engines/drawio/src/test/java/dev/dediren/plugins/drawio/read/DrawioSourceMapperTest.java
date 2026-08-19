@@ -8,6 +8,8 @@ import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.json.JsonSupport;
+import dev.dediren.contracts.layout.LayoutDensity;
+import dev.dediren.contracts.layout.LayoutDirection;
 import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.contracts.source.GenericGraphSemanticProfile;
 import dev.dediren.contracts.source.GenericGraphView;
@@ -596,8 +598,10 @@ class DrawioSourceMapperTest {
     assertThat(views(document))
         .extracting(GenericGraphView::id, GenericGraphView::kind)
         .containsExactly(tuple("main", GenericGraphViewKind.ARCHIMATE));
-    // Nothing was skipped or dropped: a round trip loses only appearance.
-    assertThat(codes(result)).containsExactly(DiagnosticCode.DRAWIO_HINT_IGNORED.code());
+    // Nothing was skipped, dropped, or even disclosed. The appearance a round trip loses here is
+    // the exporter's own, computed from this very model, so warning about it would be a warning
+    // that fires on every import — no signal, and training against the ones that mean something.
+    assertThat(codes(result)).isEmpty();
   }
 
   @Test
@@ -857,6 +861,255 @@ class DrawioSourceMapperTest {
         + profile
         + "\" dedirenModelSchemaVersion=\"model.schema.v1\">"
         + "<mxCell style=\"text;html=1;\" vertex=\"1\" parent=\"1\" visible=\"0\"/></object>";
+  }
+
+  // ------------------------------------------------- semantic-boundary sources
+
+  /**
+   * A semantic-boundary group's element is required to be a node of the <em>document</em>, not of
+   * the view: {@code SemanticsRouterEngine} checks {@code semantic_source_id} against {@code
+   * source.nodes()} and {@code SceneProjection} resolves it there too, while the view's own {@code
+   * nodes} list is checked separately and never consulted for this. So a package boundary whose
+   * package is drawn only as the boundary is contract-legal, and the export has to carry the
+   * element it names or its own artifact cannot be re-imported.
+   */
+  @Test
+  void aSemanticBoundaryGroupRestoresTheElementItStandsForWhenNoCellDrawsIt() throws Exception {
+    SourceDocument document =
+        map(page(
+                "Components",
+                """
+                <mxCell id="0" />
+                <mxCell id="1" parent="0" />
+                <object id="meta" dedirenType="dediren.view" dedirenViewId="component-view" dedirenViewKind="uml-component" dedirenSemanticProfile="uml" dedirenModelSchemaVersion="model.schema.v1">
+                  <mxCell style="text;html=1;" vertex="1" parent="1" visible="0"/>
+                </object>
+                <object id="c1" label="Orders" dedirenId="orders-package-boundary" dedirenType="dediren.group" dedirenGroupRole="semantic" dedirenSemanticSourceId="pkg-orders" dedirenSemanticSourceType="Package" dedirenSemanticSourceLabel="Orders">
+                  <mxCell style="rounded=0;" vertex="1" parent="1"/>
+                </object>
+                <object id="c2" label="Order API" dedirenId="component-order-api" dedirenType="Component">
+                  <mxCell style="rounded=0;" vertex="1" parent="c1"/>
+                </object>
+                """))
+            .document();
+
+    assertThat(document.nodes())
+        .extracting(SourceNode::id, SourceNode::type, SourceNode::label)
+        .containsExactly(
+            tuple("component-order-api", "Component", "Order API"),
+            tuple("pkg-orders", "Package", "Orders"));
+    // Restored as a document node, deliberately not as a view node: the view lays out the
+    // boundary, not a box for the package.
+    assertThat(views(document).get(0).nodes()).containsExactly("component-order-api");
+    assertThat(groups(document))
+        .extracting(GenericGraphViewGroup::id, GenericGraphViewGroup::semanticSourceId)
+        .containsExactly(tuple("orders-package-boundary", "pkg-orders"));
+  }
+
+  /**
+   * The guard this class's javadoc promises: a green import that produces a model the next command
+   * rejects is the failure it exists to prevent, so a group naming itself — which {@code
+   * SceneProjection}'s own fallback produces whenever a semantic-boundary group declares no source —
+   * must not resolve. Only a node can back a boundary.
+   */
+  @Test
+  void aSemanticSourceNamingAGroupRatherThanANodeIsRefused() {
+    assertThatThrownBy(
+            () ->
+                map(page(
+                    "Services",
+                    """
+                    <mxCell id="0" />
+                    <mxCell id="1" parent="0" />
+                    <object id="meta" dedirenType="dediren.view" dedirenViewId="main" dedirenViewKind="archimate" dedirenSemanticProfile="archimate" dedirenModelSchemaVersion="model.schema.v1">
+                      <mxCell style="text;html=1;" vertex="1" parent="1" visible="0"/>
+                    </object>
+                    <object id="c1" label="Application Services" dedirenId="application-services" dedirenType="dediren.group" dedirenGroupRole="semantic" dedirenSemanticSourceId="application-services">
+                      <mxCell style="rounded=0;" vertex="1" parent="1"/>
+                    </object>
+                    <object id="c2" label="Web" dedirenId="web-app" dedirenType="ApplicationComponent">
+                      <mxCell style="rounded=0;" vertex="1" parent="c1"/>
+                    </object>
+                    """)))
+        .isInstanceOf(EngineException.class)
+        .hasMessageContaining("application-services")
+        .satisfies(
+            error ->
+                assertThat(code((EngineException) error))
+                    .isEqualTo(DiagnosticCode.DRAWIO_ROUND_TRIP_INVALID.code()));
+  }
+
+  /**
+   * A boundary that names an element and carries nothing to rebuild it with is still refused: an
+   * untyped guess would smuggle a {@code generic.node} into a UML model and fail one command later.
+   */
+  @Test
+  void aSemanticSourceWithNoCarriedTypeIsStillRefused() {
+    assertThatThrownBy(
+            () ->
+                map(page(
+                    "Components",
+                    """
+                    <mxCell id="0" />
+                    <mxCell id="1" parent="0" />
+                    <object id="meta" dedirenType="dediren.view" dedirenViewId="component-view" dedirenViewKind="uml-component" dedirenSemanticProfile="uml" dedirenModelSchemaVersion="model.schema.v1">
+                      <mxCell style="text;html=1;" vertex="1" parent="1" visible="0"/>
+                    </object>
+                    <object id="c1" label="Orders" dedirenId="orders-package-boundary" dedirenType="dediren.group" dedirenGroupRole="semantic" dedirenSemanticSourceId="pkg-orders">
+                      <mxCell style="rounded=0;" vertex="1" parent="1"/>
+                    </object>
+                    <object id="c2" label="Order API" dedirenId="component-order-api" dedirenType="Component">
+                      <mxCell style="rounded=0;" vertex="1" parent="c1"/>
+                    </object>
+                    """)))
+        .isInstanceOf(EngineException.class)
+        .satisfies(
+            error ->
+                assertThat(code((EngineException) error))
+                    .isEqualTo(DiagnosticCode.DRAWIO_ROUND_TRIP_INVALID.code()));
+  }
+
+  /**
+   * {@code properties.uml.sequence} is what makes a Message a Message: {@code
+   * UmlSequenceValidation.validateMessageProperties} rejects one without it, so an export that
+   * dropped the ordering produced a file that re-imported green and failed the next command.
+   */
+  @Test
+  void restoresAMessageOrderingFromTheEdgeWrapper() throws Exception {
+    SourceDocument document =
+        map(page(
+                "Sequence",
+                """
+                <mxCell id="0" />
+                <mxCell id="1" parent="0" />
+                <object id="meta" dedirenType="dediren.view" dedirenViewId="sequence-view" dedirenViewKind="uml-sequence" dedirenSemanticProfile="uml" dedirenModelSchemaVersion="model.schema.v1">
+                  <mxCell style="text;html=1;" vertex="1" parent="1" visible="0"/>
+                </object>
+                <object id="c1" label="Customer" dedirenId="customer" dedirenType="Lifeline">
+                  <mxCell style="rounded=0;" vertex="1" parent="1"/>
+                </object>
+                <object id="c2" label="Service" dedirenId="service" dedirenType="Lifeline">
+                  <mxCell style="rounded=0;" vertex="1" parent="1"/>
+                </object>
+                <object id="c3" label="placeOrder" dedirenId="m1" dedirenType="Message" dedirenSource="customer" dedirenTarget="service" dedirenUmlSequence="2">
+                  <mxCell style="html=1;" edge="1" parent="1" source="c1" target="c2"/>
+                </object>
+                """))
+            .document();
+
+    assertThat(document.relationships()).hasSize(1);
+    assertThat(document.relationships().get(0).properties().get("uml").get("sequence").asInt())
+        .isEqualTo(2);
+  }
+
+  /**
+   * The ordering is a UML property, so it is restored only under the UML profile — the same reason
+   * a {@code dedirenType} is only honoured on a round-tripped document.
+   */
+  @Test
+  void aMessageOrderingIsNotRestoredOutsideTheUmlProfile() throws Exception {
+    SourceDocument document =
+        map(page(
+                "Graph",
+                """
+                <mxCell id="0" />
+                <mxCell id="1" parent="0" />
+                <object id="meta" dedirenType="dediren.view" dedirenViewId="main" dedirenViewKind="generic" dedirenSemanticProfile="generic-graph" dedirenModelSchemaVersion="model.schema.v1">
+                  <mxCell style="text;html=1;" vertex="1" parent="1" visible="0"/>
+                </object>
+                <object id="c1" label="A" dedirenId="a" dedirenType="generic.node">
+                  <mxCell style="rounded=0;" vertex="1" parent="1"/>
+                </object>
+                <object id="c2" label="B" dedirenId="b" dedirenType="generic.node">
+                  <mxCell style="rounded=0;" vertex="1" parent="1"/>
+                </object>
+                <object id="c3" label="calls" dedirenId="e" dedirenType="generic.link" dedirenSource="a" dedirenTarget="b" dedirenUmlSequence="2">
+                  <mxCell style="html=1;" edge="1" parent="1" source="c1" target="c2"/>
+                </object>
+                """))
+            .document();
+
+    assertThat(document.relationships().get(0).properties()).doesNotContainKey("uml");
+  }
+
+  /**
+   * {@code DEDIREN_DRAWIO_HINT_IGNORED} is scoped to the cells whose appearance Dediren did not
+   * author: a hand-drawn cell on a round-tripped page loses its style like any other, while the
+   * cell beside it that Dediren wrote loses only what the exporter computed from the model. Each
+   * key is counted once per cell, so the counts are what shows the scoping worked.
+   */
+  @Test
+  void onARoundTrippedPageOnlyAHandDrawnCellsAppearanceIsAnIgnoredHint() throws Exception {
+    DrawioSourceMapper.MappingResult result =
+        map(page(
+            "Mixed",
+            """
+            <mxCell id="0" />
+            <mxCell id="1" parent="0" />
+            <object id="meta" dedirenType="dediren.view" dedirenViewId="main" dedirenViewKind="archimate" dedirenSemanticProfile="archimate" dedirenModelSchemaVersion="model.schema.v1">
+              <mxCell style="text;html=1;" vertex="1" parent="1" visible="0"/>
+            </object>
+            <object id="c1" label="Ledger" dedirenId="svc.ledger" dedirenType="ApplicationComponent">
+              <mxCell style="rounded=0;fillColor=#dae8fc;" vertex="1" parent="1"/>
+            </object>
+            <mxCell id="scribble" value="Note" style="rounded=1;fillColor=#ffe6cc;shadow=1;" vertex="1" parent="1"/>
+            """));
+
+    assertThat(diagnostic(result, DiagnosticCode.DRAWIO_HINT_IGNORED).message())
+        .contains("shadow (1)")
+        .contains("rounded (1)")
+        .contains("fillColor (1)");
+  }
+
+  /** The other half of the pair above: what the metadata cell carries, the view gets back. */
+  @Test
+  void restoresTheViewsLayoutPreferencesFromTheMetadataCell() throws Exception {
+    SourceDocument document =
+        map(page(
+                "Main",
+                """
+                <mxCell id="0" />
+                <mxCell id="1" parent="0" />
+                <object id="meta" dedirenType="dediren.view" dedirenViewId="main" dedirenViewKind="archimate" dedirenSemanticProfile="archimate" dedirenModelSchemaVersion="model.schema.v1" dedirenLayoutPreferences="{&quot;direction&quot;:&quot;down&quot;,&quot;density&quot;:&quot;spacious&quot;}">
+                  <mxCell style="text;html=1;" vertex="1" parent="1" visible="0"/>
+                </object>
+                <object id="c1" label="Ledger" dedirenId="svc.ledger" dedirenType="ApplicationComponent">
+                  <mxCell style="rounded=0;" vertex="1" parent="1"/>
+                </object>
+                """))
+            .document();
+
+    assertThat(views(document).get(0).layoutPreferences())
+        .isNotNull()
+        .satisfies(
+            preferences -> {
+              assertThat(preferences.direction()).isEqualTo(LayoutDirection.DOWN);
+              assertThat(preferences.density()).isEqualTo(LayoutDensity.SPACIOUS);
+            });
+  }
+
+  /** An unreadable preferences block is refused, never quietly ignored into a different picture. */
+  @Test
+  void anUnreadableLayoutPreferencesBlockIsRefused() {
+    assertThatThrownBy(
+            () ->
+                map(page(
+                    "Main",
+                    """
+                    <mxCell id="0" />
+                    <mxCell id="1" parent="0" />
+                    <object id="meta" dedirenType="dediren.view" dedirenViewId="main" dedirenViewKind="archimate" dedirenSemanticProfile="archimate" dedirenModelSchemaVersion="model.schema.v1" dedirenLayoutPreferences="{&quot;direction&quot;:&quot;sideways&quot;}">
+                      <mxCell style="text;html=1;" vertex="1" parent="1" visible="0"/>
+                    </object>
+                    <object id="c1" label="Ledger" dedirenId="svc.ledger" dedirenType="ApplicationComponent">
+                      <mxCell style="rounded=0;" vertex="1" parent="1"/>
+                    </object>
+                    """)))
+        .isInstanceOf(EngineException.class)
+        .satisfies(
+            error ->
+                assertThat(code((EngineException) error))
+                    .isEqualTo(DiagnosticCode.DRAWIO_ROUND_TRIP_INVALID.code()));
   }
 
   private static String roundTripCell(String cellId, String dedirenId, String type, String label) {

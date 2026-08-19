@@ -5,6 +5,7 @@ import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.json.JsonSupport;
+import dev.dediren.contracts.layout.LayoutPreferences;
 import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.contracts.source.GenericGraphSemanticProfile;
 import dev.dediren.contracts.source.GenericGraphView;
@@ -29,6 +30,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -101,10 +103,14 @@ public final class DrawioSourceMapper {
   private static final String ATTR_TARGET = DrawioIdentity.TARGET;
   private static final String ATTR_GROUP_ROLE = DrawioIdentity.GROUP_ROLE;
   private static final String ATTR_SEMANTIC_SOURCE = DrawioIdentity.SEMANTIC_SOURCE_ID;
+  private static final String ATTR_SEMANTIC_SOURCE_TYPE = DrawioIdentity.SEMANTIC_SOURCE_TYPE;
+  private static final String ATTR_SEMANTIC_SOURCE_LABEL = DrawioIdentity.SEMANTIC_SOURCE_LABEL;
+  private static final String ATTR_UML_SEQUENCE = DrawioIdentity.UML_SEQUENCE;
   private static final String ATTR_VIEW_ID = DrawioIdentity.VIEW_ID;
   private static final String ATTR_VIEW_KIND = DrawioIdentity.VIEW_KIND;
   private static final String ATTR_PROFILE = DrawioIdentity.SEMANTIC_PROFILE;
   private static final String ATTR_MODEL_VERSION = DrawioIdentity.MODEL_SCHEMA_VERSION;
+  private static final String ATTR_LAYOUT_PREFERENCES = DrawioIdentity.LAYOUT_PREFERENCES;
 
   /** Wrapper attributes the mapper consumes; anything else on a wrapper is a discarded hint. */
   private static final Set<String> CONSUMED_ATTRIBUTES =
@@ -117,10 +123,14 @@ public final class DrawioSourceMapper {
           ATTR_TARGET,
           ATTR_GROUP_ROLE,
           ATTR_SEMANTIC_SOURCE,
+          ATTR_SEMANTIC_SOURCE_TYPE,
+          ATTR_SEMANTIC_SOURCE_LABEL,
+          ATTR_UML_SEQUENCE,
           ATTR_VIEW_ID,
           ATTR_VIEW_KIND,
           ATTR_PROFILE,
-          ATTR_MODEL_VERSION);
+          ATTR_MODEL_VERSION,
+          ATTR_LAYOUT_PREFERENCES);
 
   /** Longest attacker-supplied fragment echoed into a published diagnostic. */
   private static final int ECHO_LIMIT = 80;
@@ -138,6 +148,18 @@ public final class DrawioSourceMapper {
   private final Set<String> reservedElementIds = new LinkedHashSet<>();
   private final Set<String> reservedViewIds = new LinkedHashSet<>();
   private final Map<String, Endpoint> dedirenIndex = new LinkedHashMap<>();
+
+  /**
+   * The elements a semantic boundary declares but no cell draws, keyed by element id.
+   *
+   * <p>Separate from {@link #dedirenIndex} because these are not cells: nothing on the page can be
+   * an edge endpoint or a container for them. They exist only to be rebuilt as document nodes, and
+   * only a boundary that carried a type can produce one.
+   */
+  private final Map<String, CarriedElement> carriedSemanticSources = new LinkedHashMap<>();
+
+  /** The dediren ids of cells that map to nodes — the only ids a semantic boundary may name. */
+  private final Set<String> nodeDedirenIds = new LinkedHashSet<>();
   private final Map<String, Integer> discardedKeys = new LinkedHashMap<>();
   private final Map<String, Integer> stencilTokens = new LinkedHashMap<>();
   private final List<String> hiddenCells = new ArrayList<>();
@@ -193,6 +215,9 @@ public final class DrawioSourceMapper {
     for (PageScan scan : scans) {
       buildPage(scan);
     }
+    // After every page, because a later page may draw the very element an earlier page's boundary
+    // stands for, and a drawn cell wins over the reconstruction.
+    carriedSemanticSources.forEach(this::addCarriedSemanticSource);
 
     int produced = nodes.size() + relationships.size() + groupCount;
     if (produced > maxElements) {
@@ -236,6 +261,7 @@ public final class DrawioSourceMapper {
     private MxCell metadata;
     private String viewId;
     private GenericGraphViewKind viewKind = GenericGraphViewKind.GENERIC;
+    private LayoutPreferences layoutPreferences;
 
     private PageScan(int number, MxDiagram diagram) {
       this.number = number;
@@ -422,6 +448,25 @@ public final class DrawioSourceMapper {
       }
       scan.viewId = declaredViewId;
     }
+
+    String declaredPreferences = attributes.get(ATTR_LAYOUT_PREFERENCES);
+    if (declaredPreferences != null && !declaredPreferences.isBlank()) {
+      // MxReader already refused any attribute value over DrawioLimits.MAX_TOKEN_BYTES, so the
+      // string handed to the mapper here is bounded before it is parsed.
+      try {
+        scan.layoutPreferences =
+            JsonSupport.objectMapper().readValue(declaredPreferences, LayoutPreferences.class);
+      } catch (JacksonException unreadable) {
+        // Bounded and typed rather than best-effort: an unreadable block would otherwise become a
+        // silently different picture, which is the failure mode this attribute exists to close.
+        throw roundTripInvalid(
+            ATTR_LAYOUT_PREFERENCES
+                + " is not a readable layout_preferences object: "
+                + echo(unreadable.getOriginalMessage()),
+            scan,
+            scan.metadata);
+      }
+    }
   }
 
   // ---------------------------------------------------------------- declined constructs
@@ -494,6 +539,9 @@ public final class DrawioSourceMapper {
   /** Where a {@code dedirenSource}/{@code dedirenTarget} lands once the group hop is applied. */
   private record Endpoint(String elementId, boolean group, String semanticSourceId) {}
 
+  /** A boundary's element as the file carries it, for the node this mapper rebuilds from it. */
+  private record CarriedElement(String type, String label) {}
+
   private void reserveRoundTripIds(PageScan scan) throws EngineException {
     Set<String> onThisPage = new LinkedHashSet<>();
     for (MxCell cell : scan.content) {
@@ -511,11 +559,67 @@ public final class DrawioSourceMapper {
       }
       reservedElementIds.add(declared);
       if (cell.vertex() && !scan.edgeLabelIds.contains(cell.id())) {
+        boolean group = scan.isGroup(cell);
         dedirenIndex.put(
-            declared,
-            new Endpoint(declared, scan.isGroup(cell), attribute(cell, ATTR_SEMANTIC_SOURCE)));
+            declared, new Endpoint(declared, group, attribute(cell, ATTR_SEMANTIC_SOURCE)));
+        if (group) {
+          reserveCarriedSemanticSource(scan, cell);
+        } else {
+          nodeDedirenIds.add(declared);
+        }
       }
     }
+  }
+
+  /**
+   * Records the element a semantic boundary stands for when the boundary carries enough to rebuild
+   * it.
+   *
+   * <p>A boundary's element is contract-legal without a box of its own — {@code
+   * SemanticsRouterEngine} and {@code SceneProjection} both resolve {@code semantic_source_id}
+   * against the document's nodes, not the view's — so the export writes the element's type and
+   * label onto the container and this rebuilds the node. The type is honoured only on a
+   * round-tripped document, for the same reason {@link #typeOrDefault} is: outside one there is no
+   * declared profile for it to be valid under, and a hand-typed attribute must not smuggle a UML
+   * type into a generic-graph model.
+   */
+  private void reserveCarriedSemanticSource(PageScan scan, MxCell cell) throws EngineException {
+    if (!DrawioIdentity.GROUP_ROLE_SEMANTIC.equals(attribute(cell, ATTR_GROUP_ROLE))) {
+      return;
+    }
+    String semanticSource = attribute(cell, ATTR_SEMANTIC_SOURCE);
+    String type = attribute(cell, ATTR_SEMANTIC_SOURCE_TYPE);
+    if (semanticSource == null || type == null || type.isBlank()) {
+      return;
+    }
+    if (!valid(semanticSource)) {
+      throw roundTripInvalid(
+          ATTR_SEMANTIC_SOURCE
+              + " '"
+              + echo(semanticSource)
+              + "' is not a valid Dediren id",
+          scan,
+          cell);
+    }
+    // An absent label attribute means an empty label, not "borrow the container's": the export
+    // writes this attribute whenever the element has a label at all, and guessing would rename an
+    // element that was deliberately unlabelled.
+    String label = attribute(cell, ATTR_SEMANTIC_SOURCE_LABEL);
+    CarriedElement carried =
+        new CarriedElement(roundTripDocument ? type : "generic.node", label(label));
+    CarriedElement existing = carriedSemanticSources.putIfAbsent(semanticSource, carried);
+    if (existing != null && !existing.equals(carried)) {
+      throw roundTripInvalid(
+          ATTR_SEMANTIC_SOURCE
+              + " '"
+              + echo(semanticSource)
+              + "' is described with a different type or label on page "
+              + scan.number
+              + " than on an earlier page",
+          scan,
+          cell);
+    }
+    reservedElementIds.add(semanticSource);
   }
 
   /**
@@ -533,12 +637,16 @@ public final class DrawioSourceMapper {
         continue;
       }
       String semanticSource = attribute(cell, ATTR_SEMANTIC_SOURCE);
-      if (semanticSource != null && !dedirenIndex.containsKey(semanticSource)) {
+      if (semanticSource != null
+          && !nodeDedirenIds.contains(semanticSource)
+          && !carriedSemanticSources.containsKey(semanticSource)) {
         throw roundTripInvalid(
             "dedirenSemanticSourceId '"
                 + echo(semanticSource)
-                + "' names no dedirenId in the"
-                + " document",
+                + "' names no node in the document: a boundary stands for an element, so it must"
+                + " name a cell that maps to one, or carry that element's "
+                + ATTR_SEMANTIC_SOURCE_TYPE
+                + " itself",
             scan,
             cell);
       }
@@ -628,8 +736,25 @@ public final class DrawioSourceMapper {
             scan.viewKind,
             viewNodes,
             viewRelationships,
-            null,
+            scan.layoutPreferences,
             viewGroups));
+  }
+
+  /**
+   * Rebuilds the element a semantic boundary stands for, when no cell on any page drew it.
+   *
+   * <p>A <em>document</em> node, deliberately never a view node: the view lays out the boundary,
+   * not a second box for the same element, and adding it to {@code views[].nodes} would make the
+   * re-imported view differ from the one that was exported. A cell that drew the element wins over
+   * this reconstruction — a drawn element is the file's own statement about it.
+   */
+  private void addCarriedSemanticSource(String semanticSourceId, CarriedElement carried) {
+    if (nodes.containsKey(semanticSourceId)) {
+      return;
+    }
+    nodes.put(
+        semanticSourceId,
+        new SourceNode(semanticSourceId, carried.type(), carried.label(), Map.of()));
   }
 
   private void addNode(PageScan scan, MxCell cell, String elementId, boolean identified)
@@ -685,12 +810,19 @@ public final class DrawioSourceMapper {
       }
       return;
     }
-    Map<String, JsonNode> properties =
-        identified || elementId.equals(cell.id())
-            ? Map.of()
-            : Map.of(PROPERTY_KEY, originalId(cell.id()));
+    Map<String, JsonNode> properties = new LinkedHashMap<>();
+    if (!identified && !elementId.equals(cell.id())) {
+      properties.put(PROPERTY_KEY, originalId(cell.id()));
+    }
+    JsonNode sequence = messageSequence(cell);
+    if (sequence != null) {
+      ObjectNode uml = JsonSupport.objectMapper().createObjectNode();
+      uml.set("sequence", sequence);
+      properties.put("uml", uml);
+    }
     relationships.put(
-        elementId, new SourceRelationship(elementId, type, source, target, label, properties));
+        elementId,
+        new SourceRelationship(elementId, type, source, target, label, Map.copyOf(properties)));
   }
 
   /**
@@ -763,6 +895,36 @@ public final class DrawioSourceMapper {
     return drawio.isEmpty() ? Map.of() : Map.of(PROPERTY_KEY, drawio);
   }
 
+  /**
+   * A Message's restored {@code properties.uml.sequence}, or {@code null}.
+   *
+   * <p>mxGraph carries no element properties, so the export writes the one a model is invalid
+   * without onto the edge's wrapper: {@code UmlSequenceValidation.validateMessageProperties}
+   * rejects a Message that declares no positive integral ordering, and an export that dropped it
+   * produced a file that re-imported green and failed the very next command. Restored only under
+   * the UML profile — a {@code uml} property namespace in a generic-graph or ArchiMate model would
+   * be exactly the smuggling {@link #typeOrDefault} exists to prevent.
+   */
+  private JsonNode messageSequence(MxCell cell) {
+    if (profile != GenericGraphSemanticProfile.UML) {
+      return null;
+    }
+    String declared = attribute(cell, ATTR_UML_SEQUENCE);
+    if (declared == null) {
+      return null;
+    }
+    try {
+      java.math.BigInteger sequence = new java.math.BigInteger(declared.trim());
+      return sequence.signum() > 0
+          ? JsonSupport.objectMapper().getNodeFactory().numberNode(sequence)
+          : null;
+    } catch (NumberFormatException notAnOrdering) {
+      // A hand-typed value is a hint, not a contract: the model simply keeps no ordering, and the
+      // UML validator names the missing property at the path an author can act on.
+      return null;
+    }
+  }
+
   private static ObjectNode originalId(String original) {
     ObjectNode drawio = JsonSupport.objectMapper().createObjectNode();
     drawio.put("original_id", original);
@@ -798,7 +960,21 @@ public final class DrawioSourceMapper {
 
   // ---------------------------------------------------------------- discarded hints
 
+  /**
+   * Counts what this import throws away, for {@link DiagnosticCode#DRAWIO_HINT_IGNORED}.
+   *
+   * <p><strong>A Dediren-authored cell's own style is not a discarded hint.</strong> On a
+   * round-tripped document the exporter computed that style from this very model and will compute
+   * it again, so nothing is lost and there is nothing to reapply. Reporting it anyway made the
+   * warning fire on every import including Dediren's own artifact, which is how a diagnostic stops
+   * carrying signal and starts training its reader past the ones that matter. A hand-drawn cell on
+   * the same page still loses its appearance, and still says so.
+   */
   private void recordDiscarded(MxCell cell) {
+    if (roundTripDocument && attribute(cell, ATTR_ID) != null) {
+      recordUnconsumedAttributes(cell);
+      return;
+    }
     Map<String, String> style = parseStyle(cell.style());
     // A recognized stencil is never an ignored hint: on the foreign path it is recorded as a
     // suggestion, and on the round-trip path it agrees with the dedirenType that was used instead.
@@ -824,6 +1000,20 @@ public final class DrawioSourceMapper {
         discardedKeys.merge("waypoints", 1, Integer::sum);
       }
     }
+  }
+
+  /**
+   * The one thing still worth reporting on a Dediren-authored cell: an attribute nothing here
+   * consumes. Geometry and style are the exporter's own and are recomputed, but an extra key in
+   * draw.io's Edit Data dialog is a user's own data, and this import does not keep it.
+   */
+  private void recordUnconsumedAttributes(MxCell cell) {
+    if (cell.object() == null) {
+      return;
+    }
+    cell.object().attributes().keySet().stream()
+        .filter(key -> !CONSUMED_ATTRIBUTES.contains(key))
+        .forEach(key -> discardedKeys.merge(key, 1, Integer::sum));
   }
 
   // ---------------------------------------------------------------- diagnostics
@@ -951,6 +1141,11 @@ public final class DrawioSourceMapper {
     if ((value == null || value.isEmpty()) && labelCell != null) {
       value = labelCell.value();
     }
+    return label(value);
+  }
+
+  /** The same {@code <br>} decode for a label that arrives as a wrapper attribute, not a cell. */
+  private static String label(String value) {
     return value == null ? "" : SAFE_BR.matcher(value).replaceAll("\n");
   }
 

@@ -11,8 +11,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -50,22 +54,56 @@ class DrawioRoundTripTest {
   @TempDir Path temp;
 
   /**
-   * The Dediren-authored seed, and the choice is not arbitrary.
+   * The Dediren-authored seed: the smallest grouped, typed view in the fixture set.
    *
-   * <p>It is a grouped view whose group's {@code semantic_source_id} ({@code pkg-orders}) is also
-   * laid out as a node, which is what lets the exported file re-import at all. Verified by sweeping
-   * all seventeen checked-in (source, layout) fixture pairs through {@code export → import}: the
-   * six whose semantic-boundary group stands for an element that is <em>not</em> also a laid-out node —
-   * {@code uml-component-basic}, {@code uml-complex-class}, the three state-machine fixtures and
-   * {@code uml-use-case-basic} — fail re-import outright with {@code
-   * DEDIREN_DRAWIO_ROUND_TRIP_INVALID}, and {@code pipeline-rich} and the three sequence fixtures
-   * import green but produce a model the very next command rejects. Those are lane defects reported
-   * to the lane owner, not properties of this test; nesting is therefore proved on the foreign
-   * fixture below, whose containers are layout-only and do round-trip.
+   * <p>Sweeping all seventeen checked-in (source, layout) pairs through the whole pipeline is what
+   * chose the other seeds used below, and the sweep is worth recording because it is the only
+   * measurement of what the lane can actually re-import. Eleven of the seventeen now complete
+   * {@code export → import → project}. The six that do not — {@code uml-component-basic}, {@code
+   * uml-use-case-basic}, {@code uml-sequence-lifecycle} and the three state-machine fixtures — all
+   * stop at the same place and for one reason: a required UML ownership property ({@code
+   * Port.component}, {@code ExtensionPoint.use_case}, {@code Transition.region}, {@code
+   * ExecutionSpecification.covered}) that mxGraph has nowhere to keep. The export now names each
+   * one in a {@code DEDIREN_DRAWIO_PROPERTIES_DROPPED} warning as it writes the file, and {@link
+   * #dedirenAuthoredNestedBoundariesRoundTripWithTheirUnlaidPackage} pins that residual so it stays
+   * visible rather than latent.
    */
   private static final String SOURCE_FIXTURE = "fixtures/source/valid-uml-basic.json";
 
   private static final String LAYOUT_FIXTURE = "fixtures/layout-result/uml-basic.json";
+
+  /**
+   * The seed for the boundary case that used to fail re-import outright: two semantic-boundary
+   * groups whose packages are declared by the model but laid out by nothing, which is
+   * contract-legal precisely because {@code semantic_source_id} resolves against the document's
+   * nodes rather than the view's.
+   */
+  private static final String UNLAID_SOURCE_FIXTURE = "fixtures/source/valid-uml-complex.json";
+
+  private static final String UNLAID_LAYOUT_FIXTURE =
+      "fixtures/layout-result/uml-complex-class.json";
+
+  /** The one Dediren-authored fixture with a semantic boundary inside another semantic boundary. */
+  private static final String NESTED_SOURCE_FIXTURE =
+      "fixtures/source/valid-uml-component-basic.json";
+
+  private static final String NESTED_LAYOUT_FIXTURE =
+      "fixtures/layout-result/uml-component-basic.json";
+
+  /** A view whose groups declare no {@code semantic_source_id} at all. */
+  private static final String UNSOURCED_GROUP_SOURCE_FIXTURE =
+      "fixtures/source/valid-pipeline-rich.json";
+
+  private static final String UNSOURCED_GROUP_LAYOUT_FIXTURE =
+      "fixtures/layout-result/pipeline-rich.json";
+
+  /** A view whose Messages are invalid without an ordering the format has nowhere to keep. */
+  private static final String SEQUENCE_SOURCE_FIXTURE =
+      "fixtures/source/valid-uml-sequence-basic.json";
+
+  private static final String SEQUENCE_LAYOUT_FIXTURE =
+      "fixtures/layout-result/uml-sequence-basic.json";
+
   private static final String FOREIGN_FIXTURE = "fixtures/drawio/roundtrip-foreign-nested.drawio";
   private static final String EXPORT_POLICY = "fixtures/export-policy/default-drawio.json";
 
@@ -112,31 +150,173 @@ class DrawioRoundTripTest {
   }
 
   /**
-   * The accepted lossiness, asserted rather than tolerated.
+   * Importing Dediren's own export discloses nothing, and that is the assertion.
    *
-   * <p>{@code DEDIREN_DRAWIO_HINT_IGNORED} fires here even though the input is Dediren's own
-   * output,
-   * because geometry and style are discarded on <em>every</em> import by contract. That is current,
-   * verified behaviour and this test pins it; whether an unconditional warning on Dediren's own
-   * artifact is useful signal is a separate question recorded for the lane owner, not something to
-   * settle by writing the opposite assertion.
+   * <p>{@code DEDIREN_DRAWIO_HINT_IGNORED} used to fire here. The keys it named were the
+   * exporter's own — geometry it took from this layout result and a style it computed from this
+   * model — so nothing was lost and there was nothing for a reader to do. A warning that fires on
+   * every single import, Dediren's own artifact included, carries no signal and trains its reader
+   * past the ones that do. The foreign trip below still gets it, which is what keeps this
+   * assertion from being a hole rather than a fix.
    */
   @Test
-  void dedirenAuthoredImportDisclosesOnlyTheContractualLossiness() throws Exception {
+  void dedirenAuthoredImportDisclosesNothingBecauseNothingIsLost() throws Exception {
     String in = exportDrawio(path(SOURCE_FIXTURE), path(LAYOUT_FIXTURE));
 
     JsonNode envelope =
         stage("import", "--plugin", "drawio", "--input", write("in.drawio", in).toString());
 
     assertThat(codes(envelope))
-        .describedAs("no cell may be skipped, no edge dropped, and no layer flattened")
-        .doesNotContain(
-            DiagnosticCode.DRAWIO_CELLS_SKIPPED.code(),
-            DiagnosticCode.DRAWIO_LAYERS_FLATTENED.code(),
-            DiagnosticCode.DRAWIO_ROUND_TRIP_INVALID.code())
-        .describedAs("a stencil is never inferred when dedirenType already says what this is")
-        .doesNotContain(DiagnosticCode.DRAWIO_KIND_INFERRED.code())
-        .contains(DiagnosticCode.DRAWIO_HINT_IGNORED.code());
+        .describedAs("nothing is skipped, dropped, flattened, inferred, or merely discarded")
+        .isEmpty();
+  }
+
+  // ------------------------------------------- round trip 1b: the boundary cases that used to fail
+
+  /**
+   * A semantic boundary standing for an element nothing lays out.
+   *
+   * <p>This is the shape that used to make Dediren's own export unusable: {@code
+   * complex-class-view} declares two package boundaries whose packages are model nodes but not
+   * view nodes, which is legal — {@code SemanticsRouterEngine} and {@code SceneProjection} both
+   * resolve {@code semantic_source_id} against {@code source.nodes()} — and the export wrote the id
+   * without the element, so re-import failed with {@code DEDIREN_DRAWIO_ROUND_TRIP_INVALID}. The
+   * export carries the element now, and the whole pipeline runs.
+   */
+  @Test
+  void dedirenAuthoredBoundaryCarriesAPackageNothingLaysOut() throws Exception {
+    String in = exportDrawio(path(UNLAID_SOURCE_FIXTURE), path(UNLAID_LAYOUT_FIXTURE));
+    RoundTrip trip = roundTrip(in, "unlaid");
+
+    assertThat(DrawioEquivalence.withTypedIdentity(trip.out()))
+        .describedAs("in:\n%s\nout:\n%s", in, trip.out())
+        .isEqualTo(DrawioEquivalence.withTypedIdentity(in));
+
+    var structure = DrawioEquivalence.withTypedIdentity(trip.out());
+    assertThat(structure.groups())
+        .containsOnlyKeys("commerce-package-boundary", "fulfillment-package-boundary");
+    assertThat(structure.groups().get("commerce-package-boundary").semanticSourceId())
+        .isEqualTo("pkg-commerce");
+    // The relation cannot see this: the package has no cell on either side, so a boundary that
+    // came back naming a package the model no longer declares would still compare equal. The
+    // restored *element* has to be pinned in the model, with the type it had.
+    assertThat(nodeType(trip.model(), "pkg-commerce")).isEqualTo("Package");
+    assertThat(nodeType(trip.model(), "pkg-fulfillment")).isEqualTo("Package");
+    assertThat(trip.model().at("/plugins/generic-graph/views/0/nodes"))
+        .describedAs("the view lays out the boundary, not a second box for the same package")
+        .noneSatisfy(node -> assertThat(node.asString()).isEqualTo("pkg-commerce"));
+  }
+
+  /**
+   * A semantic boundary inside another semantic boundary, on the Dediren-authored path.
+   *
+   * <p>Nesting used to be provable only on the foreign fixture, whose containers are layout-only,
+   * so the path that carries a group role and a semantic source through two levels was untested.
+   * {@code component-view} nests two component boundaries inside a package boundary and the
+   * package is laid out by nothing, which is both halves of the defect at once.
+   *
+   * <p>The trailing assertion is the honest part: this model still cannot complete the pipeline,
+   * because {@code Port.component} is required and mxGraph has nowhere to keep it. That is
+   * disclosed on export rather than discovered later, and pinned here so it stays a known residual
+   * instead of a latent one.
+   */
+  @Test
+  void dedirenAuthoredNestedBoundariesRoundTripWithTheirUnlaidPackage() throws Exception {
+    String in = exportDrawio(path(NESTED_SOURCE_FIXTURE), path(NESTED_LAYOUT_FIXTURE));
+
+    JsonNode imported =
+        stage("import", "--plugin", "drawio", "--input", write("nested.drawio", in).toString());
+    JsonNode model = imported.get("data");
+
+    var structure = DrawioEquivalence.withTypedIdentity(in);
+    assertThat(structure.groups())
+        .containsOnlyKeys(
+            "orders-package-boundary", "order-api-boundary", "payment-adapter-boundary");
+    assertThat(structure.groups().get("order-api-boundary").container())
+        .describedAs("a semantic boundary nested inside another semantic boundary")
+        .isEqualTo("orders-package-boundary");
+    assertThat(structure.groups().get("order-api-boundary").semanticSourceId())
+        .isEqualTo("component-order-api");
+    assertThat(structure.nodes().get("port-rest-api").container()).isEqualTo("order-api-boundary");
+
+    assertThat(groupIds(model)).containsExactly(
+        "orders-package-boundary", "order-api-boundary", "payment-adapter-boundary");
+    assertThat(nodeType(model, "pkg-orders")).isEqualTo("Package");
+
+    Path modelFile = writeJson("nested-model.json", model);
+    CliResult projected =
+        Main.executeForTesting(
+            new String[] {
+              "project", "--plugin", "generic-graph", "--target", "layout-request",
+              "--view", "component-view", "--input", modelFile.toString()
+            },
+            "");
+    assertThat(projected.exitCode())
+        .describedAs("the known residual: a required UML ownership property has nowhere to ride")
+        .isEqualTo(3);
+    assertThat(projected.stdout()).contains("Port.component");
+    assertThat(exportCodes(path(NESTED_SOURCE_FIXTURE), path(NESTED_LAYOUT_FIXTURE)))
+        .describedAs("and the export said so, at the moment it wrote the file")
+        .contains(DiagnosticCode.DRAWIO_PROPERTIES_DROPPED.code());
+  }
+
+  /**
+   * A semantic boundary that declares no source element at all.
+   *
+   * <p>{@code SceneProjection} gives such a group a provenance naming the group's own id, and the
+   * export used to write that fallback out as a {@code dedirenSemanticSourceId}. It resolved on
+   * re-import — against an index that held groups as well as nodes — and then the next command
+   * rejected the model with {@code DEDIREN_GENERIC_GRAPH_GROUP_SEMANTIC_SOURCE_UNKNOWN}, which is
+   * precisely the green-import-then-unusable-model failure the mapper exists to prevent.
+   */
+  @Test
+  void dedirenAuthoredGroupWithNoSourceElementNeverManufacturesOne() throws Exception {
+    String in =
+        exportDrawio(path(UNSOURCED_GROUP_SOURCE_FIXTURE), path(UNSOURCED_GROUP_LAYOUT_FIXTURE));
+    RoundTrip trip = roundTrip(in, "unsourced");
+
+    assertThat(DrawioEquivalence.withTypedIdentity(trip.out()))
+        .describedAs("in:\n%s\nout:\n%s", in, trip.out())
+        .isEqualTo(DrawioEquivalence.withTypedIdentity(in));
+
+    var structure = DrawioEquivalence.withTypedIdentity(trip.out());
+    assertThat(structure.groups())
+        .containsOnlyKeys("application-services", "external-dependencies");
+    assertThat(structure.groups().get("application-services").groupRole()).isEqualTo("semantic");
+    assertThat(structure.groups().get("application-services").semanticSourceId())
+        .describedAs("a boundary that stands for nothing says so, rather than naming itself")
+        .isNull();
+    JsonNode declaredSource =
+        trip.model().at("/plugins/generic-graph/views/0/groups/0/semantic_source_id");
+    assertThat(declaredSource.isMissingNode() || declaredSource.isNull())
+        .describedAs("the imported model must not carry a self-reference either: %s", declaredSource)
+        .isTrue();
+  }
+
+  /**
+   * A UML Message's ordering, which the model is invalid without.
+   *
+   * <p>{@code UmlSequenceValidation.validateMessageProperties} rejects a Message that declares no
+   * {@code properties.uml.sequence}, so an export that dropped it produced a file that re-imported
+   * green and failed {@code project} with {@code DEDIREN_UML_RELATIONSHIP_PROPERTY_INVALID}. It
+   * rides the edge's {@code <object>} wrapper now, which is a channel draw.io preserves through an
+   * editing session.
+   */
+  @Test
+  void dedirenAuthoredSequenceKeepsItsMessageOrdering() throws Exception {
+    String in = exportDrawio(path(SEQUENCE_SOURCE_FIXTURE), path(SEQUENCE_LAYOUT_FIXTURE));
+    RoundTrip trip = roundTrip(in, "sequence");
+
+    assertThat(DrawioEquivalence.withTypedIdentity(trip.out()))
+        .describedAs("in:\n%s\nout:\n%s", in, trip.out())
+        .isEqualTo(DrawioEquivalence.withTypedIdentity(in));
+    assertThat(messageSequences(trip.model()))
+        .describedAs("every Message comes back with the ordering it was exported with")
+        .containsExactly(1, 2, 3);
+    // The other half of the same defect: everything else under properties is still dropped, and
+    // the export now says which, instead of leaving it to be discovered a command later.
+    assertThat(exportCodes(path(SEQUENCE_SOURCE_FIXTURE), path(SEQUENCE_LAYOUT_FIXTURE)))
+        .contains(DiagnosticCode.DRAWIO_PROPERTIES_DROPPED.code());
   }
 
   // ---------------------------------------------------------------- round trip 2: foreign
@@ -169,9 +349,18 @@ class DrawioRoundTripTest {
     assertThat(trip.model().at("/nodes/1/label").asString())
         .describedAs("the imported model must hold a newline, not the <br> markup that encoded it")
         .isEqualTo("Ingest\nGateway");
+    // The export has to put the break back as markup, and the relation cannot see that it did:
+    // DrawioEquivalence decodes <br> on both sides. Two things are wrong with writing the newline
+    // through instead. draw.io styles every cell html=1 and an HTML label collapses whitespace, so
+    // the break would not render; and XML attribute-value normalization (XML 1.0 §3.3.3) replaces
+    // a literal newline in an attribute with a space, so the break did not even survive to the
+    // next import — it came back as "Ingest Gateway". Both halves are pinned on the artifact.
     assertThat(trip.out())
-        .describedAs("no <br> markup, escaped or raw, may survive into the exported label")
-        .doesNotContain("&lt;br", "<br>", "<br/>", "<br />");
+        .describedAs("the break is re-encoded as the markup it was decoded from")
+        .contains("&lt;br&gt;");
+    assertThat(trip.out())
+        .describedAs("and never as a raw newline inside an attribute value")
+        .doesNotContain("label=\"Ingest\nGateway\"");
     assertThat(structure.groups()).containsOnlyKeys("platform", "core");
     assertThat(structure.groups().get("core").container())
         .describedAs("a group inside a group keeps its nesting")
@@ -222,6 +411,191 @@ class DrawioRoundTripTest {
     RoundTrip trip = roundTrip(in, "foreign");
 
     assertThat(trip.exportDiagnostics()).contains(DiagnosticCode.DRAWIO_SHAPE_UNMAPPED.code());
+  }
+
+  // ---------------------------------------------------------------- export-anchored fixed point
+
+  /**
+   * The sharpest instrument in this file: inside Dediren-authored {@code .drawio} space the round
+   * trip must be the <em>identity</em>.
+   *
+   * <pre>
+   *   source + view --project--&gt;--layout--&gt;--export--&gt; d1
+   *   d1            --import--&gt;                        source'
+   *   source' + view'--project--&gt;--layout--&gt;--export--&gt; d2
+   *   assert d1 == d2, byte for byte
+   * </pre>
+   *
+   * <p>Export is a retraction: everything it writes, the importer reads, and a second pass has
+   * nothing left to change. Byte equality is a strictly stronger bar than {@link
+   * DrawioEquivalence}, which excludes geometry, style and document order by design — so this
+   * catches faults the relation is blind to. A dropped {@code layout_preferences} block, for
+   * example, produces an identical structure laid out at different coordinates; {@code ≈} passes
+   * and this fails.
+   *
+   * <p><strong>{@code d1} comes from the live pipeline, never from {@code
+   * fixtures/layout-result/}.</strong> A checked-in layout fixture ages against ELK, and a test
+   * that fails on fixture staleness rather than on a round-trip fault is a test that gets muted.
+   * Both halves run through the same ELK in the same JVM.
+   *
+   * <p>The corpus is {@link LayoutFixtureRegenerator#mappings()} — the repository's own list of
+   * (source, view) pairs — rather than a second copy of it here, so a new fixture is swept without
+   * anyone remembering to add it.
+   */
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("fixtureCorpus")
+  void everyFixtureReachesAnExportAnchoredFixedPoint(String name, String sourceFile, String viewId)
+      throws Exception {
+    Path source = path("fixtures/source/" + sourceFile);
+    String first = pipeline(source, viewId, name + "-1");
+
+    JsonNode imported =
+        stage("import", "--plugin", "drawio", "--input", write(name + ".drawio", first).toString());
+    Path reimported = writeJson(name + "-model.json", imported.get("data"));
+    String reimportedView =
+        imported.at("/data/plugins/generic-graph/views/0/id").asString();
+    String second = pipeline(reimported, reimportedView, name + "-2");
+
+    assertThat(second)
+        .describedAs(
+            "%s: export must be idempotent, and it is not.\n%s",
+            name, DrawioEquivalence.explainDifference(first, second))
+        .isEqualTo(first);
+  }
+
+  /** How a fixture that cannot reach the fixed point fails, so the exclusion can be re-checked. */
+  private enum Residual {
+    /** {@code project} rejects the re-imported model, so there is no second export at all. */
+    PROJECT_REJECTS_THE_REIMPORTED_MODEL,
+    /** The second export succeeds and draws the same graph at different coordinates. */
+    LAYS_OUT_DIFFERENTLY
+  }
+
+  /**
+   * The fixtures that do not reach the fixed point, and every one of them for the same reason.
+   *
+   * <p><strong>One root cause, two symptoms.</strong> mxGraph has nowhere to keep an element's
+   * {@code properties}, and this export carries exactly one of them ({@code uml.sequence}, on the
+   * edge wrapper, because a Message is invalid without it). Everything else is dropped, which
+   * shows up in two ways. Six models become invalid: a required UML ownership property — {@code
+   * Port.component}, {@code ExtensionPoint.use_case}, {@code Transition.region}, {@code
+   * ExecutionSpecification.covered} — is gone, so {@code project} rejects the re-imported model
+   * before a second export can happen. Two more stay valid and move: {@code
+   * UmlNotationSemantics} sizes a Class box from {@code uml.attributes}/{@code uml.operations} and
+   * builds a sequence fragment's layout intents from {@code uml.covered}, so without them ELK
+   * draws the same graph at different coordinates ({@code class-customer} 300×190 → 220×120;
+   * {@code m1@46.0} → {@code m1}).
+   *
+   * <p>Excluding them here is not a weakening of the assertion — {@link
+   * #everyFixtureStillExcludedFromTheFixedPointStillNeedsToBe} re-measures every entry and fails
+   * when one starts passing, so the list can only shrink deliberately. The general remedy is a
+   * property channel on the {@code <object>} wrapper, which is a product decision (it puts model
+   * JSON in front of a user in draw.io's Edit Data dialog) and is not taken here.
+   */
+  private static final Map<String, Residual> NOT_YET_A_FIXED_POINT =
+      Map.of(
+          "uml-component-basic.json", Residual.PROJECT_REJECTS_THE_REIMPORTED_MODEL,
+          "uml-use-case-basic.json", Residual.PROJECT_REJECTS_THE_REIMPORTED_MODEL,
+          "uml-sequence-lifecycle.json", Residual.PROJECT_REJECTS_THE_REIMPORTED_MODEL,
+          "uml-state-machine-basic.json", Residual.PROJECT_REJECTS_THE_REIMPORTED_MODEL,
+          "uml-state-machine-two-node-cycle.json", Residual.PROJECT_REJECTS_THE_REIMPORTED_MODEL,
+          "uml-state-machine-multi-cycle.json", Residual.PROJECT_REJECTS_THE_REIMPORTED_MODEL,
+          "uml-complex-class.json", Residual.LAYS_OUT_DIFFERENTLY,
+          "uml-sequence-fragments.json", Residual.LAYS_OUT_DIFFERENTLY);
+
+  static List<Arguments> fixtureCorpus() {
+    return corpus(mapping -> !NOT_YET_A_FIXED_POINT.containsKey(mapping.fixtureName()));
+  }
+
+  static List<Arguments> excludedCorpus() {
+    return corpus(mapping -> NOT_YET_A_FIXED_POINT.containsKey(mapping.fixtureName()));
+  }
+
+  private static List<Arguments> corpus(
+      java.util.function.Predicate<LayoutFixtureRegenerator.FixtureMapping> wanted) {
+    return LayoutFixtureRegenerator.mappings().stream()
+        .filter(wanted)
+        .map(
+            mapping ->
+                Arguments.of(
+                    mapping.fixtureName().replace(".json", ""),
+                    mapping.sourceFileName(),
+                    mapping.viewId()))
+        .toList();
+  }
+
+  /**
+   * An exclusion that has quietly started working is a lie in the test file, so every one of them
+   * is re-measured. This is what makes {@link #NOT_YET_A_FIXED_POINT} a record of a known defect
+   * rather than a list of tests someone turned off.
+   */
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("excludedCorpus")
+  void everyFixtureStillExcludedFromTheFixedPointStillNeedsToBe(
+      String name, String sourceFile, String viewId) throws Exception {
+    Residual residual = NOT_YET_A_FIXED_POINT.get(name + ".json");
+    Path source = path("fixtures/source/" + sourceFile);
+    String first = pipeline(source, viewId, name + "-x1");
+
+    JsonNode imported =
+        stage(
+            "import", "--plugin", "drawio", "--input", write(name + "-x.drawio", first).toString());
+    Path reimported = writeJson(name + "-x-model.json", imported.get("data"));
+    String reimportedView = imported.at("/data/plugins/generic-graph/views/0/id").asString();
+
+    CliResult projected =
+        Main.executeForTesting(
+            new String[] {
+              "project", "--plugin", "generic-graph", "--target", "layout-request",
+              "--view", reimportedView, "--input", reimported.toString()
+            },
+            "");
+    if (residual == Residual.PROJECT_REJECTS_THE_REIMPORTED_MODEL) {
+      assertThat(projected.exitCode())
+          .describedAs(
+              "%s now projects cleanly, so it no longer belongs in NOT_YET_A_FIXED_POINT: %s",
+              name, projected.stdout())
+          .isNotZero();
+      return;
+    }
+
+    assertThat(projected.exitCode())
+        .describedAs("%s is recorded as laying out differently, not as failing to project", name)
+        .isZero();
+    String second = pipeline(reimported, reimportedView, name + "-x2");
+    assertThat(second)
+        .describedAs("%s now reaches the fixed point, so remove it from NOT_YET_A_FIXED_POINT", name)
+        .isNotEqualTo(first);
+  }
+
+  /** {@code project → layout → export} for one model and view, entirely through the live engines. */
+  private String pipeline(Path model, String viewId, String tag) throws Exception {
+    JsonNode request =
+        stage(
+            "project",
+            "--plugin",
+            "generic-graph",
+            "--target",
+            "layout-request",
+            "--view",
+            viewId,
+            "--input",
+            model.toString());
+    Path requestFile = writeJson(tag + "-request.json", request.get("data"));
+    JsonNode laidOut = stage("layout", "--plugin", "elk-layout", "--input", requestFile.toString());
+    Path layoutFile = writeJson(tag + "-layout.json", laidOut.get("data"));
+    JsonNode exported =
+        stage(
+            "export",
+            "--plugin",
+            "drawio",
+            "--policy",
+            path(EXPORT_POLICY).toString(),
+            "--source",
+            model.toString(),
+            "--layout",
+            layoutFile.toString());
+    return exported.at("/data/content").asString();
   }
 
   // ---------------------------------------------------------------- fixed point
@@ -297,6 +671,54 @@ class DrawioRoundTripTest {
             "--layout",
             layoutFile.toString());
     return new RoundTrip(model, exported.at("/data/content").asString(), codes(exported));
+  }
+
+  /** The type the imported model gives one node id, or {@code null} when it declares none. */
+  private static String nodeType(JsonNode model, String nodeId) {
+    for (JsonNode node : model.path("nodes")) {
+      if (nodeId.equals(node.path("id").asString())) {
+        return node.path("type").asString();
+      }
+    }
+    return null;
+  }
+
+  private static List<String> groupIds(JsonNode model) {
+    List<String> ids = new ArrayList<>();
+    model
+        .at("/plugins/generic-graph/views/0/groups")
+        .forEach(group -> ids.add(group.path("id").asString()));
+    return ids;
+  }
+
+  /** Every Message's restored {@code properties.uml.sequence}, in relationship order. */
+  private static List<Integer> messageSequences(JsonNode model) {
+    List<Integer> orderings = new ArrayList<>();
+    model
+        .path("relationships")
+        .forEach(
+            relationship -> {
+              JsonNode sequence = relationship.at("/properties/uml/sequence");
+              if (!sequence.isMissingNode()) {
+                orderings.add(sequence.asInt());
+              }
+            });
+    return orderings;
+  }
+
+  /** The diagnostics one export emits, for the disclosure assertions. */
+  private List<String> exportCodes(Path source, Path layout) throws Exception {
+    return codes(
+        stage(
+            "export",
+            "--plugin",
+            "drawio",
+            "--policy",
+            path(EXPORT_POLICY).toString(),
+            "--source",
+            source.toString(),
+            "--layout",
+            layout.toString()));
   }
 
   /** The seed for the Dediren-authored trip: Dediren's own export of a checked-in fixture pair. */

@@ -157,6 +157,18 @@ silently dropped: each fails the import atomically with
 `DEDIREN_DRAWIO_UNSUPPORTED_CONSTRUCT` so you can rewrite the input without
 them; no partial model is produced.
 
+A `.drawio` Dediren exported carries a `dediren*` identity vocabulary on each
+cell's `<object>` wrapper, so re-importing it recovers element ids, types,
+labels, edge endpoints, group roles, and the element a semantic boundary
+stands for — including a package or region the view draws only as its
+boundary. One hidden metadata cell per page carries the view id, kind,
+semantic profile, model schema version, and the view's `layout_preferences`,
+so a re-import lays the page out the way the export did. Element `properties`
+are the one thing that does not survive: mxGraph has nowhere to keep them, and
+the export names every dropped path in a `DEDIREN_DRAWIO_PROPERTIES_DROPPED`
+warning (only a UML `Message`'s `uml.sequence` is carried). Treat the source
+model, not the `.drawio`, as the record of truth.
+
 Limits are 64 MiB input, 64 MiB decompressed content summed across every
 page, 256 pages, 200000 cells, 100000 produced elements, 256 nesting levels,
 and 64 KiB per label or attribute. At the ceiling is accepted; the first
@@ -1540,11 +1552,28 @@ you can recover from stdout JSON alone.
   file carrying Dediren's round-trip metadata, the same code instead names a
   concrete authoring mistake in the `.drawio` file itself: a duplicate
   `dedirenId`, a type or label that disagrees across pages, an edge endpoint
-  naming no `dedirenId`, or an unrecognized semantic profile or view kind.
+  naming no `dedirenId`, a `dedirenSemanticSourceId` on a boundary that names
+  no node and carries no `dedirenSemanticSourceType` of its own, a
+  `dedirenLayoutPreferences` block that is not a readable `layout_preferences`
+  object, or an unrecognized semantic profile or view kind.
   Fix the named cell or page in draw.io and re-import.
 - `DEDIREN_DRAWIO_HINT_IGNORED`: import succeeded, but the named
   presentation hint was intentionally discarded. Reapply appearance through
-  Dediren render policy if needed.
+  Dediren render policy if needed. Scoped to cells Dediren did not author: a
+  cell carrying a `dedirenId` on a round-tripped page keeps no style of its
+  own — the exporter computes it from the model and will compute it again — so
+  only a hand-drawn cell's appearance, and any unrecognized custom attribute,
+  is reported.
+- `DEDIREN_DRAWIO_PROPERTIES_DROPPED`: export succeeded, but mxGraph has
+  nowhere to keep element `properties`, so the named property paths are not in
+  the exported file and will not come back if it is re-imported. Only a UML
+  `Message`'s `uml.sequence` is carried (on the edge's `<object>` wrapper),
+  because a Message is invalid without it. Keep the source model as the record
+  of truth; re-import the `.drawio` to recover structure, geometry and
+  identity, not properties. A re-imported model missing a *required* property
+  (for example `Port.component`, `Transition.region`,
+  `ExecutionSpecification.covered`) will be rejected by the next `validate` or
+  `project` call with a `DEDIREN_UML_*` code — this warning names it first.
 - `DEDIREN_DRAWIO_CELLS_SKIPPED`: import succeeded, but some cells were left
   out. The message says which of two reasons: a cell hidden in draw.io was
   skipped rather than imported (unhide it and re-export), or an edge whose

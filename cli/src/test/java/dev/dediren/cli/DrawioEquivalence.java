@@ -201,6 +201,68 @@ final class DrawioEquivalence {
     return withTypedIdentity(drawio).structureOnly();
   }
 
+  /**
+   * Why two {@code .drawio} documents are not byte-identical, in words.
+   *
+   * <p>The fixed-point assertion below is byte equality, which is the right bar and the worst
+   * failure message: "expected 40kB, got 40kB" gets a test deleted rather than diagnosed. This
+   * names the first structural difference this relation can see, and falls back to the first
+   * differing line when the difference is one the relation excludes on purpose — geometry, style,
+   * or attribute order. Returns {@code ""} when the two are byte-identical.
+   */
+  static String explainDifference(String left, String right) throws Exception {
+    if (left.equals(right)) {
+      return "";
+    }
+    Structure a = withTypedIdentity(left);
+    Structure b = withTypedIdentity(right);
+    List<String> found = new ArrayList<>();
+    describeVertices("node", a.nodes(), b.nodes(), found);
+    describeVertices("group", a.groups(), b.groups(), found);
+    Set<EdgeFacts> onlyLeft = new LinkedHashSet<>(a.edges());
+    onlyLeft.removeAll(b.edges());
+    Set<EdgeFacts> onlyRight = new LinkedHashSet<>(b.edges());
+    onlyRight.removeAll(a.edges());
+    onlyLeft.forEach(edge -> found.add("edge only in the first document: " + edge));
+    onlyRight.forEach(edge -> found.add("edge only in the second document: " + edge));
+    if (!found.isEmpty()) {
+      return "structural difference: " + String.join("; ", found.subList(0, Math.min(4, found.size())));
+    }
+    return "structurally equal, so the difference is one the relation excludes (geometry, style,"
+        + " or document order): "
+        + firstDifferingLine(left, right);
+  }
+
+  private static void describeVertices(
+      String kind, Map<String, VertexFacts> left, Map<String, VertexFacts> right,
+      List<String> found) {
+    left.forEach(
+        (id, facts) -> {
+          VertexFacts other = right.get(id);
+          if (other == null) {
+            found.add(kind + " '" + id + "' only in the first document");
+          } else if (!facts.equals(other)) {
+            found.add(kind + " '" + id + "': " + facts + " vs " + other);
+          }
+        });
+    right.keySet().stream()
+        .filter(id -> !left.containsKey(id))
+        .forEach(id -> found.add(kind + " '" + id + "' only in the second document"));
+  }
+
+  private static String firstDifferingLine(String left, String right) {
+    String[] a = left.split("\n", -1);
+    String[] b = right.split("\n", -1);
+    for (int line = 0; line < Math.max(a.length, b.length); line++) {
+      String one = line < a.length ? a[line] : "<end of document>";
+      String two = line < b.length ? b[line] : "<end of document>";
+      if (!one.equals(two)) {
+        return "line " + (line + 1) + "\n  first:  " + one.strip() + "\n  second: " + two.strip();
+      }
+    }
+    return "no differing line, so the documents differ only in their trailing bytes";
+  }
+
   // ------------------------------------------------------------------ projection helpers
 
   /**

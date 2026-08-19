@@ -36,6 +36,29 @@ public final class DrawioIdentity {
   public static final String SEMANTIC_SOURCE_ID = "dedirenSemanticSourceId";
 
   /**
+   * The {@link #SEMANTIC_SOURCE_ID} element's own type, written on a semantic-boundary container.
+   *
+   * <p>A boundary stands for an element that frequently has no box of its own — a UML package drawn
+   * only as its boundary is the standard shape, and its {@code semantic_source_id} is contract-legal
+   * precisely because {@code SemanticsRouterEngine} resolves it against the document's nodes rather
+   * than the view's. Without this pair the export names an id nothing in the file declares, and
+   * Dediren cannot re-import its own artifact.
+   */
+  public static final String SEMANTIC_SOURCE_TYPE = "dedirenSemanticSourceType";
+
+  /** The {@link #SEMANTIC_SOURCE_ID} element's own label; the container's label may differ. */
+  public static final String SEMANTIC_SOURCE_LABEL = "dedirenSemanticSourceLabel";
+
+  /**
+   * A UML Message's {@code properties.uml.sequence}, the one model property mxGraph has no place
+   * for that a model is invalid without: {@code UmlSequenceValidation} rejects a Message that
+   * declares no ordering. Everything else under {@code properties} is disclosed as dropped rather
+   * than carried, because a general property channel would put opaque JSON in front of a user in
+   * draw.io's Edit Data dialog.
+   */
+  public static final String UML_SEQUENCE = "dedirenUmlSequence";
+
+  /**
    * An edge's endpoints, keyed by {@link #ID} rather than by mxCell id: the editor is free to
    * reassign cell ids, and identity has to survive that.
    */
@@ -58,6 +81,19 @@ public final class DrawioIdentity {
 
   /** On the per-page metadata cell: the schema version the source document was written against. */
   public static final String MODEL_SCHEMA_VERSION = "dedirenModelSchemaVersion";
+
+  /**
+   * On the per-page metadata cell: the view's {@code layout_preferences}, as the model's own JSON.
+   *
+   * <p>Preferences decide the geometry, so losing them means a re-imported view lays out
+   * differently from the one that was exported — the file's structure survives and its picture does
+   * not, which no structural comparison can see. The block is nested and open-ended (direction,
+   * density, routing, layering, crossing, placement, …), so it rides as the model's own JSON rather
+   * than as a dozen flat attributes that would have to be kept in step by hand. It is the one place
+   * JSON is acceptable here: this cell is hidden dediren metadata, not something a user meets in
+   * draw.io's Edit Data dialog.
+   */
+  public static final String LAYOUT_PREFERENCES = "dedirenLayoutPreferences";
 
   /** {@link #TYPE} of the one hidden metadata cell each page carries. */
   public static final String VIEW_TYPE = "dediren.view";
