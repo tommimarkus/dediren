@@ -162,8 +162,7 @@ class SecureXmlTest {
         .as("a stock factory splits the body across events")
         .hasSizeGreaterThan(1);
 
-    assertThat(characterEventsOf(SecureXml.inputFactory(), payload))
-        .containsExactly("AAABBBCCC");
+    assertThat(characterEventsOf(SecureXml.inputFactory(), payload)).containsExactly("AAABBBCCC");
   }
 
   @Test

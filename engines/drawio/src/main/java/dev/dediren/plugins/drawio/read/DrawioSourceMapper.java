@@ -517,10 +517,7 @@ public final class DrawioSourceMapper {
       JsonNode properties = parsed.get(elementId);
       if (!properties.isObject()) {
         throw roundTripInvalid(
-            ATTR_ELEMENT_PROPERTIES
-                + " entry '"
-                + echo(elementId)
-                + "' is not a properties object",
+            ATTR_ELEMENT_PROPERTIES + " entry '" + echo(elementId) + "' is not a properties object",
             scan,
             scan.metadata);
       }
@@ -902,8 +899,7 @@ public final class DrawioSourceMapper {
       properties.put("uml", uml);
     }
     relationships.put(
-        elementId,
-        new SourceRelationship(elementId, type, source, target, label, properties));
+        elementId, new SourceRelationship(elementId, type, source, target, label, properties));
   }
 
   /**

@@ -38,9 +38,9 @@ import tools.jackson.databind.JsonNode;
  * <p>{@code ExportEngine.exportModel} is an opt-in because a notation has to have somewhere to put
  * a second view. draw.io does: the format is natively multi-page, and a page is a first-class
  * container with its own cell id space. A whole model is therefore one {@code <mxfile>} with one
- * {@code <diagram>} per view — not a merged graph, which is what forces the XMI lane's
- * class-family restriction. Nothing about a page collides with another page, so the aggregate is
- * the per-view builder run once per view.
+ * {@code <diagram>} per view — not a merged graph, which is what forces the XMI lane's class-family
+ * restriction. Nothing about a page collides with another page, so the aggregate is the per-view
+ * builder run once per view.
  *
  * <p>The reverse direction already existed: {@link
  * dev.dediren.plugins.drawio.read.DrawioSourceMapper} has read multi-page documents from the start,
@@ -235,8 +235,8 @@ class WholeModelDrawioExportTest {
    * The first page keeps the view id {@code main} verbatim rather than being renumbered into it.
    * {@code DrawioSourceMapper} materializes {@code main} for a page-one that declares no view id,
    * and {@code CoreCommands.renderImportedMain} projects exactly that id, so a model that has a
-   * {@code main} view must round-trip through the aggregate as {@code main} and not as
-   * {@code main-2}.
+   * {@code main} view must round-trip through the aggregate as {@code main} and not as {@code
+   * main-2}.
    */
   @Test
   void theFirstPageKeepsTheViewIdMainWhenTheModelHasOne() throws Exception {
@@ -257,8 +257,10 @@ class WholeModelDrawioExportTest {
         .containsExactly("main", "finance");
 
     SourceDocument reimported = importer.importSource(bothViews().value().content()).value();
-    JsonNode views = JsonSupport.objectMapper()
-        .valueToTree(reimported.plugins().get("generic-graph")).get("views");
+    JsonNode views =
+        JsonSupport.objectMapper()
+            .valueToTree(reimported.plugins().get("generic-graph"))
+            .get("views");
     assertThat(views).hasSize(2);
     assertThat(views.get(0).get("id").asString()).isEqualTo("main");
     assertThat(views.get(1).get("id").asString()).isEqualTo("finance");
@@ -278,7 +280,9 @@ class WholeModelDrawioExportTest {
     assertThat(first)
         .describedAs("page one draws nothing with properties, so it carries no map at all")
         .doesNotContainKey(DrawioIdentity.ELEMENT_PROPERTIES);
-    assertThat(second.get(DrawioIdentity.ELEMENT_PROPERTIES)).contains("ledger").contains("finance");
+    assertThat(second.get(DrawioIdentity.ELEMENT_PROPERTIES))
+        .contains("ledger")
+        .contains("finance");
   }
 
   // ---------------------------------------------------------------- diagnostics

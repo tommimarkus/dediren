@@ -484,10 +484,10 @@ class DrawioRoundTripTest {
    * The one fixture that does not reach the fixed point, and why it is not a property this export
    * drops.
    *
-   * <p><strong>What used to be here.</strong> Eight fixtures failed, all for one reason: mxGraph had
-   * nowhere to keep an element's {@code properties}. Six became invalid on re-import — a required
-   * UML ownership property ({@code Port.component}, {@code ExtensionPoint.use_case}, {@code
-   * Transition.region}, {@code ExecutionSpecification.covered}) was gone, so {@code project}
+   * <p><strong>What used to be here.</strong> Eight fixtures failed, all for one reason: mxGraph
+   * had nowhere to keep an element's {@code properties}. Six became invalid on re-import — a
+   * required UML ownership property ({@code Port.component}, {@code ExtensionPoint.use_case},
+   * {@code Transition.region}, {@code ExecutionSpecification.covered}) was gone, so {@code project}
    * rejected the model before a second export could happen — and two stayed valid and moved,
    * because {@code UmlNotationSemantics} sizes a Class box from {@code uml.attributes}/{@code
    * uml.operations}. All eight are closed by {@link

@@ -40,8 +40,8 @@ import tools.jackson.databind.JsonNode;
  * shape, which is why a general {@code dedirenProperties} attribute was declined. The hidden
  * metadata cell has the same round-trip guarantee — draw.io preserves unknown {@code <object>}
  * attributes verbatim — and no editing surface, and {@link DrawioIdentity#LAYOUT_PREFERENCES}
- * already proved it carries the model's own JSON through an editing session. This is that
- * mechanism applied to the one remaining lossy channel.
+ * already proved it carries the model's own JSON through an editing session. This is that mechanism
+ * applied to the one remaining lossy channel.
  *
  * <h2>What it closes</h2>
  *
@@ -72,9 +72,7 @@ class DrawioElementPropertyChannelTest {
         id,
         type,
         id,
-        umlProperties == null
-            ? Map.of()
-            : Map.of("uml", JsonSupport.readTree(umlProperties)));
+        umlProperties == null ? Map.of() : Map.of("uml", JsonSupport.readTree(umlProperties)));
   }
 
   /** A component with a port: the smallest model with a required ownership property. */
@@ -167,7 +165,8 @@ class DrawioElementPropertyChannelTest {
   // ---------------------------------------------------------------- the channel itself
 
   @Test
-  void carriesElementPropertiesOnTheHiddenMetadataCellAndNeverOnAnElementWrapper() throws Exception {
+  void carriesElementPropertiesOnTheHiddenMetadataCellAndNeverOnAnElementWrapper()
+      throws Exception {
     List<MxCell> cells =
         MxReader.read(export(componentSource(), componentLayout())).diagrams().get(0).cells();
 
@@ -274,8 +273,9 @@ class DrawioElementPropertyChannelTest {
   void theVisibleMessageOrderingAttributeOutranksTheHiddenPropertyMap() throws Exception {
     String drawio = export(componentSource(), componentLayout());
     assertThat(drawio).contains(DrawioIdentity.UML_SEQUENCE + "=\"9\"");
-    String edited = drawio.replace(DrawioIdentity.UML_SEQUENCE + "=\"9\"",
-        DrawioIdentity.UML_SEQUENCE + "=\"4\"");
+    String edited =
+        drawio.replace(
+            DrawioIdentity.UML_SEQUENCE + "=\"9\"", DrawioIdentity.UML_SEQUENCE + "=\"4\"");
 
     EngineResult<SourceDocument> reimported = importer.importSource(edited);
 

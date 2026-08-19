@@ -73,10 +73,10 @@ public final class DrawioExportEngine implements ExportEngine {
    * <p><strong>Why this notation opts in where UML/XMI trails.</strong> {@code exportModel} is an
    * opt-in because a notation needs somewhere to put a second view without the two interfering.
    * draw.io is natively multi-page and a page owns its own mxCell id space, so the aggregate is
-   * page concatenation: nothing is merged, nothing collides, and — unlike the XMI lane, which has to
-   * restrict itself to the class family to keep {@code xmi:id}s apart — no view has to be left out.
-   * Every page keeps its own hidden {@code dediren.view} metadata cell, so the aggregate re-imports
-   * as the multi-view document it was exported from.
+   * page concatenation: nothing is merged, nothing collides, and — unlike the XMI lane, which has
+   * to restrict itself to the class family to keep {@code xmi:id}s apart — no view has to be left
+   * out. Every page keeps its own hidden {@code dediren.view} metadata cell, so the aggregate
+   * re-imports as the multi-view document it was exported from.
    *
    * <p>Empty in, empty out: a driver that supplies no view gets no artifact rather than an empty
    * one, matching the OEF lane. Policy validation is the single-view lane's, unchanged — a policy

@@ -102,7 +102,8 @@ public final class DedirenTools {
       return error(DiagnosticCode.COMMAND_INPUT_INVALID, "import requires 'plugin'", null);
     }
     if (!SUPPORTED_IMPORT_PLUGINS.contains(plugin)) {
-      return error(DiagnosticCode.COMMAND_INPUT_INVALID, SUPPORTED_IMPORT_PLUGINS_MESSAGE, "plugin");
+      return error(
+          DiagnosticCode.COMMAND_INPUT_INVALID, SUPPORTED_IMPORT_PLUGINS_MESSAGE, "plugin");
     }
     String text;
     if (source != null) {

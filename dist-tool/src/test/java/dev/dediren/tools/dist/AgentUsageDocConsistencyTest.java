@@ -118,8 +118,7 @@ class AgentUsageDocConsistencyTest {
                 + " declaration that then authorizes every DEDIREN_DRAWIO_ code")
         .doesNotContain("DEDIREN_DRAWIO_");
     assertThat(
-            isDocumented(
-                "DEDIREN_DRAWIO_SOMETHING_UNDOCUMENTED", documented, documentedPrefixes))
+            isDocumented("DEDIREN_DRAWIO_SOMETHING_UNDOCUMENTED", documented, documentedPrefixes))
         .as(
             "a synthetic, wholly undocumented DEDIREN_DRAWIO_ code must not be silently"
                 + " authorized by the *_LIMIT_EXCEEDED prose shorthand")
@@ -170,10 +169,10 @@ class AgentUsageDocConsistencyTest {
 
   /**
    * A {@link #TOKEN} match ending in '_' is only a genuine family-prefix declaration (e.g. {@code
-   * DEDIREN_ELK_*}) when the source text immediately continues with a literal {@code *} that
-   * itself closes the identifier. Prose shorthand that embeds a wildcard inside one literal code
-   * (e.g. {@code DEDIREN_DRAWIO_*_LIMIT_EXCEEDED}, where {@code *} stands in for one of several
-   * suffixes) is not a family declaration and must not blanket-authorize the whole namespace.
+   * DEDIREN_ELK_*}) when the source text immediately continues with a literal {@code *} that itself
+   * closes the identifier. Prose shorthand that embeds a wildcard inside one literal code (e.g.
+   * {@code DEDIREN_DRAWIO_*_LIMIT_EXCEEDED}, where {@code *} stands in for one of several suffixes)
+   * is not a family declaration and must not blanket-authorize the whole namespace.
    */
   private static boolean isFamilyPrefix(String doc, Matcher matcher) {
     if (!matcher.group().endsWith("_")) {

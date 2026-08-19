@@ -45,7 +45,7 @@ or the token-efficient authoring guide in
 | [Engine Runtime](engine-runtime.md) | The engine contract, the bundled first-party engines, and runtime diagnostics |
 | [Layout (ELK)](layout.md) | The official Java ELK plugin, layout modes (`flow`/`packed`/`auto`), and `validate-layout` quality metrics |
 | [SVG Rendering](svg-render.md) | The render plugin, render policies, and the `artifacts[]` result shape |
-| [Exports (OEF & XMI)](exports.md) | ArchiMate Open Exchange Format 3.1 and UML 2.5.1 XMI export, plus the supported UML notation coverage |
+| [Exports (OEF, XMI & draw.io)](exports.md) | ArchiMate Open Exchange Format 3.1, UML 2.5.1 XMI, and draw.io mxfile export, plus the supported UML notation coverage |
 | [Contracts & Schemas](contracts-and-schemas.md) | Public schemas, command envelopes, diagnostics, and version/compatibility signals |
 | [Distribution & Runtime](distribution-and-runtime.md) | The agent bundle, its single launcher, environment variables, supply-chain artifacts, and versioning |
 
@@ -61,9 +61,12 @@ Commands](pipeline-and-commands.md).
 
 | Notation | Source profile | View kinds | Export plugin | Export format |
 | --- | --- | --- | --- | --- |
-| Generic graph | (default) | `generic` | — | SVG only |
-| ArchiMate | `archimate` | `archimate` | `archimate-oef` | OEF XML + SVG |
-| UML | `uml` | `uml-class`, `uml-data`, `uml-activity`, `uml-sequence`, `uml-state-machine`, `uml-use-case`, `uml-component`, `uml-deployment` | `uml-xmi` | XMI XML + SVG |
+| Generic graph | (default) | `generic` | `drawio` | draw.io XML + SVG |
+| ArchiMate | `archimate` | `archimate` | `archimate-oef`, `drawio` | OEF XML + draw.io XML + SVG |
+| UML | `uml` | `uml-class`, `uml-data`, `uml-activity`, `uml-sequence`, `uml-state-machine`, `uml-use-case`, `uml-component`, `uml-deployment` | `uml-xmi`, `drawio` | XMI XML + draw.io XML + SVG |
+
+The `drawio` engine is the only one bound under **both** capabilities: it also
+reads `.drawio` back in as `dediren import --plugin drawio`.
 
 ## Keeping This Documentation Current
 
@@ -87,7 +90,7 @@ described in [`CLAUDE.md`](../../CLAUDE.md).
 - **Render policy field or styling behavior** → update
   [SVG Rendering](svg-render.md) alongside `schemas/render-policy.schema.json`.
 - **OEF/XMI export semantics or expanded UML notation coverage** → update
-  [Exports (OEF & XMI)](exports.md).
+  [Exports (OEF, XMI & draw.io)](exports.md).
 - **Bundle layout, launcher behavior, environment variable, or release/version
   policy** → update [Distribution & Runtime](distribution-and-runtime.md).
 

@@ -12,9 +12,8 @@ import javax.xml.stream.XMLStreamException;
  * attacker-supplied XML.
  *
  * <p><strong>Every call returns a fresh factory.</strong> {@link XMLInputFactory} is not documented
- * as thread-safe and is mutable, so a shared instance could be reconfigured — including
- * un-hardened — by any holder. Callers create one per parse; the cost is negligible next to the
- * parse itself.
+ * as thread-safe and is mutable, so a shared instance could be reconfigured — including un-hardened
+ * — by any holder. Callers create one per parse; the cost is negligible next to the parse itself.
  *
  * <h2>What the configuration actually does</h2>
  *

@@ -169,9 +169,9 @@ public final class DrawioDocumentBuilder {
 
   /**
    * True on the whole-model lane. It decides one thing: where a page's name comes from. A
-   * single-page document is named by the policy's {@code diagram_name}, which is that policy field's
-   * whole job; a multi-page one cannot be, because every page would then share one name, so a view's
-   * own label names its page and {@code diagram_name} is the fallback.
+   * single-page document is named by the policy's {@code diagram_name}, which is that policy
+   * field's whole job; a multi-page one cannot be, because every page would then share one name, so
+   * a view's own label names its page and {@code diagram_name} is the fallback.
    */
   private final boolean multiPage;
 
@@ -234,12 +234,12 @@ public final class DrawioDocumentBuilder {
    * cannot collide the way they do in a single-document notation, and no view has to be excluded to
    * keep the aggregate valid.
    *
-   * <p><strong>Diagnostics are deduplicated across pages, never within one.</strong> A warning about
-   * the source model rather than about this page — a property map that would not fit, an element
-   * type no shape covers — is raised by every page that meets it, and repeating it once per view is
-   * how a large aggregate buries every other diagnostic in the envelope. Two pages that raise the
-   * literally identical diagnostic are saying one thing once. Anything page-specific names its
-   * element and stays distinct on its own.
+   * <p><strong>Diagnostics are deduplicated across pages, never within one.</strong> A warning
+   * about the source model rather than about this page — a property map that would not fit, an
+   * element type no shape covers — is raised by every page that meets it, and repeating it once per
+   * view is how a large aggregate buries every other diagnostic in the envelope. Two pages that
+   * raise the literally identical diagnostic are saying one thing once. Anything page-specific
+   * names its element and stays distinct on its own.
    */
   public static Document buildModel(
       SourceDocument source, List<LayoutResult> layouts, DrawioExportPolicy policy) {
@@ -784,11 +784,11 @@ public final class DrawioDocumentBuilder {
    * property map on its hidden metadata cell, is now only the case when that map would not fit.
    *
    * <p>The warning used to fire on every export with a property anywhere in the model, because
-   * exactly one property was carried and the rest were declared lost. It has to stop saying that:
-   * a diagnostic that fires on the ordinary case is one a reader learns to skip, and it would now
-   * be false as well. What remains is the real residual — {@link DrawioLimits#MAX_TOKEN_BYTES}
-   * bounds one attribute value, so a model whose page needs a larger map than that keeps the
-   * picture and loses the properties, exactly as every page did before.
+   * exactly one property was carried and the rest were declared lost. It has to stop saying that: a
+   * diagnostic that fires on the ordinary case is one a reader learns to skip, and it would now be
+   * false as well. What remains is the real residual — {@link DrawioLimits#MAX_TOKEN_BYTES} bounds
+   * one attribute value, so a model whose page needs a larger map than that keeps the picture and
+   * loses the properties, exactly as every page did before.
    *
    * <p>One diagnostic per view, counting property paths rather than elements, for the same reason
    * {@link #reportOmittedOrnaments()} aggregates: a fifty-message sequence diagram would otherwise
@@ -977,7 +977,9 @@ public final class DrawioDocumentBuilder {
   private String pageId() {
     return XmlIds.unique(
         claimedPageIds,
-        layout.viewId() == null ? "page-" + (claimedPageIds.size() + 1) : XmlIds.slug(layout.viewId()));
+        layout.viewId() == null
+            ? "page-" + (claimedPageIds.size() + 1)
+            : XmlIds.slug(layout.viewId()));
   }
 
   /**
@@ -1053,8 +1055,8 @@ public final class DrawioDocumentBuilder {
    * subset is a second contract nobody would remember to extend: the day a notation starts sizing a
    * shape from a new property, an export written against the old subset stops being idempotent and
    * says nothing about it. The cell competes with nothing for space and is bounded by {@link
-   * DrawioLimits#MAX_TOKEN_BYTES}, which the repository's largest fixture uses about six percent of,
-   * so there is no size argument to trade the completeness against.
+   * DrawioLimits#MAX_TOKEN_BYTES}, which the repository's largest fixture uses about six percent
+   * of, so there is no size argument to trade the completeness against.
    *
    * <p><strong>Only this page's elements.</strong> The whole model on every page would repeat one
    * blob per view and grow the file with the product of views and elements, for no gain — the pages
