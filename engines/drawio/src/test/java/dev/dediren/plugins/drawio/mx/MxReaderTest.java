@@ -431,6 +431,14 @@ class MxReaderTest {
     // Deliberate, and the direct consequence of the javadoc note above: a bare DOCTYPE is inert,
     // and this reader does not add a DTD-event check of its own. If that posture should change,
     // it changes here and in docs/threat-model.md, not by accident.
+    //
+    // Adding that check was tried and reverted, so the reasoning is recorded rather than
+    // rediscovered: refusing the declaration up front means the parse never reaches the entity
+    // reference, which is the only observable that distinguishes a hardened inner factory from a
+    // default one. It would leave the "default factory on the inner parse only" mutant alive — no
+    // test would fail if the most dangerous line in this class were weakened. Defence in depth that
+    // blinds the test guarding the deeper layer is not depth. SecureXml already renders the
+    // declaration inert; the residual gain did not pay for the lost coverage.
     MxFile file =
         MxReader.read(
             "<!DOCTYPE mxGraphModel>\n"
