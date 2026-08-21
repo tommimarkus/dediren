@@ -1275,7 +1275,8 @@ public final class DistTool {
     if (!"ok".equals(envelope.path("status").asText())) {
       throw new IllegalStateException("text render status should be ok: " + stdout);
     }
-    if (!"render-result.schema.v6".equals(envelope.path("render_result_schema_version").asText())) {
+    if (!"render-result.schema.v6"
+        .equals(envelope.path("data").path("render_result_schema_version").asText())) {
       throw new IllegalStateException(
           "text render schema version should be render-result.schema.v6: " + stdout);
     }
@@ -1398,7 +1399,7 @@ public final class DistTool {
         {"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"dediren_query","arguments":{"source":"fixtures/source/valid-archimate-oef.json","kind":"orphans"}}}
         {"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"dediren_import","arguments":{"source":"fixtures/mermaid/flowchart-v1.mmd","plugin":"mermaid"}}}
         {"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"dediren_build","arguments":{"source":"fixtures/source/valid-pipeline-rich.json","out":"mcp-png-build-out","render_policy":"fixtures/render-policy/rich-svg.json","output":"image","accepted_image_types":["image/png"]}}}
-        {"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"dediren_import","arguments":{"content":"flowchart LR\n  start --> finish\n","plugin":"mermaid","output":"text"}}}
+        {"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"dediren_import","arguments":{"content":"flowchart LR\\n  start --> finish\\n","plugin":"mermaid","output":"text"}}}
         """,
         StandardCharsets.UTF_8);
 
