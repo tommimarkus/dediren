@@ -1,0 +1,118 @@
+{
+  "layout_result_schema_version" : "layout-result.schema.v2",
+  "view_id" : "compact-side-return",
+  "nodes" : [ {
+    "id" : "continue-decision",
+    "source_id" : "continue-decision",
+    "projection_id" : "continue-decision",
+    "x" : 76.0,
+    "y" : 12.0,
+    "width" : 32.0,
+    "height" : 32.0,
+    "label" : "Continue?",
+    "source_pointer" : "/nodes/0"
+  }, {
+    "id" : "take-action",
+    "source_id" : "take-action",
+    "projection_id" : "take-action",
+    "x" : 12.0,
+    "y" : 190.0,
+    "width" : 160.0,
+    "height" : 80.0,
+    "label" : "Take action",
+    "source_pointer" : "/nodes/1"
+  }, {
+    "id" : "resume",
+    "source_id" : "resume",
+    "projection_id" : "resume",
+    "x" : 12.0,
+    "y" : 344.0,
+    "width" : 160.0,
+    "height" : 80.0,
+    "label" : "Resume",
+    "source_pointer" : "/nodes/2"
+  }, {
+    "id" : "done",
+    "source_id" : "done",
+    "projection_id" : "done",
+    "x" : 76.0,
+    "y" : 498.0,
+    "width" : 32.0,
+    "height" : 32.0,
+    "label" : "",
+    "source_pointer" : "/nodes/3"
+  } ],
+  "edges" : [ {
+    "id" : "continue-yes",
+    "source" : "continue-decision",
+    "target" : "take-action",
+    "source_id" : "continue-yes",
+    "projection_id" : "continue-yes",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 92.0,
+      "y" : 45.0
+    }, {
+      "x" : 92.0,
+      "y" : 189.0
+    } ],
+    "label" : "yes",
+    "source_pointer" : "/relationships/0"
+  }, {
+    "id" : "continue-no",
+    "source" : "continue-decision",
+    "target" : "done",
+    "source_id" : "continue-no",
+    "projection_id" : "continue-no",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 109.0,
+      "y" : 28.0
+    }, {
+      "x" : 244.0,
+      "y" : 28.0
+    }, {
+      "x" : 244.0,
+      "y" : 514.0
+    }, {
+      "x" : 109.0,
+      "y" : 514.0
+    } ],
+    "label" : "no",
+    "source_pointer" : "/relationships/1"
+  }, {
+    "id" : "action-resume",
+    "source" : "take-action",
+    "target" : "resume",
+    "source_id" : "action-resume",
+    "projection_id" : "action-resume",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 92.0,
+      "y" : 271.0
+    }, {
+      "x" : 92.0,
+      "y" : 343.0
+    } ],
+    "label" : "",
+    "source_pointer" : "/relationships/2"
+  }, {
+    "id" : "resume-done",
+    "source" : "resume",
+    "target" : "done",
+    "source_id" : "resume-done",
+    "projection_id" : "resume-done",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 92.0,
+      "y" : 425.0
+    }, {
+      "x" : 92.0,
+      "y" : 497.0
+    } ],
+    "label" : "",
+    "source_pointer" : "/relationships/3"
+  } ],
+  "groups" : [ ],
+  "warnings" : [ ]
+}

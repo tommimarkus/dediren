@@ -16,6 +16,7 @@ import java.util.Set;
 
 public final class LayoutQuality {
   private static final double ROUTE_DETOUR_RATIO = 1.5;
+  private static final double SIMPLE_SIDE_RETURN_DETOUR_RATIO = 2.0;
   private static final double ROUTE_DETOUR_EXCESS = 240.0;
   private static final double ROUTE_CLOSE_PARALLEL_DISTANCE = 20.0;
   private static final double ROUTE_CLOSE_PARALLEL_MIN_OVERLAP = 40.0;
@@ -913,9 +914,32 @@ public final class LayoutQuality {
     Point start = points.getFirst();
     Point end = points.getLast();
     double directLength = Math.abs(start.x() - end.x()) + Math.abs(start.y() - end.y());
+    double detourRatio =
+        isSimpleSideReturn(points) ? SIMPLE_SIDE_RETURN_DETOUR_RATIO : ROUTE_DETOUR_RATIO;
     return directLength > 0.0
-        && routeLength > directLength * ROUTE_DETOUR_RATIO
+        && routeLength > directLength * detourRatio
         && routeLength - directLength > ROUTE_DETOUR_EXCESS;
+  }
+
+  private static boolean isSimpleSideReturn(List<Point> points) {
+    if (points.size() != 4) {
+      return false;
+    }
+    Point start = points.get(0);
+    Point firstCorner = points.get(1);
+    Point secondCorner = points.get(2);
+    Point end = points.get(3);
+    boolean verticalReturn =
+        Math.abs(start.x() - end.x()) <= GEOMETRY_EPSILON
+            && Math.abs(start.y() - firstCorner.y()) <= GEOMETRY_EPSILON
+            && Math.abs(firstCorner.x() - secondCorner.x()) <= GEOMETRY_EPSILON
+            && Math.abs(secondCorner.y() - end.y()) <= GEOMETRY_EPSILON;
+    boolean horizontalReturn =
+        Math.abs(start.y() - end.y()) <= GEOMETRY_EPSILON
+            && Math.abs(start.x() - firstCorner.x()) <= GEOMETRY_EPSILON
+            && Math.abs(firstCorner.y() - secondCorner.y()) <= GEOMETRY_EPSILON
+            && Math.abs(secondCorner.x() - end.x()) <= GEOMETRY_EPSILON;
+    return verticalReturn || horizontalReturn;
   }
 
   private static double routeLength(List<Point> points) {

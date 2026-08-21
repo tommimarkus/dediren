@@ -186,5 +186,4 @@ final class LayoutRequestValidator {
       throw new IllegalArgumentException("value at " + path + " must be finite and positive");
     }
   }
-
 }

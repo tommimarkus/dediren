@@ -596,6 +596,26 @@ class LayoutQualityTest {
   }
 
   @Test
+  void simpleSideReturnAlongTheFlowAxisIsNotAnExcessiveDetour() {
+    var edge =
+        edge(
+            "side-return",
+            "decision",
+            "merge",
+            List.of(
+                new Point(100.0, 40.0),
+                new Point(235.0, 40.0),
+                new Point(235.0, 526.0),
+                new Point(100.0, 526.0)));
+
+    LayoutQualityReport report =
+        LayoutQuality.validateLayout(layoutResult(List.of(), List.of(edge), List.of()));
+
+    assertThat(report.routeDetourCount()).isZero();
+    assertThat(report.status()).isEqualTo("ok");
+  }
+
+  @Test
   void labeledEdgeTrappedInDenseParallelBandIsCountedAsDissociation() {
     // Three unrelated labeled edges running parallel 44px apart (ELK's edge-edge spacing band):
     // the middle edge cannot host a centered label without it landing on a neighbour's route,
@@ -1133,10 +1153,14 @@ class LayoutQualityTest {
 
   @Test
   void sharedEndpointMetadataDoesNotTurnTouchesOrCollinearOverlapIntoCrossings() {
-    var touchA = edge("touch-a", "hub", "left", List.of(new Point(0.0, 0.0), new Point(200.0, 0.0)));
-    var touchB = edge("touch-b", "hub", "right", List.of(new Point(100.0, -50.0), new Point(100.0, 0.0)));
-    var overlapA = edge("overlap-a", "hub", "left", List.of(new Point(0.0, 20.0), new Point(200.0, 20.0)));
-    var overlapB = edge("overlap-b", "hub", "right", List.of(new Point(100.0, 20.0), new Point(300.0, 20.0)));
+    var touchA =
+        edge("touch-a", "hub", "left", List.of(new Point(0.0, 0.0), new Point(200.0, 0.0)));
+    var touchB =
+        edge("touch-b", "hub", "right", List.of(new Point(100.0, -50.0), new Point(100.0, 0.0)));
+    var overlapA =
+        edge("overlap-a", "hub", "left", List.of(new Point(0.0, 20.0), new Point(200.0, 20.0)));
+    var overlapB =
+        edge("overlap-b", "hub", "right", List.of(new Point(100.0, 20.0), new Point(300.0, 20.0)));
 
     assertThat(
             LayoutQuality.validateLayout(

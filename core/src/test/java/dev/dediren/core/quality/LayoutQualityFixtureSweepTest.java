@@ -31,7 +31,7 @@ class LayoutQualityFixtureSweepTest {
   //
   // uml-state-machine-two-node-cycle.json has one baseline crossing from the corrected metric,
   // present before the compact-sibling port change. Keep it explicit so new fixtures, including
-  // the compact fan-out fixture, remain zero by default.
+  // the compact fan-out and side-return fixtures, remain zero by default.
   private static final Map<String, Integer> EXPECTED_EDGE_CROSSING_COUNTS =
       Map.of("uml-state-machine-two-node-cycle.json", 1);
 

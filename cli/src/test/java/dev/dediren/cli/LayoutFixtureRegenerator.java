@@ -58,6 +58,10 @@ class LayoutFixtureRegenerator {
               "uml-compact-sibling-fan-out.json",
               "valid-uml-compact-sibling-fan-out.json",
               "compact-sibling-fan-out"),
+          new FixtureMapping(
+              "uml-compact-side-return.json",
+              "valid-uml-compact-side-return.json",
+              "compact-side-return"),
           new FixtureMapping("pipeline-rich.json", "valid-pipeline-rich.json", "main"),
           new FixtureMapping("uml-basic.json", "valid-uml-basic.json", "class-view"),
           new FixtureMapping("uml-activity.json", "valid-uml-basic.json", "activity-view"),
