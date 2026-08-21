@@ -84,11 +84,11 @@ diagram below is that module architecture **modelled by Dediren from itself** �
 an ArchiMate® Application Cooperation view compiled through the same
 `project → layout → render` pipeline shown above.
 
-![Dediren module architecture: twenty Maven modules in four stability-tier bands — contracts and the IR spine at the foundation; the ArchiMate and UML notation cores, the schema-cache utility, and the engine-api seam; the orchestration core and ten engines; and the cli entrypoint with its MCP adapter and dist-tool — connected by Serving relationships that run from each module to the modules depending on it.](docs/architecture/dediren.dediren/generated/svg/module-architecture.svg)
+![Dediren module architecture: twenty-one Maven modules in four stability-tier bands — contracts and the IR spine at the foundation; the ArchiMate and UML notation cores, the schema-cache utility, and the engine-api seam; the orchestration core and eleven engines; and the cli entrypoint with its MCP adapter and dist-tool — connected by Serving relationships that run from each module to the modules depending on it.](docs/architecture/dediren.dediren/generated/svg/module-architecture.svg)
 
 Four stability-tier bands read left to right: the `contracts` kernel (in
 emerald) and the `ir` spine, then the notation/utility cores and the
-`engine-api` seam, then orchestration `core` and the ten engines behind the
+`engine-api` seam, then orchestration `core` and the eleven engines behind the
 seam, and finally the thin `cli` entrypoint with its `mcp-server` adapter and
 `dist-tool`. Three companion **UML®** views zoom in: a **class** view of the
 `engine-api` seam — the typed `SemanticsEngine` / `LayoutEngine` /

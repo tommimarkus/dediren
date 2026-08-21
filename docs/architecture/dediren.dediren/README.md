@@ -98,7 +98,7 @@ includes its package-derived `role="img"`, `<title>`, `<desc>`, and provenance.
 
 ## Modelling decisions (disclosed)
 
-- **Modules are ArchiMate `ApplicationComponent`s.** Each of the 18 shipped
+- **Modules are ArchiMate `ApplicationComponent`s.** Each of the 21 shipped
   Maven modules is one component. `test-support` and `coverage-report` are
   test/build-only and are intentionally excluded from the product architecture.
 - **Dependencies are `Serving` relationships, drawn provider → consumer.** A
@@ -108,7 +108,7 @@ includes its package-derived `role="img"`, `<title>`, `<desc>`, and provenance.
   emerald as the root). This is the *opposite* of the "arrow points at what you
   depend on" intuition — the four stability-tier bands, not the arrow heads,
   carry the "modular monolith rooted at `contracts`" reading.
-- **The model holds all 54 direct dependency edges; the hero view shows 24.**
+- **The model holds all 64 direct dependency edges; the hero view shows 27.**
   Fidelity lives in `model.json` (every compile/runtime edge, used by the OEF
   export). The `module-architecture` *view* curates to the architecturally
   significant edges — omitting the ubiquitous `contracts`/`ir` edges every
