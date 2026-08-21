@@ -24,10 +24,7 @@ class CoordinateGridTest {
   @Test
   void distinctXValuesEvenOnePixelApartNeverShareAColumn() {
     LaidOutScene scene =
-        sceneOf(
-            List.of(
-                node("a", 0, 0, 10, 10, "a"),
-                node("b", 11, 0, 10, 10, "b")));
+        sceneOf(List.of(node("a", 0, 0, 10, 10, "a"), node("b", 11, 0, 10, 10, "b")));
     CoordinateGrid grid = CoordinateGrid.of(scene);
     assertThat(grid.colOf(0)).isNotEqualTo(grid.colOf(11));
   }
@@ -35,10 +32,7 @@ class CoordinateGridTest {
   @Test
   void anchorOrderingIsPreserved() {
     LaidOutScene scene =
-        sceneOf(
-            List.of(
-                node("a", 0, 0, 10, 10, "a"),
-                node("b", 100, 0, 10, 10, "b")));
+        sceneOf(List.of(node("a", 0, 0, 10, 10, "a"), node("b", 100, 0, 10, 10, "b")));
     CoordinateGrid grid = CoordinateGrid.of(scene);
     assertThat(grid.colOf(0)).isLessThan(grid.colOf(10));
     assertThat(grid.colOf(10)).isLessThan(grid.colOf(100));
@@ -58,10 +52,7 @@ class CoordinateGridTest {
   void wideningOneNodeDoesNotBreakAnEarlierSatisfiedNodesWidth() {
     String longLabel = "a".repeat(30);
     LaidOutScene scene =
-        sceneOf(
-            List.of(
-                node("a", 0, 0, 400, 10, "short"),
-                node("b", 500, 0, 5, 5, longLabel)));
+        sceneOf(List.of(node("a", 0, 0, 400, 10, "short"), node("b", 500, 0, 5, 5, longLabel)));
     CoordinateGrid grid = CoordinateGrid.of(scene);
     int aSpan = grid.colOf(400) - grid.colOf(0);
     assertThat(aSpan).isGreaterThanOrEqualTo("short".length() + 2);
@@ -86,10 +77,7 @@ class CoordinateGridTest {
   @Test
   void anchorsWithinEpsilonAreMerged() {
     LaidOutScene scene =
-        sceneOf(
-            List.of(
-                node("a", 0, 0, 10.2, 10, "a"),
-                node("b", 10.3, 0, 10, 10, "b")));
+        sceneOf(List.of(node("a", 0, 0, 10.2, 10, "a"), node("b", 10.3, 0, 10, 10, "b")));
     CoordinateGrid grid = CoordinateGrid.of(scene);
     assertThat(grid.colOf(10.2)).isEqualTo(grid.colOf(10.3));
   }
@@ -123,7 +111,8 @@ class CoordinateGridTest {
     PlacedGroup group =
         new PlacedGroup("g", "g", "g", null, 0, 0, 3, 3, List.of("a"), "a-really-long-group-label");
     LaidOutScene scene =
-        new LaidOutScene("v", List.of(node("a", 0, 0, 3, 3, "a")), List.of(), List.of(group), List.of());
+        new LaidOutScene(
+            "v", List.of(node("a", 0, 0, 3, 3, "a")), List.of(), List.of(group), List.of());
     CoordinateGrid grid = CoordinateGrid.of(scene);
     // Group label does not force widening: span reflects the small node/group extents only.
     int span = grid.colOf(3) - grid.colOf(0);

@@ -9,9 +9,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Draws one {@link RoutedEdge}'s route onto the grid: axis-aligned segments as straight lines,
- * with an L-route approximation ({@link DiagnosticCode#ASCII_EDGE_APPROXIMATED}) for any polyline
- * whose route is not axis-aligned in source coordinates, and an arrowhead at the final point.
+ * Draws one {@link RoutedEdge}'s route onto the grid: axis-aligned segments as straight lines, with
+ * an L-route approximation ({@link DiagnosticCode#ASCII_EDGE_APPROXIMATED}) for any polyline whose
+ * route is not axis-aligned in source coordinates, and an arrowhead at the final point.
  */
 final class EdgeTracer {
 
@@ -22,7 +22,8 @@ final class EdgeTracer {
 
   private EdgeTracer() {}
 
-  static List<Diagnostic> draw(CharCanvas canvas, CoordinateGrid grid, GlyphSet glyphs, RoutedEdge edge) {
+  static List<Diagnostic> draw(
+      CharCanvas canvas, CoordinateGrid grid, GlyphSet glyphs, RoutedEdge edge) {
     List<Diagnostic> diagnostics = new ArrayList<>();
     List<int[]> cells = drawCells(grid, edge, diagnostics);
     if (cells.size() < 2) {

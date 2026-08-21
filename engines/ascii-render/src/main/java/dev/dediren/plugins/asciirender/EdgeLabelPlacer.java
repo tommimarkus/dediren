@@ -10,9 +10,9 @@ import java.util.List;
 /**
  * Places one {@link RoutedEdge}'s label onto its longest drawn segment, run after every node is
  * drawn so it can detect a collision with a node's literal cells. A horizontal segment tries the
- * row above, then the row below; a vertical segment tries one column right, then one column left
- * of the segment's midpoint. If both candidates collide (including clipping at the canvas edge),
- * the label is dropped and {@link DiagnosticCode#ASCII_EDGE_LABEL_DROPPED} is reported.
+ * row above, then the row below; a vertical segment tries one column right, then one column left of
+ * the segment's midpoint. If both candidates collide (including clipping at the canvas edge), the
+ * label is dropped and {@link DiagnosticCode#ASCII_EDGE_LABEL_DROPPED} is reported.
  */
 final class EdgeLabelPlacer {
 
@@ -51,11 +51,14 @@ final class EdgeLabelPlacer {
       int row = a[0];
       int midCol = (a[1] + b[1]) / 2;
       int startCol = midCol - label.length() / 2;
-      placed = tryWrite(canvas, row - 1, startCol, label) || tryWrite(canvas, row + 1, startCol, label);
+      placed =
+          tryWrite(canvas, row - 1, startCol, label) || tryWrite(canvas, row + 1, startCol, label);
     } else {
       int col = a[1];
       int midRow = (a[0] + b[0]) / 2;
-      placed = tryWrite(canvas, midRow, col + 1, label) || tryWrite(canvas, midRow, col - label.length(), label);
+      placed =
+          tryWrite(canvas, midRow, col + 1, label)
+              || tryWrite(canvas, midRow, col - label.length(), label);
     }
 
     if (placed) {
@@ -65,7 +68,11 @@ final class EdgeLabelPlacer {
         new Diagnostic(
             DiagnosticCode.ASCII_EDGE_LABEL_DROPPED.code(),
             DiagnosticSeverity.WARNING,
-            "edge " + edge.id() + "'s label \"" + label + "\" had nowhere clear to land and was dropped",
+            "edge "
+                + edge.id()
+                + "'s label \""
+                + label
+                + "\" had nowhere clear to land and was dropped",
             "edges[" + edge.id() + "].label"));
     return diagnostics;
   }

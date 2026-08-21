@@ -30,9 +30,9 @@ import tools.jackson.databind.JsonNode;
 /**
  * {@link DedirenTools#importSource}'s {@code output: "text"} lane. Mirrors {@link
  * DedirenImportToolTest}'s fake-{@link ImportEngine} style, plus fake {@link SemanticsEngine},
- * {@link LayoutEngine}, and {@link RenderEngine} standing in for the {@code generic-graph} /
- * {@code elk-layout} / {@code ascii} bundled engines this in-memory render lane calls through
- * {@code CoreCommands.renderImportedMain}. Real-engine text-output coverage lives in {@code
+ * {@link LayoutEngine}, and {@link RenderEngine} standing in for the {@code generic-graph} / {@code
+ * elk-layout} / {@code ascii} bundled engines this in-memory render lane calls through {@code
+ * CoreCommands.renderImportedMain}. Real-engine text-output coverage lives in {@code
  * DedirenToolsEngineBackedTest} (cli), same split as the existing SVG lane.
  */
 class DedirenImportTextOutputTest {
@@ -129,14 +129,12 @@ class DedirenImportTextOutputTest {
   @Test
   void buildRejectsTextOutputWithItsOwnUnchangedErrorMessage(@TempDir Path root) {
     DedirenTools tools =
-        new DedirenTools(
-            root, Engines.of(List.of(), List.of(), List.of(), List.of()), Map.of());
+        new DedirenTools(root, Engines.of(List.of(), List.of(), List.of(), List.of()), Map.of());
 
     CallToolResult result =
         tools.build(
             new CallToolRequest(
-                "dediren_build",
-                Map.of("source", "model.json", "out", "out", "output", "text")));
+                "dediren_build", Map.of("source", "model.json", "out", "out", "output", "text")));
 
     assertThat(result.isError()).isTrue();
     JsonNode envelope = JsonSupport.objectMapper().readTree(textOf(result, 0));
@@ -178,8 +176,7 @@ class DedirenImportTextOutputTest {
     }
 
     @Override
-    public EngineResult<RenderMetadata> projectRenderMetadata(
-        SourceDocument source, String view) {
+    public EngineResult<RenderMetadata> projectRenderMetadata(SourceDocument source, String view) {
       return new EngineResult<>(
           new RenderMetadata("render-metadata.schema.v1", null, Map.of(), Map.of(), Map.of()),
           List.of());
@@ -221,9 +218,7 @@ class DedirenImportTextOutputTest {
     public EngineResult<RenderResult> render(
         LaidOutScene scene, JsonNode policy, RenderMetadata metadataOrNull) throws EngineException {
       List<RenderArtifact> artifacts =
-          content == null
-              ? List.of()
-              : List.of(new RenderArtifact("text", content));
+          content == null ? List.of() : List.of(new RenderArtifact("text", content));
       return new EngineResult<>(
           new RenderResult(
               dev.dediren.contracts.ContractVersions.RENDER_RESULT_SCHEMA_VERSION, artifacts),

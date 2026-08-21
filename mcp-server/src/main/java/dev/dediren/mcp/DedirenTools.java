@@ -202,9 +202,9 @@ public final class DedirenTools {
 
   /**
    * The {@code output: "text"} lane: renders the imported model's {@code main} view through the
-   * {@code ascii} render engine and returns the envelope plus the rendered diagram as a second
-   * text content, mirroring the SVG lane's image-attachment shape but with an inline text artifact
-   * in place of an {@link ImageContent}.
+   * {@code ascii} render engine and returns the envelope plus the rendered diagram as a second text
+   * content, mirroring the SVG lane's image-attachment shape but with an inline text artifact in
+   * place of an {@link ImageContent}.
    */
   private CallToolResult importTextOutput(
       CoreCommands.ImportedSourceResult imported, String policy) {

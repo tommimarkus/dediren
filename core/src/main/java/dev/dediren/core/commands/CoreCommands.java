@@ -139,9 +139,9 @@ public final class CoreCommands {
 
   /**
    * Renders the imported model's required {@code main} view in memory through the given render
-   * engine id (for example {@code "render"} for SVG or {@code "ascii"} for an inline text
-   * diagram). This is deliberately not a build command: no artifact path is accepted and no
-   * filesystem write is possible.
+   * engine id (for example {@code "render"} for SVG or {@code "ascii"} for an inline text diagram).
+   * This is deliberately not a build command: no artifact path is accepted and no filesystem write
+   * is possible.
    */
   public static ImportedRenderResult renderImportedMain(
       SourceDocument source,

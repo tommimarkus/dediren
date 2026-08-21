@@ -10,9 +10,8 @@ final class LabelWrap {
 
   /**
    * Wraps {@code label} to lines no longer than {@code maxCols}, greedily packing whitespace-
-   * separated words and hard-breaking a word that alone exceeds {@code maxCols}. Runs of
-   * whitespace collapse to a single space before wrapping. A null or blank label wraps to an
-   * empty list.
+   * separated words and hard-breaking a word that alone exceeds {@code maxCols}. Runs of whitespace
+   * collapse to a single space before wrapping. A null or blank label wraps to an empty list.
    */
   static List<String> wrap(String label, int maxCols) {
     List<String> lines = new ArrayList<>();

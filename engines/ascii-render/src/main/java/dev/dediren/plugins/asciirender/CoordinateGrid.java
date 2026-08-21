@@ -11,8 +11,8 @@ import java.util.List;
 
 /**
  * Quantizes a {@link LaidOutScene}'s continuous geometry onto a character grid: every distinct
- * border or edge-point coordinate becomes a column/row anchor, gaps between anchors scale down to
- * a handful of cells, and node borders widen further where needed to fit a wrapped label.
+ * border or edge-point coordinate becomes a column/row anchor, gaps between anchors scale down to a
+ * handful of cells, and node borders widen further where needed to fit a wrapped label.
  */
 final class CoordinateGrid {
 
@@ -113,8 +113,7 @@ final class CoordinateGrid {
   private static void widenForNodeLabels(
       LaidOutScene scene, double[] anchors, int[] columns, boolean isX) {
     List<PlacedNode> nodes = new ArrayList<>(scene.nodes());
-    nodes.sort(
-        Comparator.comparingDouble(n -> isX ? n.x() + n.width() : n.y() + n.height()));
+    nodes.sort(Comparator.comparingDouble(n -> isX ? n.x() + n.width() : n.y() + n.height()));
     for (PlacedNode n : nodes) {
       double startVal = isX ? n.x() : n.y();
       double endVal = isX ? n.x() + n.width() : n.y() + n.height();

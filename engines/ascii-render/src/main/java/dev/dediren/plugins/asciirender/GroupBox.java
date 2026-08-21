@@ -14,7 +14,8 @@ final class GroupBox {
 
   private GroupBox() {}
 
-  static List<Diagnostic> draw(CharCanvas canvas, CoordinateGrid grid, GlyphSet glyphs, PlacedGroup group) {
+  static List<Diagnostic> draw(
+      CharCanvas canvas, CoordinateGrid grid, GlyphSet glyphs, PlacedGroup group) {
     int top = grid.rowOf(group.y());
     int bottom = grid.rowOf(group.y() + group.height());
     int left = grid.colOf(group.x());

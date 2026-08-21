@@ -19,7 +19,8 @@ final class NodeBox {
 
   private NodeBox() {}
 
-  static List<Diagnostic> draw(CharCanvas canvas, CoordinateGrid grid, GlyphSet glyphs, PlacedNode node) {
+  static List<Diagnostic> draw(
+      CharCanvas canvas, CoordinateGrid grid, GlyphSet glyphs, PlacedNode node) {
     int top = grid.rowOf(node.y());
     int bottom = grid.rowOf(node.y() + node.height());
     int left = grid.colOf(node.x());

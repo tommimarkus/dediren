@@ -120,7 +120,9 @@ final class CharCanvas {
     return out.toString();
   }
 
-  /** Whether {@code (row, col)} is on the canvas. Used by edge-label placement to detect clipping. */
+  /**
+   * Whether {@code (row, col)} is on the canvas. Used by edge-label placement to detect clipping.
+   */
   boolean isInBounds(int row, int col) {
     return inBounds(row, col);
   }

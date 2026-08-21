@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import dev.dediren.contracts.ContractVersions;
 import dev.dediren.ir.LaidOutScene;
 import org.junit.jupiter.api.Test;
-import tools.jackson.databind.node.ObjectNode;
 import tools.jackson.databind.node.JsonNodeFactory;
+import tools.jackson.databind.node.ObjectNode;
 
 /** Identity test for the ASCII render engine: id and artifact kind. */
 class AsciiEngineIdentityTest {
@@ -20,7 +20,11 @@ class AsciiEngineIdentityTest {
   @Test
   void renderReturnsResultWithCorrectSchemaVersion() throws Exception {
     LaidOutScene scene =
-        new LaidOutScene("v", java.util.List.of(), java.util.List.of(), java.util.List.of(),
+        new LaidOutScene(
+            "v",
+            java.util.List.of(),
+            java.util.List.of(),
+            java.util.List.of(),
             java.util.List.of());
     ObjectNode policy = JsonNodeFactory.instance.objectNode();
     var result = engine.render(scene, policy, null);
@@ -31,7 +35,11 @@ class AsciiEngineIdentityTest {
   @Test
   void renderReturnsExactlyOneTextArtifact() throws Exception {
     LaidOutScene scene =
-        new LaidOutScene("v", java.util.List.of(), java.util.List.of(), java.util.List.of(),
+        new LaidOutScene(
+            "v",
+            java.util.List.of(),
+            java.util.List.of(),
+            java.util.List.of(),
             java.util.List.of());
     ObjectNode policy = JsonNodeFactory.instance.objectNode();
     var result = engine.render(scene, policy, null);
