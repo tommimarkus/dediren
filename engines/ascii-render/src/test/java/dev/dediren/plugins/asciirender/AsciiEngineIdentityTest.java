@@ -18,24 +18,24 @@ class AsciiEngineIdentityTest {
   }
 
   @Test
-  void renderReturnsResultWithCorrectSchemaVersion() {
+  void renderReturnsResultWithCorrectSchemaVersion() throws Exception {
     LaidOutScene scene =
         new LaidOutScene("v", java.util.List.of(), java.util.List.of(), java.util.List.of(),
             java.util.List.of());
     ObjectNode policy = JsonNodeFactory.instance.objectNode();
     var result = engine.render(scene, policy, null);
-    assertThat(result.result().renderResultSchemaVersion())
+    assertThat(result.value().renderResultSchemaVersion())
         .isEqualTo(ContractVersions.RENDER_RESULT_SCHEMA_VERSION);
   }
 
   @Test
-  void renderReturnsExactlyOneTextArtifact() {
+  void renderReturnsExactlyOneTextArtifact() throws Exception {
     LaidOutScene scene =
         new LaidOutScene("v", java.util.List.of(), java.util.List.of(), java.util.List.of(),
             java.util.List.of());
     ObjectNode policy = JsonNodeFactory.instance.objectNode();
     var result = engine.render(scene, policy, null);
-    assertThat(result.result().artifacts()).hasSize(1);
-    assertThat(result.result().artifacts().get(0).kind()).isEqualTo("text");
+    assertThat(result.value().artifacts()).hasSize(1);
+    assertThat(result.value().artifacts().get(0).artifactKind()).isEqualTo("text");
   }
 }
