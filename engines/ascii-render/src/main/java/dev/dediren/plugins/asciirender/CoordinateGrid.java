@@ -17,6 +17,14 @@ import java.util.List;
 final class CoordinateGrid {
 
   private static final double EPSILON = 0.5;
+
+  /**
+   * ELK routes edge endpoints a pixel or two off the node boundary. An edge point this close to a
+   * node or group border adopts the border's anchor instead of minting its own column, so drawn
+   * edges meet their boxes instead of stopping one cell short.
+   */
+  private static final double BORDER_SNAP = 2.0;
+
   private static final double X_UNITS_PER_COL = 8.0;
   private static final double Y_UNITS_PER_ROW = 16.0;
   private static final int LABEL_WRAP_MAX_COLS = 32;
@@ -44,6 +52,36 @@ final class CoordinateGrid {
     return new CoordinateGrid(xAnchors, xColumns, yAnchors, yColumns);
   }
 
+  private static List<Double> collectAnchors(LaidOutScene scene, boolean isX) {
+    List<Double> borders = new ArrayList<>();
+    for (PlacedNode n : scene.nodes()) {
+      borders.add(isX ? n.x() : n.y());
+      borders.add(isX ? n.x() + n.width() : n.y() + n.height());
+    }
+    for (PlacedGroup g : scene.groups()) {
+      borders.add(isX ? g.x() : g.y());
+      borders.add(isX ? g.x() + g.width() : g.y() + g.height());
+    }
+    List<Double> all = new ArrayList<>(borders);
+    for (RoutedEdge e : scene.edges()) {
+      for (Point p : e.points()) {
+        double v = isX ? p.x() : p.y();
+        if (distanceToNearest(borders, v) > BORDER_SNAP) {
+          all.add(v);
+        }
+      }
+    }
+    return all;
+  }
+
+  private static double distanceToNearest(List<Double> values, double value) {
+    double best = Double.MAX_VALUE;
+    for (double v : values) {
+      best = Math.min(best, Math.abs(v - value));
+    }
+    return best;
+  }
+
   int colOf(double x) {
     return xColumns[nearestIndex(xAnchors, x)];
   }
@@ -58,24 +96,6 @@ final class CoordinateGrid {
 
   int height() {
     return yColumns.length == 0 ? 0 : yColumns[yColumns.length - 1] + 1;
-  }
-
-  private static List<Double> collectAnchors(LaidOutScene scene, boolean isX) {
-    List<Double> raw = new ArrayList<>();
-    for (PlacedNode n : scene.nodes()) {
-      raw.add(isX ? n.x() : n.y());
-      raw.add(isX ? n.x() + n.width() : n.y() + n.height());
-    }
-    for (PlacedGroup g : scene.groups()) {
-      raw.add(isX ? g.x() : g.y());
-      raw.add(isX ? g.x() + g.width() : g.y() + g.height());
-    }
-    for (RoutedEdge e : scene.edges()) {
-      for (Point p : e.points()) {
-        raw.add(isX ? p.x() : p.y());
-      }
-    }
-    return raw;
   }
 
   private static double[] mergeAnchors(List<Double> raw) {
@@ -158,7 +178,7 @@ final class CoordinateGrid {
         best = i;
       }
     }
-    if (best == -1 || bestDiff > EPSILON) {
+    if (best == -1 || bestDiff > BORDER_SNAP) {
       throw new IllegalArgumentException("No anchor near coordinate: " + value);
     }
     return best;

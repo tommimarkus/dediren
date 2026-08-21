@@ -107,6 +107,60 @@ class CoordinateGridTest {
   }
 
   @Test
+  void edgePointsWithinTwoUnitsOfABorderAdoptTheBorderAnchor() {
+    // ELK routes edge endpoints a pixel or two off the node boundary; without border snapping
+    // that offset becomes its own column and every edge detaches from its box by one cell.
+    RoutedEdge edge =
+        new RoutedEdge(
+            "e",
+            "a",
+            "b",
+            "e",
+            "e",
+            List.of(),
+            List.of(
+                new dev.dediren.contracts.layout.Point(81, 5),
+                new dev.dediren.contracts.layout.Point(99, 5)),
+            "",
+            null);
+    LaidOutScene scene =
+        new LaidOutScene(
+            "v",
+            List.of(node("a", 0, 0, 80, 10, "a"), node("b", 100, 0, 80, 10, "b")),
+            List.of(edge),
+            List.of(),
+            List.of());
+    CoordinateGrid grid = CoordinateGrid.of(scene);
+    assertThat(grid.colOf(81)).isEqualTo(grid.colOf(80));
+    assertThat(grid.colOf(99)).isEqualTo(grid.colOf(100));
+  }
+
+  @Test
+  void edgePointsBeyondTheSnapToleranceKeepTheirOwnAnchor() {
+    RoutedEdge edge =
+        new RoutedEdge(
+            "e",
+            "a",
+            "b",
+            "e",
+            "e",
+            List.of(),
+            List.of(new dev.dediren.contracts.layout.Point(85, 5)),
+            "",
+            null);
+    LaidOutScene scene =
+        new LaidOutScene(
+            "v",
+            List.of(node("a", 0, 0, 80, 10, "a"), node("b", 100, 0, 80, 10, "b")),
+            List.of(edge),
+            List.of(),
+            List.of());
+    CoordinateGrid grid = CoordinateGrid.of(scene);
+    assertThat(grid.colOf(85)).isNotEqualTo(grid.colOf(80));
+    assertThat(grid.colOf(85)).isNotEqualTo(grid.colOf(100));
+  }
+
+  @Test
   void groupBordersContributeAnchorsWithoutContentWidening() {
     PlacedGroup group =
         new PlacedGroup("g", "g", "g", null, 0, 0, 3, 3, List.of("a"), "a-really-long-group-label");
