@@ -807,8 +807,7 @@ final class PortPlan {
       incomingCounts.merge(edge.target(), 1, Integer::sum);
     }
 
-    Map<String, Integer> outgoingIndexes = new HashMap<>();
-    Map<String, Integer> incomingIndexes = new HashMap<>();
+    BinaryCorridors binaryCorridors = binaryCorridors(edges, nodes, outgoingCounts, incomingCounts);
     Map<String, EndpointSides> sidesByEdge = new HashMap<>();
     EndpointSides defaultSides = defaultEndpointSides(direction);
     for (LayoutEdge edge : edges) {
@@ -816,29 +815,90 @@ final class PortPlan {
         continue;
       }
       EndpointMerge merge = merges.getOrDefault(edge.id(), NO_ENDPOINT_MERGE);
-      int outgoingIndex = nextEndpointIndex(outgoingIndexes, edge.source());
-      int incomingIndex = nextEndpointIndex(incomingIndexes, edge.target());
       PortSide sourceSide = defaultSides.sourceSide();
       PortSide targetSide = defaultSides.targetSide();
-      if (!merge.sourceEndpoint()
-          && outgoingCounts.getOrDefault(edge.source(), 0) > 1
-          && isConnectorSized(nodes.get(edge.source()))) {
-        sourceSide = connectorBranchSide(direction, true, outgoingIndex);
+      Integer sourceBranch = binaryCorridors.sourceBranches().get(edge.id());
+      if (!merge.sourceEndpoint() && sourceBranch != null) {
+        sourceSide = connectorBranchSide(direction, true, sourceBranch);
       }
-      if (!merge.targetEndpoint()
-          && incomingCounts.getOrDefault(edge.target(), 0) > 1
-          && isConnectorSized(nodes.get(edge.target()))) {
-        targetSide = connectorBranchSide(direction, false, incomingIndex);
+      Integer targetBranch = binaryCorridors.targetBranches().get(edge.id());
+      if (!merge.targetEndpoint() && targetBranch != null) {
+        targetSide = connectorBranchSide(direction, false, targetBranch);
       }
       sidesByEdge.put(edge.id(), new EndpointSides(sourceSide, targetSide));
     }
     return sidesByEdge;
   }
 
-  private static int nextEndpointIndex(Map<String, Integer> indexes, String nodeId) {
-    int index = indexes.getOrDefault(nodeId, 0);
-    indexes.put(nodeId, index + 1);
-    return index;
+  /**
+   * Match the two ends of a binary split/merge region so its primary branch stays on the flow axis
+   * and its alternate branch uses one outer side corridor. Ordinary fan-out and fan-in keep every
+   * endpoint on the primary flow side, where ELK can order the ports without crossings.
+   */
+  private static BinaryCorridors binaryCorridors(
+      List<LayoutEdge> edges,
+      Map<String, LayoutNode> nodes,
+      Map<String, Integer> outgoingCounts,
+      Map<String, Integer> incomingCounts) {
+    Map<String, List<LayoutEdge>> outgoingByNode = new LinkedHashMap<>();
+    for (LayoutEdge edge : edges) {
+      if (nodes.containsKey(edge.source()) && nodes.containsKey(edge.target())) {
+        outgoingByNode.computeIfAbsent(edge.source(), ignored -> new ArrayList<>()).add(edge);
+      }
+    }
+
+    Map<String, Integer> sourceBranches = new HashMap<>();
+    Map<String, Integer> targetBranches = new HashMap<>();
+    for (Map.Entry<String, List<LayoutEdge>> entry : outgoingByNode.entrySet()) {
+      List<LayoutEdge> branches = entry.getValue();
+      if (branches.size() != 2 || !isConnectorSized(nodes.get(entry.getKey()))) {
+        continue;
+      }
+      LinearBranch first =
+          traceLinearBranch(branches.get(0), outgoingByNode, nodes, outgoingCounts, incomingCounts);
+      LinearBranch second =
+          traceLinearBranch(branches.get(1), outgoingByNode, nodes, outgoingCounts, incomingCounts);
+      if (first == null
+          || second == null
+          || !first.convergenceNodeId().equals(second.convergenceNodeId())
+          || first.incomingEdgeId().equals(second.incomingEdgeId())) {
+        continue;
+      }
+      sourceBranches.put(branches.get(0).id(), 0);
+      sourceBranches.put(branches.get(1).id(), 1);
+      targetBranches.put(first.incomingEdgeId(), 0);
+      targetBranches.put(second.incomingEdgeId(), 1);
+    }
+    return new BinaryCorridors(sourceBranches, targetBranches);
+  }
+
+  private static LinearBranch traceLinearBranch(
+      LayoutEdge first,
+      Map<String, List<LayoutEdge>> outgoingByNode,
+      Map<String, LayoutNode> nodes,
+      Map<String, Integer> outgoingCounts,
+      Map<String, Integer> incomingCounts) {
+    LayoutEdge edge = first;
+    Set<String> visitedEdges = new HashSet<>();
+    while (visitedEdges.add(edge.id())) {
+      String targetId = edge.target();
+      LayoutNode target = nodes.get(targetId);
+      if (target == null) {
+        return null;
+      }
+      if (incomingCounts.getOrDefault(targetId, 0) == 2 && isConnectorSized(target)) {
+        return new LinearBranch(targetId, edge.id());
+      }
+      if (outgoingCounts.getOrDefault(targetId, 0) != 1) {
+        return null;
+      }
+      List<LayoutEdge> outgoing = outgoingByNode.getOrDefault(targetId, List.of());
+      if (outgoing.size() != 1) {
+        return null;
+      }
+      edge = outgoing.getFirst();
+    }
+    return null;
   }
 
   private static PortSide connectorBranchSide(
@@ -905,6 +965,11 @@ final class PortPlan {
   }
 
   private record EndpointSides(PortSide sourceSide, PortSide targetSide) {}
+
+  private record BinaryCorridors(
+      Map<String, Integer> sourceBranches, Map<String, Integer> targetBranches) {}
+
+  private record LinearBranch(String convergenceNodeId, String incomingEdgeId) {}
 
   private record EndpointMerge(boolean sourceEndpoint, boolean targetEndpoint) {}
 

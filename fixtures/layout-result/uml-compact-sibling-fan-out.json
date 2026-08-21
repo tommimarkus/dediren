@@ -1,0 +1,76 @@
+{
+  "layout_result_schema_version" : "layout-result.schema.v2",
+  "view_id" : "compact-sibling-fan-out",
+  "nodes" : [ {
+    "id" : "cache-decision",
+    "source_id" : "cache-decision",
+    "projection_id" : "cache-decision",
+    "x" : 12.0,
+    "y" : 37.83333333333333,
+    "width" : 32.0,
+    "height" : 32.0,
+    "label" : "Cached?",
+    "source_pointer" : "/nodes/0"
+  }, {
+    "id" : "use-cache",
+    "source_id" : "use-cache",
+    "projection_id" : "use-cache",
+    "x" : 134.0,
+    "y" : 12.0,
+    "width" : 160.0,
+    "height" : 80.0,
+    "label" : "Use cache",
+    "source_pointer" : "/nodes/1"
+  }, {
+    "id" : "refresh-cache",
+    "source_id" : "refresh-cache",
+    "projection_id" : "refresh-cache",
+    "x" : 134.0,
+    "y" : 132.0,
+    "width" : 160.0,
+    "height" : 80.0,
+    "label" : "Refresh cache",
+    "source_pointer" : "/nodes/2"
+  } ],
+  "edges" : [ {
+    "id" : "cache-hit",
+    "source" : "cache-decision",
+    "target" : "use-cache",
+    "source_id" : "cache-hit",
+    "projection_id" : "cache-hit",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 45.0,
+      "y" : 52.0
+    }, {
+      "x" : 133.0,
+      "y" : 52.0
+    } ],
+    "label" : "hit",
+    "source_pointer" : "/relationships/0"
+  }, {
+    "id" : "cache-miss",
+    "source" : "cache-decision",
+    "target" : "refresh-cache",
+    "source_id" : "cache-miss",
+    "projection_id" : "cache-miss",
+    "routing_hints" : [ ],
+    "points" : [ {
+      "x" : 45.0,
+      "y" : 55.66666666666667
+    }, {
+      "x" : 69.0,
+      "y" : 55.66666666666667
+    }, {
+      "x" : 69.0,
+      "y" : 172.0
+    }, {
+      "x" : 133.0,
+      "y" : 172.0
+    } ],
+    "label" : "miss",
+    "source_pointer" : "/relationships/1"
+  } ],
+  "groups" : [ ],
+  "warnings" : [ ]
+}

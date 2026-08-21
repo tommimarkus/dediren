@@ -1,0 +1,106 @@
+{
+  "model_schema_version": "model.schema.v1",
+  "required_plugins": [
+    {
+      "id": "generic-graph",
+      "version": "2026.08.8"
+    },
+    {
+      "id": "uml-xmi",
+      "version": "2026.08.8"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "continue-decision",
+      "type": "DecisionNode",
+      "label": "Continue?",
+      "properties": {}
+    },
+    {
+      "id": "take-action",
+      "type": "Action",
+      "label": "Take action",
+      "properties": {}
+    },
+    {
+      "id": "resume",
+      "type": "Action",
+      "label": "Resume",
+      "properties": {}
+    },
+    {
+      "id": "done",
+      "type": "ActivityFinalNode",
+      "label": "",
+      "properties": {}
+    }
+  ],
+  "relationships": [
+    {
+      "id": "continue-yes",
+      "type": "ControlFlow",
+      "source": "continue-decision",
+      "target": "take-action",
+      "label": "yes",
+      "properties": {}
+    },
+    {
+      "id": "continue-no",
+      "type": "ControlFlow",
+      "source": "continue-decision",
+      "target": "done",
+      "label": "no",
+      "properties": {}
+    },
+    {
+      "id": "action-resume",
+      "type": "ControlFlow",
+      "source": "take-action",
+      "target": "resume",
+      "label": "",
+      "properties": {}
+    },
+    {
+      "id": "resume-done",
+      "type": "ControlFlow",
+      "source": "resume",
+      "target": "done",
+      "label": "",
+      "properties": {}
+    }
+  ],
+  "plugins": {
+    "generic-graph": {
+      "semantic_profile": "uml",
+      "views": [
+        {
+          "id": "compact-side-return",
+          "label": "Compact side return",
+          "kind": "uml-activity",
+          "nodes": ["continue-decision", "take-action", "resume", "done"],
+          "relationships": [
+            "continue-yes",
+            "continue-no",
+            "action-resume",
+            "resume-done"
+          ],
+          "layout_preferences": {
+            "mode": "flow",
+            "algorithm": "layered",
+            "direction": "down",
+            "density": "readable",
+            "cycle_breaking": "greedy",
+            "placement": {
+              "strategy": "network-simplex"
+            },
+            "routing": {
+              "style": "orthogonal",
+              "endpoint_merging": "off"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

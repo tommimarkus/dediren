@@ -938,7 +938,7 @@ class ElkLayoutEngineTest {
   }
 
   @Test
-  void compactDecisionFanOutUsesSeparateSourceCorners() {
+  void compactDecisionFanOutKeepsSiblingPortsOnThePrimaryFlowSide() {
     LayoutRequest request =
         new LayoutRequest(
             ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
@@ -971,18 +971,113 @@ class ElkLayoutEngineTest {
     LaidOutEdge cachedEdge = edgeById(result, "check-cache-cached");
     LaidOutEdge staleEdge = edgeById(result, "check-cache-stale");
 
+    LaidOutNode decision = nodeById(result, "check-cache");
+
+    assertRouteEndpointOnSide(result, "check-cache-cached", "check-cache", true, PortSide.EAST);
+    assertRouteEndpointOnSide(result, "check-cache-stale", "check-cache", true, PortSide.EAST);
+    assertEquals(
+        0,
+        routeCrossingCountNearSource(cachedEdge, staleEdge, decision),
+        "compact decision fan-out routes should not cross near their shared endpoint, cached="
+            + cachedEdge.points()
+            + ", stale="
+            + staleEdge.points());
     assertFalse(
-        samePoint(cachedEdge.points().get(0), staleEdge.points().get(0)),
-        "decision fan-out branches should not leave the same visual corner, cached="
-            + cachedEdge.points()
-            + ", stale="
+        hasExcessiveRouteDetour(cachedEdge),
+        "compact decision fan-out must not trade the crossing for a detour, cached="
+            + cachedEdge.points());
+    assertFalse(
+        hasExcessiveRouteDetour(staleEdge),
+        "compact decision fan-out must not trade the crossing for a detour, stale="
             + staleEdge.points());
+  }
+
+  @Test
+  void compactSideReturnKeepsThePrimaryDownwardSpineStraightAndUncrossed() {
+    LayoutResult result =
+        new ElkLayoutEngine().layout(compactSideReturnRequest(LayoutDirection.DOWN));
+    ElkLayoutRenderArtifacts.write(result);
+    LaidOutEdge spine = edgeById(result, "resume-final");
+    LaidOutEdge sideReturn = edgeById(result, "decision-final");
+
+    assertRouteEndpointOnSide(result, "decision-action", "decision", true, PortSide.SOUTH);
+    assertRouteEndpointOnSide(result, "decision-final", "decision", true, PortSide.EAST);
+    assertRouteEndpointOnSide(result, "resume-final", "final", false, PortSide.NORTH);
+    assertRouteEndpointOnSide(result, "decision-final", "final", false, PortSide.EAST);
     assertTrue(
-        usesDifferentSourceSides(result, "check-cache-cached", "check-cache-stale", "check-cache"),
-        "decision fan-out branches should use separate source corners, cached="
-            + cachedEdge.points()
-            + ", stale="
-            + staleEdge.points());
+        spine.points().stream()
+            .allMatch(point -> Math.abs(point.x() - spine.points().get(0).x()) < GEOMETRY_EPSILON),
+        "the primary route should stay on one vertical spine, points=" + spine.points());
+    assertEquals(
+        0,
+        routeCrossingCount(spine, sideReturn),
+        "the side return must not cross the primary spine, spine="
+            + spine.points()
+            + ", return="
+            + sideReturn.points());
+    assertFalse(
+        hasExcessiveRouteDetour(sideReturn),
+        "the side return should use one outer corridor without an excessive dogleg, points="
+            + sideReturn.points());
+  }
+
+  @ParameterizedTest(name = "{0} compact side return")
+  @MethodSource("compactSideReturnDirections")
+  void compactSideReturnKeepsItsPrimaryAndAlternateFacesPairedInEveryDirection(
+      LayoutDirection direction,
+      PortSide primarySource,
+      PortSide primaryTarget,
+      PortSide alternate) {
+    LayoutResult result = new ElkLayoutEngine().layout(compactSideReturnRequest(direction));
+
+    assertRouteEndpointOnSide(result, "decision-action", "decision", true, primarySource);
+    assertRouteEndpointOnSide(result, "resume-final", "final", false, primaryTarget);
+    assertRouteEndpointOnSide(result, "decision-final", "decision", true, alternate);
+    assertRouteEndpointOnSide(result, "decision-final", "final", false, alternate);
+  }
+
+  private static List<Arguments> compactSideReturnDirections() {
+    return List.of(
+        Arguments.of(LayoutDirection.DOWN, PortSide.SOUTH, PortSide.NORTH, PortSide.EAST),
+        Arguments.of(LayoutDirection.UP, PortSide.NORTH, PortSide.SOUTH, PortSide.EAST),
+        Arguments.of(LayoutDirection.RIGHT, PortSide.EAST, PortSide.WEST, PortSide.NORTH),
+        Arguments.of(LayoutDirection.LEFT, PortSide.WEST, PortSide.EAST, PortSide.NORTH));
+  }
+
+  private static LayoutRequest compactSideReturnRequest(LayoutDirection direction) {
+    return new LayoutRequest(
+        ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
+        "activity",
+        List.of(
+            new LayoutNode("decision", "Continue?", "decision", 32.0, 32.0),
+            new LayoutNode("take-action", "Take action", "take-action", 160.0, 80.0),
+            new LayoutNode("resume", "Resume", "resume", 160.0, 80.0),
+            new LayoutNode("final", "Done", "final", 32.0, 32.0)),
+        List.of(
+            new LayoutEdge(
+                "decision-action",
+                "decision",
+                "take-action",
+                "yes",
+                "decision-action",
+                "ControlFlow"),
+            new LayoutEdge(
+                "decision-final", "decision", "final", "no", "decision-final", "ControlFlow"),
+            new LayoutEdge(
+                "action-resume", "take-action", "resume", "", "action-resume", "ControlFlow"),
+            new LayoutEdge("resume-final", "resume", "final", "", "resume-final", "ControlFlow")),
+        List.of(),
+        List.of(),
+        new LayoutPreferences(
+            LayoutMode.FLOW,
+            direction,
+            LayoutDensity.READABLE,
+            null,
+            new LayoutRoutingPreferences(LayoutRoutingStyle.ORTHOGONAL, LayoutEndpointMerging.OFF),
+            LayoutCycleBreaking.GREEDY,
+            null,
+            null,
+            new LayoutPlacementPreferences(LayoutPlacementStrategy.NETWORK_SIMPLEX)));
   }
 
   @Test
@@ -3162,14 +3257,6 @@ class ElkLayoutEngineTest {
     }
   }
 
-  private static boolean usesDifferentSourceSides(
-      LayoutResult result, String firstEdgeId, String secondEdgeId, String nodeId) {
-    LaidOutNode node = nodeById(result, nodeId);
-    PortSide firstSide = routeEndpointSide(edgeById(result, firstEdgeId).points().get(0), node);
-    PortSide secondSide = routeEndpointSide(edgeById(result, secondEdgeId).points().get(0), node);
-    return firstSide != null && secondSide != null && firstSide != secondSide;
-  }
-
   private static PortSide routeEndpointSide(Point point, LaidOutNode node) {
     if (Math.abs(node.y() - point.y()) <= PORT_SIDE_EPSILON
         && point.x() >= node.x() - GEOMETRY_EPSILON
@@ -3328,9 +3415,31 @@ class ElkLayoutEngineTest {
     Point start = edge.points().get(0);
     Point end = edge.points().get(edge.points().size() - 1);
     double directLength = Math.abs(start.x() - end.x()) + Math.abs(start.y() - end.y());
+    double detourRatio = isSimpleSideReturn(edge.points()) ? 2.0 : 1.5;
     return directLength > 0.0
-        && routeLength > directLength * 1.5
+        && routeLength > directLength * detourRatio
         && routeLength - directLength > 240.0;
+  }
+
+  private static boolean isSimpleSideReturn(List<Point> points) {
+    if (points.size() != 4) {
+      return false;
+    }
+    Point start = points.get(0);
+    Point firstCorner = points.get(1);
+    Point secondCorner = points.get(2);
+    Point end = points.get(3);
+    boolean verticalReturn =
+        Math.abs(start.x() - end.x()) <= GEOMETRY_EPSILON
+            && Math.abs(start.y() - firstCorner.y()) <= GEOMETRY_EPSILON
+            && Math.abs(firstCorner.x() - secondCorner.x()) <= GEOMETRY_EPSILON
+            && Math.abs(secondCorner.y() - end.y()) <= GEOMETRY_EPSILON;
+    boolean horizontalReturn =
+        Math.abs(start.y() - end.y()) <= GEOMETRY_EPSILON
+            && Math.abs(start.x() - firstCorner.x()) <= GEOMETRY_EPSILON
+            && Math.abs(firstCorner.y() - secondCorner.y()) <= GEOMETRY_EPSILON
+            && Math.abs(secondCorner.x() - end.x()) <= GEOMETRY_EPSILON;
+    return verticalReturn || horizontalReturn;
   }
 
   private static int routeCrossingCountNearSource(
@@ -3349,6 +3458,22 @@ class ElkLayoutEngineTest {
         if (Math.min(secondStart.x(), secondEnd.x()) > nearSourceRight) {
           continue;
         }
+        if (segmentsCross(firstStart, firstEnd, secondStart, secondEnd)) {
+          count++;
+        }
+      }
+    }
+    return count;
+  }
+
+  private static int routeCrossingCount(LaidOutEdge first, LaidOutEdge second) {
+    int count = 0;
+    for (int firstIndex = 0; firstIndex < first.points().size() - 1; firstIndex++) {
+      Point firstStart = first.points().get(firstIndex);
+      Point firstEnd = first.points().get(firstIndex + 1);
+      for (int secondIndex = 0; secondIndex < second.points().size() - 1; secondIndex++) {
+        Point secondStart = second.points().get(secondIndex);
+        Point secondEnd = second.points().get(secondIndex + 1);
         if (segmentsCross(firstStart, firstEnd, secondStart, secondEnd)) {
           count++;
         }
