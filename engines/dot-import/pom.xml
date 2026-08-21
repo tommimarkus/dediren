@@ -6,7 +6,7 @@
   <parent>
     <groupId>dev.dediren</groupId>
     <artifactId>dediren</artifactId>
-    <version>2026.08.8</version>
+    <version>2026.08.9</version>
     <relativePath>../../pom.xml</relativePath>
   </parent>
   <artifactId>dot-import</artifactId>
