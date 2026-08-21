@@ -178,8 +178,8 @@ class EngineEnvelopeContractTest {
     assertThat(envelope.get("status").asText()).isEqualTo("ok");
     assertThat(envelope.at("/data/render_result_schema_version").asText())
         .isEqualTo("render-result.schema.v6");
-    JsonNode artifacts = envelope.at("/data/render_result/artifacts");
-    assertThat(artifacts).isArray();
+    JsonNode artifacts = envelope.at("/data/artifacts");
+    assertThat(artifacts.isArray()).isTrue();
     assertThat(artifacts.size()).isEqualTo(1);
     JsonNode artifact = artifacts.get(0);
     assertThat(artifact.get("artifact_kind").asText()).isEqualTo("text");
