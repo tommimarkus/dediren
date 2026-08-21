@@ -616,6 +616,67 @@ class LayoutQualityTest {
   }
 
   @Test
+  void simpleSideReturnAcrossTheFlowAxisIsNotAnExcessiveDetour() {
+    var edge =
+        edge(
+            "side-return",
+            "decision",
+            "merge",
+            List.of(
+                new Point(40.0, 100.0),
+                new Point(40.0, 235.0),
+                new Point(526.0, 235.0),
+                new Point(526.0, 100.0)));
+
+    LayoutQualityReport report =
+        LayoutQuality.validateLayout(layoutResult(List.of(), List.of(edge), List.of()));
+
+    assertThat(report.routeDetourCount()).isZero();
+    assertThat(report.status()).isEqualTo("ok");
+  }
+
+  @Test
+  void fiveSegmentDoglegDoesNotReceiveTheSimpleSideReturnAllowance() {
+    var edge =
+        edge(
+            "dogleg",
+            "decision",
+            "merge",
+            List.of(
+                new Point(0.0, 0.0),
+                new Point(280.0, 0.0),
+                new Point(280.0, 150.0),
+                new Point(100.0, 150.0),
+                new Point(100.0, 300.0)));
+
+    LayoutQualityReport report =
+        LayoutQuality.validateLayout(layoutResult(List.of(), List.of(edge), List.of()));
+
+    assertThat(report.routeDetourCount()).isEqualTo(1);
+    assertThat(report.status()).isEqualTo("warning");
+  }
+
+  @Test
+  void fourPointStaircaseDoesNotReceiveTheSimpleSideReturnAllowance() {
+    var edge =
+        edge(
+            "staircase",
+            "decision",
+            "merge",
+            List.of(
+                new Point(0.0, 0.0),
+                new Point(280.0, 0.0),
+                new Point(280.0, 300.0),
+                new Point(100.0, 300.0)));
+
+    LayoutQualityReport report =
+        LayoutQuality.validateLayout(layoutResult(List.of(), List.of(edge), List.of()));
+
+    assertThat(report.routeDetourCount()).isEqualTo(1);
+    assertThat(report.status()).isEqualTo("warning");
+  }
+
+  @Test
   void labeledEdgeTrappedInDenseParallelBandIsCountedAsDissociation() {
     // Three unrelated labeled edges running parallel 44px apart (ELK's edge-edge spacing band):
     // the middle edge cannot host a centered label without it landing on a neighbour's route,
