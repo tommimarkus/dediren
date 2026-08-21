@@ -54,6 +54,10 @@ class LayoutFixtureRegenerator {
       List.of(
           new FixtureMapping("archimate-oef-basic.json", "valid-archimate-oef.json", "main"),
           new FixtureMapping("basic.json", "valid-basic.json", "main"),
+          new FixtureMapping(
+              "uml-compact-sibling-fan-out.json",
+              "valid-uml-compact-sibling-fan-out.json",
+              "compact-sibling-fan-out"),
           new FixtureMapping("pipeline-rich.json", "valid-pipeline-rich.json", "main"),
           new FixtureMapping("uml-basic.json", "valid-uml-basic.json", "class-view"),
           new FixtureMapping("uml-activity.json", "valid-uml-basic.json", "activity-view"),

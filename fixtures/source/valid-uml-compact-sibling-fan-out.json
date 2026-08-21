@@ -1,0 +1,72 @@
+{
+  "model_schema_version": "model.schema.v1",
+  "required_plugins": [
+    {
+      "id": "generic-graph",
+      "version": "2026.08.7"
+    },
+    {
+      "id": "uml-xmi",
+      "version": "2026.08.7"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "cache-decision",
+      "type": "DecisionNode",
+      "label": "Cached?",
+      "properties": {}
+    },
+    {
+      "id": "use-cache",
+      "type": "Action",
+      "label": "Use cache",
+      "properties": {}
+    },
+    {
+      "id": "refresh-cache",
+      "type": "Action",
+      "label": "Refresh cache",
+      "properties": {}
+    }
+  ],
+  "relationships": [
+    {
+      "id": "cache-hit",
+      "type": "ControlFlow",
+      "source": "cache-decision",
+      "target": "use-cache",
+      "label": "hit",
+      "properties": {}
+    },
+    {
+      "id": "cache-miss",
+      "type": "ControlFlow",
+      "source": "cache-decision",
+      "target": "refresh-cache",
+      "label": "miss",
+      "properties": {}
+    }
+  ],
+  "plugins": {
+    "generic-graph": {
+      "semantic_profile": "uml",
+      "views": [
+        {
+          "id": "compact-sibling-fan-out",
+          "label": "Compact decision fan-out",
+          "kind": "uml-activity",
+          "nodes": ["cache-decision", "use-cache", "refresh-cache"],
+          "relationships": ["cache-hit", "cache-miss"],
+          "layout_preferences": {
+            "direction": "right",
+            "routing": {
+              "style": "orthogonal",
+              "endpoint_merging": "off"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

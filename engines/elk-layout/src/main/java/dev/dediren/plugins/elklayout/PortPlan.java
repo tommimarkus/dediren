@@ -196,7 +196,7 @@ final class PortPlan {
           "the flat port-plan family cannot rank nodes for " + ordering);
     }
     Map<String, EndpointMerge> merges = flatEndpointMerges(edges, nodes, preferences, direction);
-    Map<String, EndpointSides> sides = flatEndpointSides(edges, nodes, merges, direction);
+    Map<String, EndpointSides> sides = flatEndpointSides(edges, nodes, direction);
     return new PortPlan(
         ordering,
         sides,
@@ -793,64 +793,19 @@ final class PortPlan {
   // --- sides --------------------------------------------------------------------------------
 
   private static Map<String, EndpointSides> flatEndpointSides(
-      List<LayoutEdge> edges,
-      Map<String, LayoutNode> nodes,
-      Map<String, EndpointMerge> merges,
-      Direction direction) {
-    Map<String, Integer> outgoingCounts = new HashMap<>();
-    Map<String, Integer> incomingCounts = new HashMap<>();
-    for (LayoutEdge edge : edges) {
-      if (!nodes.containsKey(edge.source()) || !nodes.containsKey(edge.target())) {
-        continue;
-      }
-      outgoingCounts.merge(edge.source(), 1, Integer::sum);
-      incomingCounts.merge(edge.target(), 1, Integer::sum);
-    }
-
-    Map<String, Integer> outgoingIndexes = new HashMap<>();
-    Map<String, Integer> incomingIndexes = new HashMap<>();
+      List<LayoutEdge> edges, Map<String, LayoutNode> nodes, Direction direction) {
     Map<String, EndpointSides> sidesByEdge = new HashMap<>();
     EndpointSides defaultSides = defaultEndpointSides(direction);
     for (LayoutEdge edge : edges) {
       if (!nodes.containsKey(edge.source()) || !nodes.containsKey(edge.target())) {
         continue;
       }
-      EndpointMerge merge = merges.getOrDefault(edge.id(), NO_ENDPOINT_MERGE);
-      int outgoingIndex = nextEndpointIndex(outgoingIndexes, edge.source());
-      int incomingIndex = nextEndpointIndex(incomingIndexes, edge.target());
-      PortSide sourceSide = defaultSides.sourceSide();
-      PortSide targetSide = defaultSides.targetSide();
-      if (!merge.sourceEndpoint()
-          && outgoingCounts.getOrDefault(edge.source(), 0) > 1
-          && isConnectorSized(nodes.get(edge.source()))) {
-        sourceSide = connectorBranchSide(direction, true, outgoingIndex);
-      }
-      if (!merge.targetEndpoint()
-          && incomingCounts.getOrDefault(edge.target(), 0) > 1
-          && isConnectorSized(nodes.get(edge.target()))) {
-        targetSide = connectorBranchSide(direction, false, incomingIndex);
-      }
-      sidesByEdge.put(edge.id(), new EndpointSides(sourceSide, targetSide));
+      // Let ELK order sibling ports on their common flow side. Alternating compact endpoints
+      // across node corners introduces a near-endpoint crossing for ordinary decision fan-out.
+      // The root's port-model-order option preserves the source-model order within that side.
+      sidesByEdge.put(edge.id(), defaultSides);
     }
     return sidesByEdge;
-  }
-
-  private static int nextEndpointIndex(Map<String, Integer> indexes, String nodeId) {
-    int index = indexes.getOrDefault(nodeId, 0);
-    indexes.put(nodeId, index + 1);
-    return index;
-  }
-
-  private static PortSide connectorBranchSide(
-      Direction direction, boolean sourceEndpoint, int index) {
-    PortSide primary = sourceEndpoint ? sourcePortSide(direction) : targetPortSide(direction);
-    PortSide[] alternates =
-        switch (primary) {
-          case EAST, WEST -> new PortSide[] {primary, PortSide.NORTH, PortSide.SOUTH};
-          case NORTH, SOUTH -> new PortSide[] {primary, PortSide.EAST, PortSide.WEST};
-          default -> new PortSide[] {primary};
-        };
-    return alternates[Math.min(index, alternates.length - 1)];
   }
 
   private static EndpointSides defaultEndpointSides(Direction direction) {

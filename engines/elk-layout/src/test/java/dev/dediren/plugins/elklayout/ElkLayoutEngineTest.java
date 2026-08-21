@@ -938,7 +938,7 @@ class ElkLayoutEngineTest {
   }
 
   @Test
-  void compactDecisionFanOutUsesSeparateSourceCorners() {
+  void compactDecisionFanOutKeepsSiblingPortsOnThePrimaryFlowSide() {
     LayoutRequest request =
         new LayoutRequest(
             ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
@@ -971,17 +971,24 @@ class ElkLayoutEngineTest {
     LaidOutEdge cachedEdge = edgeById(result, "check-cache-cached");
     LaidOutEdge staleEdge = edgeById(result, "check-cache-stale");
 
-    assertFalse(
-        samePoint(cachedEdge.points().get(0), staleEdge.points().get(0)),
-        "decision fan-out branches should not leave the same visual corner, cached="
+    LaidOutNode decision = nodeById(result, "check-cache");
+
+    assertRouteEndpointOnSide(result, "check-cache-cached", "check-cache", true, PortSide.EAST);
+    assertRouteEndpointOnSide(result, "check-cache-stale", "check-cache", true, PortSide.EAST);
+    assertEquals(
+        0,
+        routeCrossingCountNearSource(cachedEdge, staleEdge, decision),
+        "compact decision fan-out routes should not cross near their shared endpoint, cached="
             + cachedEdge.points()
             + ", stale="
             + staleEdge.points());
-    assertTrue(
-        usesDifferentSourceSides(result, "check-cache-cached", "check-cache-stale", "check-cache"),
-        "decision fan-out branches should use separate source corners, cached="
-            + cachedEdge.points()
-            + ", stale="
+    assertFalse(
+        hasExcessiveRouteDetour(cachedEdge),
+        "compact decision fan-out must not trade the crossing for a detour, cached="
+            + cachedEdge.points());
+    assertFalse(
+        hasExcessiveRouteDetour(staleEdge),
+        "compact decision fan-out must not trade the crossing for a detour, stale="
             + staleEdge.points());
   }
 
