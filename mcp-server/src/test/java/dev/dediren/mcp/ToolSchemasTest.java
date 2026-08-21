@@ -71,10 +71,7 @@ class ToolSchemasTest {
 
     for (JsonNode schema : List.of(imported, build)) {
       JsonNode properties = schema.path("properties");
-      JsonNode output = properties.path("output");
       JsonNode acceptedImageTypes = properties.path("accepted_image_types");
-      assertThat(textValues(output.path("enum"))).containsExactly("data", "svg", "image");
-      assertThat(output.path("default").asText()).isEqualTo("data");
       assertThat(acceptedImageTypes.path("uniqueItems").asBoolean()).isTrue();
       assertThat(textValues(acceptedImageTypes.path("items").path("enum")))
           .containsExactly("image/svg+xml", "image/png");
@@ -82,6 +79,15 @@ class ToolSchemasTest {
           .containsExactly("accepted_image_types");
       assertThat(schema.at("/allOf/0/then/properties/output/const").asText()).isEqualTo("image");
     }
+
+    JsonNode buildOutput = build.path("properties").path("output");
+    assertThat(textValues(buildOutput.path("enum"))).containsExactly("data", "svg", "image");
+    assertThat(buildOutput.path("default").asText()).isEqualTo("data");
+
+    JsonNode importOutput = imported.path("properties").path("output");
+    assertThat(textValues(importOutput.path("enum")))
+        .containsExactly("data", "svg", "image", "text");
+    assertThat(importOutput.path("default").asText()).isEqualTo("data");
   }
 
   private static List<String> textValues(JsonNode array) {

@@ -128,11 +128,27 @@ public final class CoreCommands {
   }
 
   /**
-   * Renders the imported model's required {@code main} view in memory. This is deliberately not a
-   * build command: no artifact path is accepted and no filesystem write is possible.
+   * Renders the imported model's required {@code main} view in memory using the {@code render}
+   * (SVG) engine. This is deliberately not a build command: no artifact path is accepted and no
+   * filesystem write is possible.
    */
   public static ImportedRenderResult renderImportedMain(
       SourceDocument source, String renderPolicyText, Map<String, String> env, Engines engines) {
+    return renderImportedMain(source, renderPolicyText, "render", env, engines);
+  }
+
+  /**
+   * Renders the imported model's required {@code main} view in memory through the given render
+   * engine id (for example {@code "render"} for SVG or {@code "ascii"} for an inline text
+   * diagram). This is deliberately not a build command: no artifact path is accepted and no
+   * filesystem write is possible.
+   */
+  public static ImportedRenderResult renderImportedMain(
+      SourceDocument source,
+      String renderPolicyText,
+      String renderEngineId,
+      Map<String, String> env,
+      Engines engines) {
     JsonNode policy;
     try {
       policy = parsePolicy("render", renderPolicyText, KnownSchemaVersions.RENDER_POLICY);
@@ -199,10 +215,12 @@ public final class CoreCommands {
       diagnostics.addAll(renderMetadata.diagnostics());
 
       RenderEngine renderEngine =
-          EngineDispatch.requireEngine(engines, "render", "render", engines.renderEngine("render"));
+          EngineDispatch.requireEngine(
+              engines, renderEngineId, "render", engines.renderEngine(renderEngineId));
       EngineDispatch.InMemoryOutcome<RenderResult> render =
           EngineDispatch.dispatchInMemory(
-              "render", () -> renderEngine.render(laid.value(), policy, renderMetadata.value()));
+              renderEngineId,
+              () -> renderEngine.render(laid.value(), policy, renderMetadata.value()));
       EngineResult<RenderResult> rendered;
       switch (render) {
         case EngineDispatch.InMemoryOutcome.Value<RenderResult> value -> rendered = value.result();
