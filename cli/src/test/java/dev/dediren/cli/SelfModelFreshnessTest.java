@@ -21,13 +21,13 @@ import tools.jackson.databind.JsonNode;
 
 /**
  * Always-on drift gate for {@code docs/architecture/dediren.dediren}, Dediren's dogfood self-model
- * that feeds the README hero image and the Pages site. No test pinned it before this one, so it
- * has gone stale silently twice: the {@code drawio} lane (commit 36db762) had to add the missing
- * module *and* discovered the README hero counts had already drifted since {@code dot-import}, and
- * {@code ascii-render} (v2026.08.8) is stale right now, and the package's own README carries stale
- * digit counts too. This replaces the manual sweep with four checks: the published artifacts are
- * not stale, every reactor module is modelled, the top-level README hero counts match what the
- * model itself says, and the self-model package's own README counts match the model as well.
+ * that feeds the README hero image and the Pages site. No test pinned it before this one, so it has
+ * gone stale silently twice: the {@code drawio} lane (commit 36db762) had to add the missing module
+ * *and* discovered the README hero counts had already drifted since {@code dot-import}, and {@code
+ * ascii-render} (v2026.08.8) is stale right now, and the package's own README carries stale digit
+ * counts too. This replaces the manual sweep with four checks: the published artifacts are not
+ * stale, every reactor module is modelled, the top-level README hero counts match what the model
+ * itself says, and the self-model package's own README counts match the model as well.
  */
 class SelfModelFreshnessTest {
 
@@ -105,9 +105,7 @@ class SelfModelFreshnessTest {
         break;
       }
     }
-    assertThat(tier2)
-        .as("module-architecture view has no group with id grp-tier2")
-        .isNotNull();
+    assertThat(tier2).as("module-architecture view has no group with id grp-tier2").isNotNull();
     int engineCount = tier2.path("members").size() - 1; // minus "core" itself
 
     String moduleWord = numberWord(moduleCount);
