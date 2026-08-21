@@ -165,6 +165,43 @@ class EngineEnvelopeContractTest {
     assertDiagnostic(outcome, 3, "DEDIREN_SVG_POLICY_INVALID");
   }
 
+  @Test
+  void renderAsciiEmitsOkEnvelope() throws Exception {
+    String policy = read("fixtures/render-policy/ascii-text.json");
+    String layout = read("fixtures/layout-result/basic.json");
+
+    EngineRunOutcome outcome =
+        CoreCommands.renderCommand("ascii", policy, null, layout, Map.of(), engines());
+
+    assertThat(outcome.exitCode()).describedAs(outcome.stdout()).isZero();
+    JsonNode envelope = JsonSupport.objectMapper().readTree(outcome.stdout());
+    assertThat(envelope.get("status").asText()).isEqualTo("ok");
+    assertThat(envelope.at("/data/render_result_schema_version").asText())
+        .isEqualTo("render-result.schema.v6");
+    JsonNode artifacts = envelope.at("/data/render_result/artifacts");
+    assertThat(artifacts).isArray();
+    assertThat(artifacts.size()).isEqualTo(1);
+    JsonNode artifact = artifacts.get(0);
+    assertThat(artifact.get("artifact_kind").asText()).isEqualTo("text");
+    assertThat(artifact.get("content").asText()).isNotBlank();
+    assertSchemaValid(envelope);
+  }
+
+  @Test
+  void renderAsciiRejectsInvalidCharset() throws Exception {
+    String policy =
+        "{\"render_policy_schema_version\":\"render-policy.schema.v4\","
+            + "\"page\":{\"width\":100,\"height\":100},"
+            + "\"margin\":{\"top\":0,\"right\":0,\"bottom\":0,\"left\":0},"
+            + "\"text\":{\"charset\":\"bogus\"}}";
+    String layout = read("fixtures/layout-result/basic.json");
+
+    EngineRunOutcome outcome =
+        CoreCommands.renderCommand("ascii", policy, null, layout, Map.of(), engines());
+
+    assertDiagnostic(outcome, 3, "DEDIREN_ASCII_POLICY_INVALID");
+  }
+
   // --- archimate-oef export --------------------------------------------------------------------
 
   @Test
