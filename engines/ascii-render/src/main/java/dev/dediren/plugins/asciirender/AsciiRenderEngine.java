@@ -76,7 +76,7 @@ public final class AsciiRenderEngine implements RenderEngine {
               "$"));
     }
 
-    List<RenderArtifact> artifacts = List.of(new RenderArtifact("text", content));
+    List<RenderArtifact> artifacts = List.of(new RenderArtifact("ascii+text", content));
     return new EngineResult<>(
         new RenderResult(ContractVersions.RENDER_RESULT_SCHEMA_VERSION, artifacts), diagnostics);
   }

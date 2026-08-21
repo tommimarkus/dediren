@@ -227,7 +227,7 @@ class CliLayoutRenderCommandTest {
 
     assertThat(result.exitCode()).isZero();
     assertThat(envelope.at("/status").asText()).isEqualTo("ok");
-    assertThat(envelope.at("/data/artifacts/0/artifact_kind").asText()).isEqualTo("svg");
+    assertThat(envelope.at("/data/artifacts/0/artifact_kind").asText()).isEqualTo("svg+xml");
     assertThat(envelope.at("/data/artifacts/0/content").asText())
         .contains(
             "<svg",

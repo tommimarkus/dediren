@@ -320,7 +320,7 @@ class CliMcpParityTest {
     JsonNode artifacts =
         JsonSupport.objectMapper().readTree(textOf(result)).at("/views/0/artifacts");
     for (JsonNode artifact : artifacts) {
-      if ("svg".equals(artifact.path("artifact_kind").asText())) {
+      if ("svg+xml".equals(artifact.path("artifact_kind").asText())) {
         return artifact.path("path").asText();
       }
     }

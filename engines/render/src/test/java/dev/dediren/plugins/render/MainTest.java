@@ -55,8 +55,8 @@ class MainTest {
       String content = data.at("/artifacts/0/content").asText();
 
       assertThat(data.at("/render_result_schema_version").asText())
-          .isEqualTo("render-result.schema.v6");
-      assertThat(data.at("/artifacts/0/artifact_kind").asText()).isEqualTo("svg");
+          .isEqualTo("render-result.schema.v7");
+      assertThat(data.at("/artifacts/0/artifact_kind").asText()).isEqualTo("svg+xml");
       assertThat(content).contains("<svg", "Client", "API");
     }
 
@@ -2279,7 +2279,7 @@ class MainTest {
       JsonNode data = okData(render(input));
 
       assertThat(data.at("/artifacts").size()).isEqualTo(1);
-      assertThat(data.at("/artifacts/0/artifact_kind").asText()).isEqualTo("svg");
+      assertThat(data.at("/artifacts/0/artifact_kind").asText()).isEqualTo("svg+xml");
       String svg = data.at("/artifacts/0/content").asText();
       assertThat(svg).doesNotContain("<script");
       assertThat(svg).doesNotContain("data-dediren-edge-source");
@@ -4324,7 +4324,7 @@ class MainTest {
     JsonNode data = okData(result);
     int artifactCount = 0;
     for (JsonNode artifact : data.path("artifacts")) {
-      assertThat(artifact.path("artifact_kind").asText()).isEqualTo("svg");
+      assertThat(artifact.path("artifact_kind").asText()).isEqualTo("svg+xml");
       artifactCount++;
     }
     assertThat(artifactCount).isPositive();

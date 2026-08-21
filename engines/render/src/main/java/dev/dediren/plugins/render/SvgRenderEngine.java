@@ -74,7 +74,7 @@ public final class SvgRenderEngine implements RenderEngine {
     }
 
     String svg = renderSvg(layout, metadataOrNull, renderPolicy);
-    List<RenderArtifact> artifacts = List.of(new RenderArtifact("svg", svg));
+    List<RenderArtifact> artifacts = List.of(new RenderArtifact("svg+xml", svg));
     List<Diagnostic> diagnostics = new ArrayList<>();
     diagnostics.addAll(notationProfileNotAppliedDiagnostics(metadataOrNull, renderPolicy));
     diagnostics.addAll(edgeLabelOccludedDiagnostics(layout, metadataOrNull, renderPolicy));

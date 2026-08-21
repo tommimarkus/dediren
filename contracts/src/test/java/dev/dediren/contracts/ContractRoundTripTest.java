@@ -485,7 +485,7 @@ class ContractRoundTripTest {
     RenderResult result =
         new RenderResult(
             ContractVersions.RENDER_RESULT_SCHEMA_VERSION,
-            List.of(new dev.dediren.contracts.render.RenderArtifact("svg", "<svg></svg>")));
+            List.of(new dev.dediren.contracts.render.RenderArtifact("svg+xml", "<svg></svg>")));
 
     assertThat(policy.renderPolicySchemaVersion())
         .isEqualTo(ContractVersions.RENDER_POLICY_SCHEMA_VERSION);
@@ -540,13 +540,13 @@ class ContractRoundTripTest {
                 .valueToTree(result)
                 .at("/artifacts/0/artifact_kind")
                 .asText())
-        .isEqualTo("svg");
+        .isEqualTo("svg+xml");
     assertThat(
             JsonSupport.objectMapper()
                 .valueToTree(result)
                 .at("/render_result_schema_version")
                 .asText())
-        .isEqualTo("render-result.schema.v6");
+        .isEqualTo("render-result.schema.v7");
   }
 
   @Test
@@ -757,7 +757,7 @@ class ContractRoundTripTest {
     assertThat(basic.views())
         .allSatisfy(view -> assertThat(view.status()).isEqualTo(EnvelopeStatus.OK));
     assertThat(basic.views().getFirst().artifacts())
-        .containsExactly(new BuildArtifact("svg", "overview/diagram.svg"));
+        .containsExactly(new BuildArtifact("svg+xml", "overview/diagram.svg"));
 
     assertThat(error.status()).isEqualTo(EnvelopeStatus.ERROR);
     BuildViewOutcome warned = error.views().getFirst();
@@ -779,7 +779,7 @@ class ContractRoundTripTest {
     assertThat(encoded.at("/build_result_schema_version").asText())
         .isEqualTo("build-result.schema.v1");
     assertThat(encoded.at("/views/0/view_id").asText()).isEqualTo("overview");
-    assertThat(encoded.at("/views/0/artifacts/0/artifact_kind").asText()).isEqualTo("svg");
+    assertThat(encoded.at("/views/0/artifacts/0/artifact_kind").asText()).isEqualTo("svg+xml");
     assertThat(encoded.has("diagnostics")).isFalse();
 
     assertThat(reparse(basic)).isEqualTo(basic);

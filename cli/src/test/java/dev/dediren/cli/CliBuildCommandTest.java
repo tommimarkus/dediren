@@ -48,7 +48,7 @@ class CliBuildCommandTest {
     assertThat(buildResult.at("/status").asText()).isEqualTo("ok");
     assertThat(buildResult.at("/views/0/view_id").asText()).isEqualTo("main");
     assertThat(buildResult.at("/views/0/status").asText()).isEqualTo("ok");
-    assertThat(buildResult.at("/views/0/artifacts/0/artifact_kind").asText()).isEqualTo("svg");
+    assertThat(buildResult.at("/views/0/artifacts/0/artifact_kind").asText()).isEqualTo("svg+xml");
     assertThat(buildResult.at("/views/0/artifacts/0/path").asText()).isEqualTo("main/diagram.svg");
 
     String svg = Files.readString(out.resolve("main/diagram.svg"), StandardCharsets.UTF_8);
