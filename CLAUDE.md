@@ -436,6 +436,12 @@ SVG render changes:
 ./mvnw -pl engines/render,cli -am test
 ```
 
+ASCII render changes:
+
+```bash
+./mvnw -pl engines/ascii-render,cli -am test
+```
+
 Chromium-backed decorated-paint and raster verification (opt-in):
 
 ```bash

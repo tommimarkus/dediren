@@ -346,6 +346,11 @@ Controls:
   the successful command's JSON envelope only. The executable is operator
   supplied, not bundled or listed in `THIRD-PARTY-NOTICES.md`; upstream `resvg`
   is licensed MIT OR Apache-2.0.
+- **Optional text (ASCII) output.** `dediren_import`'s `output: "text"` is
+  response adaptation over the same in-memory import → render lane the SVG
+  attachment path uses, swapped to the `ascii` render engine — no new parser,
+  no filesystem writes, and the same inline decoded-content byte budget as the
+  other `dediren_import` output modes.
 - **Package declared outputs.** `dediren build --package` (and `dediren_build` with
   a `package` argument) add a caller-*declared* write surface: each view and export
   names the path its artifact lands at. Every declared output path — and every
