@@ -207,6 +207,19 @@
       }
     },
     {
+      "id": "ascii-render",
+      "type": "ApplicationComponent",
+      "label": "ascii-render",
+      "properties": {
+        "layer": "Application",
+        "viewpoint": "Application Cooperation",
+        "tier": "2",
+        "rationale": "Renders a laid-out scene to a plain-text ASCII character grid instead of SVG, behind the same render capability as the SVG emitter.",
+        "evidence": "source-backed",
+        "source": "engines/ascii-render/pom.xml; engine-api/src/main/java/dev/dediren/engine/RenderEngine.java"
+      }
+    },
+    {
       "id": "archimate-oef-export",
       "type": "ApplicationComponent",
       "label": "archimate-oef-export",
@@ -406,6 +419,17 @@
       }
     },
     {
+      "id": "serv-contracts-ascii-render",
+      "type": "Serving",
+      "source": "contracts",
+      "target": "ascii-render",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
       "id": "serv-contracts-archimate-oef-export",
       "type": "Serving",
       "source": "contracts",
@@ -531,6 +555,17 @@
       "type": "Serving",
       "source": "ir",
       "target": "render",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
+      "id": "serv-ir-ascii-render",
+      "type": "Serving",
+      "source": "ir",
+      "target": "ascii-render",
       "label": "",
       "properties": {
         "visible": true,
@@ -736,6 +771,17 @@
       }
     },
     {
+      "id": "serv-engine-api-ascii-render",
+      "type": "Serving",
+      "source": "engine-api",
+      "target": "ascii-render",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
       "id": "serv-engine-api-archimate-oef-export",
       "type": "Serving",
       "source": "engine-api",
@@ -890,6 +936,17 @@
       }
     },
     {
+      "id": "serv-ascii-render-cli",
+      "type": "Serving",
+      "source": "ascii-render",
+      "target": "cli",
+      "label": "",
+      "properties": {
+        "visible": true,
+        "evidence": "source-backed"
+      }
+    },
+    {
       "id": "serv-archimate-oef-export-cli",
       "type": "Serving",
       "source": "archimate-oef-export",
@@ -957,6 +1014,7 @@
             "semantics-uml",
             "elk-layout",
             "render",
+            "ascii-render",
             "archimate-oef-export",
             "uml-xmi-export",
             "mcp-server",
@@ -976,6 +1034,7 @@
             "serv-engine-api-semantics-uml",
             "serv-engine-api-elk-layout",
             "serv-engine-api-render",
+            "serv-engine-api-ascii-render",
             "serv-engine-api-archimate-oef-export",
             "serv-engine-api-uml-xmi-export",
             "serv-archimate-semantics-archimate",
@@ -1026,6 +1085,7 @@
                 "semantics-uml",
                 "elk-layout",
                 "render",
+                "ascii-render",
                 "archimate-oef-export",
                 "uml-xmi-export"
               ]
