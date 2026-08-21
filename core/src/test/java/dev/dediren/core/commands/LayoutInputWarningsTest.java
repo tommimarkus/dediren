@@ -206,7 +206,7 @@ class LayoutInputWarningsTest {
         .isEqualTo("DEDIREN_LAYOUT_NON_FINITE_GEOMETRY");
     assertThat(envelope.at("/diagnostics/0/severity").asText()).isEqualTo("warning");
     assertThat(envelope.at("/diagnostics/0/path").asText()).isEqualTo("$.nodes[0]");
-    assertThat(envelope.at("/data/artifacts/0/artifact_kind").asText()).isEqualTo("svg");
+    assertThat(envelope.at("/data/artifacts/0/artifact_kind").asText()).isEqualTo("svg+xml");
     assertThat(envelope.at("/data/artifacts/0/content").asText()).contains("<svg");
   }
 
@@ -351,7 +351,7 @@ class LayoutInputWarningsTest {
       return new EngineResult<>(
           new RenderResult(
               ContractVersions.RENDER_RESULT_SCHEMA_VERSION,
-              List.of(new RenderArtifact("svg", "<svg role=\"img\"></svg>"))),
+              List.of(new RenderArtifact("svg+xml", "<svg role=\"img\"></svg>"))),
           List.of());
     }
   }
@@ -369,7 +369,7 @@ class LayoutInputWarningsTest {
       return new EngineResult<>(
           new RenderResult(
               ContractVersions.RENDER_RESULT_SCHEMA_VERSION,
-              List.of(new RenderArtifact("svg", "<svg role=\"img\"></svg>"))),
+              List.of(new RenderArtifact("svg+xml", "<svg role=\"img\"></svg>"))),
           List.of(
               new Diagnostic(
                   "DEDIREN_ENGINE_SAYS_SO",

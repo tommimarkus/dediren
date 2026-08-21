@@ -143,7 +143,7 @@ class BuildCommandTest {
 
     BuildViewOutcome overview = result.views().getFirst();
     assertThat(overview.artifacts()).hasSize(1);
-    assertThat(overview.artifacts().getFirst().artifactKind()).isEqualTo("svg");
+    assertThat(overview.artifacts().getFirst().artifactKind()).isEqualTo("svg+xml");
     assertThat(overview.artifacts().getFirst().path()).isEqualTo("overview/diagram.svg");
     // Build-lane artifacts carry the provenance stamp injected inside the (reopened) root.
     assertThat(Files.readString(out.resolve("overview/diagram.svg")))
@@ -630,7 +630,7 @@ class BuildCommandTest {
     EngineRunOutcome outcome = BuildCommand.run(renderOnlyRequest(), engines);
 
     assertFailingViewDidNotAbortHealthyOverview(
-        outcome, "svg", "DEDIREN_LAYOUT_ROUTE_POINTS_EMPTY");
+        outcome, "svg+xml", "DEDIREN_LAYOUT_ROUTE_POINTS_EMPTY");
   }
 
   @Test
@@ -639,7 +639,7 @@ class BuildCommandTest {
 
     EngineRunOutcome outcome = BuildCommand.run(renderOnlyRequest(), engines);
 
-    assertFailingViewDidNotAbortHealthyOverview(outcome, "svg", "DEDIREN_FAKE_METADATA_FAILED");
+    assertFailingViewDidNotAbortHealthyOverview(outcome, "svg+xml", "DEDIREN_FAKE_METADATA_FAILED");
   }
 
   @Test
@@ -648,7 +648,7 @@ class BuildCommandTest {
 
     EngineRunOutcome outcome = BuildCommand.run(renderOnlyRequest(), engines);
 
-    assertFailingViewDidNotAbortHealthyOverview(outcome, "svg", "DEDIREN_FAKE_RENDER_FAILED");
+    assertFailingViewDidNotAbortHealthyOverview(outcome, "svg+xml", "DEDIREN_FAKE_RENDER_FAILED");
   }
 
   @Test
@@ -678,7 +678,7 @@ class BuildCommandTest {
 
     EngineRunOutcome outcome = BuildCommand.run(renderOnlyRequest(), engines);
 
-    assertOnlyDetailWarned(outcome, "svg", "DEDIREN_FAKE_LAYOUT_REQUEST_WARNING");
+    assertOnlyDetailWarned(outcome, "svg+xml", "DEDIREN_FAKE_LAYOUT_REQUEST_WARNING");
   }
 
   @Test
@@ -688,7 +688,7 @@ class BuildCommandTest {
 
     EngineRunOutcome outcome = BuildCommand.run(renderOnlyRequest(), engines);
 
-    assertOnlyDetailWarned(outcome, "svg", "DEDIREN_FAKE_LAYOUT_STAGE_WARNING");
+    assertOnlyDetailWarned(outcome, "svg+xml", "DEDIREN_FAKE_LAYOUT_STAGE_WARNING");
   }
 
   @Test
@@ -742,9 +742,17 @@ class BuildCommandTest {
 
   @Test
   void exportMediaSuffixSelectsFileExtension() throws Exception {
-    // exportExtension keys the file extension off the media suffix after the last '+'. First-party
-    // engines only emit "+xml", so a third-party-style "<id>+json" pins the switch's "json" arm and
-    // the substring offset (a +1 -> -1 mutation would land on a different suffix and extension).
+    // ArtifactSink keys both the file extension and the stamping rule off the media suffix after
+    // the last '+'. First-party engines only emit "+xml", so a third-party-style "<id>+json" pins
+    // the "json" arm and the substring offset (a +1 -> -1 mutation would land on a different
+    // suffix and extension).
+    //
+    // It also pins that a JSON export is written *unstamped*. Before ArtifactSink owned this, every
+    // export artifact went through Provenance.stampXml regardless of serialization, so this file
+    // was written as an XML comment followed by the document — invalid JSON, which this test used
+    // to assert as correct. JSON has no inert comment syntax, so not-stamped is the only honest
+    // answer; `dediren status` reporting such a file `unstamped` is then accurate rather than a
+    // surprise.
     Engines engines =
         Engines.of(
             List.of(new FakeSemanticsEngine(Set.of(), Set.of())),
@@ -763,8 +771,8 @@ class BuildCommandTest {
     assertThat(overview.artifacts().getFirst().artifactKind()).isEqualTo("stats+json");
     assertThat(overview.artifacts().getFirst().path()).isEqualTo("overview/oef.json");
     assertThat(Files.readString(out.resolve("overview/oef.json")))
-        .startsWith("<!-- dediren-provenance ")
-        .endsWith("{}");
+        .as("a JSON export must stay parseable JSON, so it carries no stamp")
+        .isEqualTo("{}");
   }
 
   @Test
@@ -1127,7 +1135,7 @@ class BuildCommandTest {
       return new EngineResult<>(
           new RenderResult(
               ContractVersions.RENDER_RESULT_SCHEMA_VERSION,
-              List.of(new RenderArtifact("svg", "<svg/>"))),
+              List.of(new RenderArtifact("svg+xml", "<svg/>"))),
           List.of());
     }
   }

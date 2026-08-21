@@ -24,6 +24,8 @@ import dev.dediren.contracts.source.SourceDocument;
 import dev.dediren.core.DedirenPaths;
 import dev.dediren.core.analysis.CanonicalJson;
 import dev.dediren.core.analysis.Provenance;
+import dev.dediren.core.artifact.ArtifactSink;
+import dev.dediren.core.artifact.ExportLane;
 import dev.dediren.core.engine.EngineDispatch;
 import dev.dediren.core.engine.EngineExecutionException;
 import dev.dediren.core.engine.EngineRunOutcome;
@@ -82,8 +84,6 @@ public final class BuildCommand {
 
   private static final String LAYOUT_ENGINE = "elk-layout";
   private static final String RENDER_ENGINE = "render";
-  private static final String OEF_ENGINE = "archimate-oef";
-  private static final String XMI_ENGINE = "uml-xmi";
 
   /**
    * Diagram kinds whose model content is classifier-based and composes safely in one aggregate
@@ -288,21 +288,21 @@ public final class BuildCommand {
     if (oefPolicy != null && !oefViewLayouts.isEmpty()) {
       aggregates.add(
           new AggregateSpec(
-              OEF_ENGINE,
+              ExportLane.ARCHIMATE_OEF.engineId(),
               oefViewLayouts,
               oefPolicy,
               "model.oef.xml",
-              "oef_policy_sha256",
+              ExportLane.ARCHIMATE_OEF.policyShaKey(),
               stamps.oefPolicySha()));
     }
     if (xmiPolicy != null && !xmiViewLayouts.isEmpty()) {
       aggregates.add(
           new AggregateSpec(
-              XMI_ENGINE,
+              ExportLane.UML_XMI.engineId(),
               xmiViewLayouts,
               xmiPolicy,
               "model.uml.xml",
-              "xmi_policy_sha256",
+              ExportLane.UML_XMI.policyShaKey(),
               stamps.xmiPolicySha()));
     }
     for (AggregateSpec spec : aggregates) {
@@ -484,24 +484,44 @@ public final class BuildCommand {
     if (request.oefPolicyText() != null) {
       InMemoryStage<ExportResult> oef =
           runExportStage(
-              request, engines, source, layoutRecord, OEF_ENGINE, oefPolicy, diagnostics);
+              request,
+              engines,
+              source,
+              layoutRecord,
+              ExportLane.ARCHIMATE_OEF.engineId(),
+              oefPolicy,
+              diagnostics);
       if (oef.failed()) {
         return failedView(view, artifacts, diagnostics, oef.exitCode());
       }
       warning |= oef.warning();
-      writeExportArtifact(request, view, "oef", oef.value(), artifacts, stamps);
+      writeExportArtifact(
+          request,
+          view,
+          ExportLane.ARCHIMATE_OEF,
+          stamps.oefPolicySha(),
+          oef.value(),
+          artifacts,
+          stamps);
     }
 
     // Stage 6: UML/XMI export lane.
     if (request.xmiPolicyText() != null) {
       InMemoryStage<ExportResult> xmi =
           runExportStage(
-              request, engines, source, layoutRecord, XMI_ENGINE, xmiPolicy, diagnostics);
+              request,
+              engines,
+              source,
+              layoutRecord,
+              ExportLane.UML_XMI.engineId(),
+              xmiPolicy,
+              diagnostics);
       if (xmi.failed()) {
         return failedView(view, artifacts, diagnostics, xmi.exitCode());
       }
       warning |= xmi.warning();
-      writeExportArtifact(request, view, "xmi", xmi.value(), artifacts, stamps);
+      writeExportArtifact(
+          request, view, ExportLane.UML_XMI, stamps.xmiPolicySha(), xmi.value(), artifacts, stamps);
     }
 
     EnvelopeStatus status = warning ? EnvelopeStatus.WARNING : EnvelopeStatus.OK;
@@ -712,9 +732,10 @@ public final class BuildCommand {
       List<BuildArtifact> artifacts,
       Stamps stamps) {
     for (RenderArtifact artifact : result.artifacts()) {
-      String fileName = "diagram." + renderExtension(artifact.artifactKind());
-      String stamped =
-          Provenance.stampSvg(
+      String fileName = "diagram." + ArtifactSink.renderExtension(artifact.artifactKind());
+      ArtifactSink.Stamped stamped =
+          ArtifactSink.stamp(
+              artifact.artifactKind(),
               artifact.content(),
               Provenance.payload(
                   stamps.modelSchemaVersion(),
@@ -723,7 +744,7 @@ public final class BuildCommand {
                   "render_policy_sha256",
                   stamps.renderPolicySha(),
                   stamps.version()));
-      writeFile(request, view, fileName, stamped);
+      writeFile(request, view, fileName, stamped.content());
       artifacts.add(new BuildArtifact(artifact.artifactKind(), view + "/" + fileName));
     }
   }
@@ -731,23 +752,25 @@ public final class BuildCommand {
   private static void writeExportArtifact(
       BuildRequest request,
       String view,
-      String baseName,
+      ExportLane lane,
+      String policySha,
       ExportResult result,
       List<BuildArtifact> artifacts,
       Stamps stamps) {
-    String fileName = baseName + "." + exportExtension(result.artifactKind());
-    boolean oef = "oef".equals(baseName);
-    String stamped =
-        Provenance.stampXml(
+    String fileName =
+        lane.baseFileName() + "." + ArtifactSink.exportExtension(result.artifactKind());
+    ArtifactSink.Stamped stamped =
+        ArtifactSink.stamp(
+            result.artifactKind(),
             result.content(),
             Provenance.payload(
                 stamps.modelSchemaVersion(),
                 stamps.modelSha(),
                 view,
-                oef ? "oef_policy_sha256" : "xmi_policy_sha256",
-                oef ? stamps.oefPolicySha() : stamps.xmiPolicySha(),
+                lane.policyShaKey(),
+                policySha,
                 stamps.version()));
-    writeFile(request, view, fileName, stamped);
+    writeFile(request, view, fileName, stamped.content());
     artifacts.add(new BuildArtifact(result.artifactKind(), view + "/" + fileName));
   }
 
@@ -782,30 +805,6 @@ public final class BuildCommand {
     if (!normalizedTarget.startsWith(anchor)) {
       throw new ViewOutputEscapesRootException(view);
     }
-  }
-
-  private static String renderExtension(String artifactKind) {
-    // render-result.schema.v6 admits "svg" (extension = kind) and "text" (extension "txt"); the
-    // ascii render engine is not wired into build lanes today, so "text" is unreachable here,
-    // kept for the seam's promise.
-    return switch (artifactKind) {
-      case "text" -> "txt";
-      default -> artifactKind;
-    };
-  }
-
-  private static String exportExtension(String artifactKind) {
-    // Every export-result artifact_kind matches the export-result schema pattern
-    // "^[a-z0-9][a-z0-9.-]*\+(xml|json|text)$", so a '+' media suffix is always present; the text
-    // after the last '+' selects the file extension. There is no no-'+' fallback branch: it is
-    // unreachable for schema-valid input, and substring(lastIndexOf('+') + 1) already yields the
-    // whole string (== the former fallback) if a '+' were ever absent.
-    String suffix = artifactKind.substring(artifactKind.lastIndexOf('+') + 1);
-    return switch (suffix) {
-      case "json" -> "json";
-      case "text" -> "txt";
-      default -> "xml";
-    };
   }
 
   private static ViewBuild failedView(
