@@ -5,7 +5,7 @@
   "additionalProperties": false,
   "required": ["render_result_schema_version", "artifacts"],
   "properties": {
-    "render_result_schema_version": { "const": "render-result.schema.v5" },
+    "render_result_schema_version": { "const": "render-result.schema.v6" },
     "artifacts": {
       "type": "array",
       "minItems": 1,
@@ -14,7 +14,7 @@
         "additionalProperties": false,
         "required": ["artifact_kind", "content"],
         "properties": {
-          "artifact_kind": { "enum": ["svg"] },
+          "artifact_kind": { "enum": ["svg", "text"] },
           "content": { "type": "string" },
           "encoding": { "enum": ["utf-8"] }
         }

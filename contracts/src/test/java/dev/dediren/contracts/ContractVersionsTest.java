@@ -136,7 +136,7 @@ class ContractVersionsTest {
     assertThat(ContractVersions.LAYOUT_RESULT_SCHEMA_VERSION).isEqualTo("layout-result.schema.v2");
     assertThat(ContractVersions.SEMANTIC_VALIDATION_RESULT_SCHEMA_VERSION)
         .isEqualTo("semantic-validation-result.schema.v1");
-    assertThat(ContractVersions.RENDER_RESULT_SCHEMA_VERSION).isEqualTo("render-result.schema.v5");
+    assertThat(ContractVersions.RENDER_RESULT_SCHEMA_VERSION).isEqualTo("render-result.schema.v6");
     assertThat(ContractVersions.DIFF_RESULT_SCHEMA_VERSION).isEqualTo("diff-result.schema.v1");
     assertThat(ContractVersions.QUERY_RESULT_SCHEMA_VERSION).isEqualTo("query-result.schema.v1");
     assertThat(ContractVersions.VERIFY_RESULT_SCHEMA_VERSION).isEqualTo("verify-result.schema.v1");

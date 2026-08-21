@@ -404,7 +404,7 @@ class DedirenToolsEngineBackedTest {
               dev.dediren.contracts.render.RenderMetadata metadata) {
             return new EngineResult<>(
                 new RenderResult(
-                    "render-result.schema.v5", List.of(new RenderArtifact(artifactKind, content))),
+                    "render-result.schema.v6", List.of(new RenderArtifact(artifactKind, content))),
                 List.of());
           }
         };

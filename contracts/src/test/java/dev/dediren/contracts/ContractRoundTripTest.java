@@ -546,7 +546,7 @@ class ContractRoundTripTest {
                 .valueToTree(result)
                 .at("/render_result_schema_version")
                 .asText())
-        .isEqualTo("render-result.schema.v5");
+        .isEqualTo("render-result.schema.v6");
   }
 
   @Test
