@@ -267,7 +267,7 @@ envelope with `--emit`:
   --policy "$BUNDLE/fixtures/render-policy/default-svg.json" \
   --input layout-result.json > render-result.json
 
-jq -r '.data.artifacts[] | select(.artifact_kind=="svg") | .content' render-result.json > diagram.svg
+jq -r '.data.artifacts[] | select(.artifact_kind=="svg+xml") | .content' render-result.json > diagram.svg
 ```
 
 The render engine and ordinary CLI emit SVG only; for a raster artifact,

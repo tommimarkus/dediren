@@ -44,6 +44,6 @@ class AsciiEngineIdentityTest {
     ObjectNode policy = JsonNodeFactory.instance.objectNode();
     var result = engine.render(scene, policy, null);
     assertThat(result.value().artifacts()).hasSize(1);
-    assertThat(result.value().artifacts().get(0).artifactKind()).isEqualTo("text");
+    assertThat(result.value().artifacts().get(0).artifactKind()).isEqualTo("ascii+text");
   }
 }

@@ -712,7 +712,7 @@ or the previous command envelope:
   --input layout-result.json \
   > render-result.json
 
-jq -r '.data.artifacts[] | select(.artifact_kind=="svg") | .content' render-result.json > diagram.svg
+jq -r '.data.artifacts[] | select(.artifact_kind=="svg+xml") | .content' render-result.json > diagram.svg
 ```
 
 The `render` plugin and ordinary CLI emit only an `svg` artifact; they do not
@@ -993,11 +993,11 @@ swaps the `render` plugin:
   --input layout-result.json \
   > render-result.json
 
-jq -r '.data.artifacts[] | select(.artifact_kind=="text") | .content' render-result.json > diagram.txt
+jq -r '.data.artifacts[] | select(.artifact_kind=="ascii+text") | .content' render-result.json > diagram.txt
 ```
 
 `render-result.json` holds a single `artifacts[]` entry with `artifact_kind`
-`text`. The render policy's `text.charset` field selects `unicode` (default —
+`ascii+text`. The render policy's `text.charset` field selects `unicode` (default —
 box-drawing lines and arrowheads: `─│┌┐├┼▶`) or `ascii` (plain-ASCII
 equivalents: `-|+ >v^<`), as shipped in
 `fixtures/render-policy/ascii-text.json`. An unrecognized `charset` fails with

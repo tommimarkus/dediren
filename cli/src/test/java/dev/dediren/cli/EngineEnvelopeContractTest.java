@@ -177,12 +177,12 @@ class EngineEnvelopeContractTest {
     JsonNode envelope = JsonSupport.objectMapper().readTree(outcome.stdout());
     assertThat(envelope.get("status").asText()).isEqualTo("ok");
     assertThat(envelope.at("/data/render_result_schema_version").asText())
-        .isEqualTo("render-result.schema.v6");
+        .isEqualTo("render-result.schema.v7");
     JsonNode artifacts = envelope.at("/data/artifacts");
     assertThat(artifacts.isArray()).isTrue();
     assertThat(artifacts.size()).isEqualTo(1);
     JsonNode artifact = artifacts.get(0);
-    assertThat(artifact.get("artifact_kind").asText()).isEqualTo("text");
+    assertThat(artifact.get("artifact_kind").asText()).isEqualTo("ascii+text");
     assertThat(artifact.get("content").asText()).isNotBlank();
     assertSchemaValid(envelope);
   }

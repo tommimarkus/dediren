@@ -1030,7 +1030,7 @@ class PackageBuildCommandTest {
       return new EngineResult<>(
           new RenderResult(
               ContractVersions.RENDER_RESULT_SCHEMA_VERSION,
-              List.of(new RenderArtifact("svg", "<svg" + attrs + ">" + title + "</svg>"))),
+              List.of(new RenderArtifact("svg+xml", "<svg" + attrs + ">" + title + "</svg>"))),
           List.of());
     }
   }

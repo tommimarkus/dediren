@@ -311,7 +311,7 @@ class DedirenToolsEngineBackedTest {
     String oversizedSvg = "<svg>" + "x".repeat(64 * 1024 * 1024) + "</svg>";
 
     CallToolResult result =
-        new DedirenTools(root, enginesWithRenderArtifact("svg", oversizedSvg), Map.of())
+        new DedirenTools(root, enginesWithRenderArtifact("svg+xml", oversizedSvg), Map.of())
             .importSource(
                 new CallToolRequest(
                     "dediren_import",
@@ -334,7 +334,7 @@ class DedirenToolsEngineBackedTest {
     CallToolResult result =
         new DedirenTools(
                 root,
-                enginesWithRenderArtifact("svg", "<html><body><svg></svg></body></html>"),
+                enginesWithRenderArtifact("svg+xml", "<html><body><svg></svg></body></html>"),
                 Map.of())
             .importSource(
                 new CallToolRequest(
@@ -394,7 +394,7 @@ class DedirenToolsEngineBackedTest {
     Files.copy(fixture("valid-basic.json"), root.resolve("model.json"));
     Files.copy(policy("default-svg.json"), root.resolve("policy.json"));
     String oversizedSvg = "<svg>" + "x".repeat(64 * 1024 * 1024) + "</svg>";
-    Engines engines = enginesWithRenderArtifact("svg", oversizedSvg);
+    Engines engines = enginesWithRenderArtifact("svg+xml", oversizedSvg);
 
     CallToolResult result =
         new DedirenTools(root, engines, Map.of())
@@ -433,7 +433,7 @@ class DedirenToolsEngineBackedTest {
               dev.dediren.contracts.render.RenderMetadata metadata) {
             return new EngineResult<>(
                 new RenderResult(
-                    "render-result.schema.v6", List.of(new RenderArtifact(artifactKind, content))),
+                    "render-result.schema.v7", List.of(new RenderArtifact(artifactKind, content))),
                 List.of());
           }
         };

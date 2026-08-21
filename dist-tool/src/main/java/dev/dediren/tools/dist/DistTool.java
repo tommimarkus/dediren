@@ -1262,8 +1262,8 @@ public final class DistTool {
   private static void assertSvgRenderOutput(String stdout) throws IOException {
     JsonNode data = okData(stdout);
     JsonNode artifact = data.path("artifacts").path(0);
-    if (!"svg".equals(artifact.path("artifact_kind").asText())) {
-      throw new IllegalStateException("render smoke output artifact_kind should be svg");
+    if (!"svg+xml".equals(artifact.path("artifact_kind").asText())) {
+      throw new IllegalStateException("render smoke output artifact_kind should be svg+xml");
     }
     if (!artifact.path("content").asText().contains("<svg")) {
       throw new IllegalStateException("render smoke output should contain SVG content");
@@ -1275,10 +1275,10 @@ public final class DistTool {
     if (!"ok".equals(envelope.path("status").asText())) {
       throw new IllegalStateException("text render status should be ok: " + stdout);
     }
-    if (!"render-result.schema.v6"
+    if (!"render-result.schema.v7"
         .equals(envelope.path("data").path("render_result_schema_version").asText())) {
       throw new IllegalStateException(
-          "text render schema version should be render-result.schema.v6: " + stdout);
+          "text render schema version should be render-result.schema.v7: " + stdout);
     }
     JsonNode artifacts = envelope.path("data").path("artifacts");
     if (artifacts.size() != 1) {
@@ -1286,8 +1286,8 @@ public final class DistTool {
           "text render should have exactly one artifact, got " + artifacts.size() + ": " + stdout);
     }
     JsonNode artifact = artifacts.path(0);
-    if (!"text".equals(artifact.path("artifact_kind").asText())) {
-      throw new IllegalStateException("text render artifact_kind should be text: " + stdout);
+    if (!"ascii+text".equals(artifact.path("artifact_kind").asText())) {
+      throw new IllegalStateException("text render artifact_kind should be ascii+text: " + stdout);
     }
     String content = artifact.path("content").asText();
     if (!content.contains("+--") || !content.contains("|")) {
@@ -1554,7 +1554,7 @@ public final class DistTool {
     // The build-result envelope the CLI publishes, verbatim: the MCP tool adds no second result
     // format, so the artifact it claims to have written is named under views[].artifacts[].
     JsonNode artifact = envelope.path("views").path(0).path("artifacts").path(0);
-    if (!"svg".equals(artifact.path("artifact_kind").asText())) {
+    if (!"svg+xml".equals(artifact.path("artifact_kind").asText())) {
       throw new IllegalStateException(
           "mcp dediren_build envelope should name the SVG it rendered: " + envelopeText);
     }

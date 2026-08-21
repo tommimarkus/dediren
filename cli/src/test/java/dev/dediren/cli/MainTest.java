@@ -93,7 +93,7 @@ class MainTest {
 
     JsonNode renderData = okData(render);
     String svg = renderData.at("/artifacts/0/content").asText();
-    assertThat(renderData.at("/artifacts/0/artifact_kind").asText()).isEqualTo("svg");
+    assertThat(renderData.at("/artifacts/0/artifact_kind").asText()).isEqualTo("svg+xml");
     assertThat(svg)
         .contains(
             "<svg",
@@ -155,7 +155,7 @@ class MainTest {
 
     JsonNode renderData = okData(render);
     String svg = renderData.at("/artifacts/0/content").asText();
-    assertThat(renderData.at("/artifacts/0/artifact_kind").asText()).isEqualTo("svg");
+    assertThat(renderData.at("/artifacts/0/artifact_kind").asText()).isEqualTo("svg+xml");
     assertThat(svg).contains("data-dediren-sequence-combined-fragment=\"cf-availability\"");
 
     CliResult export = runExport(env, root, source, layoutFile);
@@ -203,7 +203,7 @@ class MainTest {
 
     JsonNode renderData = okData(render);
     String svg = renderData.at("/artifacts/0/content").asText();
-    assertThat(renderData.at("/artifacts/0/artifact_kind").asText()).isEqualTo("svg");
+    assertThat(renderData.at("/artifacts/0/artifact_kind").asText()).isEqualTo("svg+xml");
     assertThat(svg)
         .contains(
             "<svg",
@@ -267,7 +267,7 @@ class MainTest {
 
     JsonNode renderData = okData(render);
     String svg = renderData.at("/artifacts/0/content").asText();
-    assertThat(renderData.at("/artifacts/0/artifact_kind").asText()).isEqualTo("svg");
+    assertThat(renderData.at("/artifacts/0/artifact_kind").asText()).isEqualTo("svg+xml");
     assertThat(svg)
         .contains(
             "<svg",
@@ -339,7 +339,7 @@ class MainTest {
 
     JsonNode renderData = okData(render);
     String svg = renderData.at("/artifacts/0/content").asText();
-    assertThat(renderData.at("/artifacts/0/artifact_kind").asText()).isEqualTo("svg");
+    assertThat(renderData.at("/artifacts/0/artifact_kind").asText()).isEqualTo("svg+xml");
     assertThat(svg)
         .contains(
             "data-dediren-node-shape=\"uml_component\"",
@@ -407,7 +407,7 @@ class MainTest {
 
     JsonNode renderData = okData(render);
     String svg = renderData.at("/artifacts/0/content").asText();
-    assertThat(renderData.at("/artifacts/0/artifact_kind").asText()).isEqualTo("svg");
+    assertThat(renderData.at("/artifacts/0/artifact_kind").asText()).isEqualTo("svg+xml");
     assertThat(svg)
         .contains(
             "data-dediren-node-shape=\"uml_device\"",

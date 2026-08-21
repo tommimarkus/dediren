@@ -32,6 +32,8 @@ import dev.dediren.contracts.source.SourceDocument;
 import dev.dediren.core.DedirenPaths;
 import dev.dediren.core.analysis.CanonicalJson;
 import dev.dediren.core.analysis.Provenance;
+import dev.dediren.core.artifact.ArtifactSink;
+import dev.dediren.core.artifact.ExportLane;
 import dev.dediren.core.commands.CoreCommands;
 import dev.dediren.core.engine.EngineDispatch;
 import dev.dediren.core.engine.EngineExecutionException;
@@ -89,8 +91,6 @@ public final class PackageBuildCommand {
   private static final String SEMANTICS_ENGINE = "generic-graph";
   private static final String LAYOUT_ENGINE = "elk-layout";
   private static final String RENDER_ENGINE = "render";
-  private static final String OEF_ENGINE = "archimate-oef";
-  private static final String XMI_ENGINE = "uml-xmi";
 
   /**
    * Mirror of the twin driver's {@code BuildCommand.CLASS_FAMILY_KINDS} (private there): diagram
@@ -318,25 +318,27 @@ public final class PackageBuildCommand {
 
     PackageOutputs outputs = view.outputs();
     try {
-      String diagram =
-          render.value().artifacts().isEmpty()
-              ? ""
-              : render.value().artifacts().getFirst().content();
+      var renderArtifacts = render.value().artifacts();
       // Stamped like the twin's render lane: the model's canonical hash plus the hash of the
       // policy the renderer actually consumed (the effective policy, presentation folded in). The
       // layout and render-metadata JSON stay unstamped, exactly as the twin's --emit stage files.
-      writeOutput(
-          request,
-          outputs.diagram(),
-          Provenance.stampSvg(
-              diagram,
-              Provenance.payload(
-                  source.modelSchemaVersion(),
-                  model.sha(),
-                  viewId,
-                  "render_policy_sha256",
-                  CanonicalJson.sha256(effectivePolicy),
-                  dedirenVersion())));
+      // An empty artifact list writes an empty diagram unstamped, as before; with no artifact there
+      // is no kind to choose a stamping rule from.
+      String diagram =
+          renderArtifacts.isEmpty()
+              ? ""
+              : ArtifactSink.stamp(
+                      renderArtifacts.getFirst().artifactKind(),
+                      renderArtifacts.getFirst().content(),
+                      Provenance.payload(
+                          source.modelSchemaVersion(),
+                          model.sha(),
+                          viewId,
+                          "render_policy_sha256",
+                          CanonicalJson.sha256(effectivePolicy),
+                          dedirenVersion()))
+                  .content();
+      writeOutput(request, outputs.diagram(), diagram);
       artifacts.put("diagram", outputs.diagram());
       if (outputs.renderMetadata() != null) {
         writeOutput(
@@ -369,7 +371,7 @@ public final class PackageBuildCommand {
       Map<String, List<ModelExportRequest.ViewLayout>> layoutsByModel,
       PackageExport export) {
     List<Diagnostic> diagnostics = new ArrayList<>();
-    String engineId = export.lane() == PackageExportLane.ARCHIMATE_OEF ? OEF_ENGINE : XMI_ENGINE;
+    String engineId = ExportLane.of(export.lane()).engineId();
     KnownSchemaVersions.Family family =
         export.lane() == PackageExportLane.ARCHIMATE_OEF
             ? KnownSchemaVersions.OEF_EXPORT_POLICY
@@ -478,23 +480,21 @@ public final class PackageBuildCommand {
     if (stage.failed()) {
       return failedExport(export, diagnostics, stage.exitCode());
     }
-    String policyShaKey =
-        export.lane() == PackageExportLane.ARCHIMATE_OEF
-            ? "oef_policy_sha256"
-            : "xmi_policy_sha256";
     try {
       writeOutput(
           request,
           export.output(),
-          Provenance.stampXml(
-              stage.value().content(),
-              Provenance.payload(
-                  owner.source().modelSchemaVersion(),
-                  owner.sha(),
-                  stampViewId,
-                  policyShaKey,
-                  CanonicalJson.sha256(policy),
-                  dedirenVersion())));
+          ArtifactSink.stamp(
+                  stage.value().artifactKind(),
+                  stage.value().content(),
+                  Provenance.payload(
+                      owner.source().modelSchemaVersion(),
+                      owner.sha(),
+                      stampViewId,
+                      ExportLane.of(export.lane()).policyShaKey(),
+                      CanonicalJson.sha256(policy),
+                      dedirenVersion()))
+              .content());
     } catch (InputProblem problem) {
       diagnostics.add(problem.diagnostic());
       return failedExport(export, diagnostics, problem.exitCode());

@@ -51,7 +51,7 @@ final class ElkLayoutRenderArtifacts {
 
     String content =
         rendered.artifacts().stream()
-            .filter(artifact -> "svg".equals(artifact.artifactKind()))
+            .filter(artifact -> "svg+xml".equals(artifact.artifactKind()))
             .map(RenderArtifact::content)
             .findFirst()
             .orElse("");
