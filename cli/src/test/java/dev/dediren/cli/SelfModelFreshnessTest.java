@@ -24,9 +24,10 @@ import tools.jackson.databind.JsonNode;
  * that feeds the README hero image and the Pages site. No test pinned it before this one, so it
  * has gone stale silently twice: the {@code drawio} lane (commit 36db762) had to add the missing
  * module *and* discovered the README hero counts had already drifted since {@code dot-import}, and
- * {@code ascii-render} (v2026.08.8) is stale right now. This replaces the manual sweep with three
- * checks: the published artifacts are not stale, every reactor module is modelled, and the README
- * hero counts match what the model itself says.
+ * {@code ascii-render} (v2026.08.8) is stale right now, and the package's own README carries stale
+ * digit counts too. This replaces the manual sweep with four checks: the published artifacts are
+ * not stale, every reactor module is modelled, the top-level README hero counts match what the
+ * model itself says, and the self-model package's own README counts match the model as well.
  */
 class SelfModelFreshnessTest {
 
@@ -70,10 +71,7 @@ class SelfModelFreshnessTest {
     // reactor is genuinely empty.
     assertThat(modules).as("root pom.xml scan found no <module> entries").isNotEmpty();
 
-    JsonNode model =
-        JsonSupport.objectMapper()
-            .readTree(
-                Files.readString(PACKAGE_ROOT.resolve("model.json"), StandardCharsets.UTF_8));
+    JsonNode model = readModel();
     List<String> nodeIds = new ArrayList<>();
     for (JsonNode node : model.path("nodes")) {
       nodeIds.add(node.path("id").asText());
@@ -95,10 +93,7 @@ class SelfModelFreshnessTest {
 
   @Test
   void readmeHeroCountsMatchModel() throws IOException {
-    JsonNode model =
-        JsonSupport.objectMapper()
-            .readTree(
-                Files.readString(PACKAGE_ROOT.resolve("model.json"), StandardCharsets.UTF_8));
+    JsonNode model = readModel();
     JsonNode view = model.path("plugins").path("generic-graph").path("views").get(0);
 
     int moduleCount = view.path("nodes").size();
@@ -145,6 +140,47 @@ class SelfModelFreshnessTest {
                         + engineWord
                         + " engines'")
                 .contains("orchestration `core` and the " + engineWord + " engines"));
+  }
+
+  @Test
+  void selfModelReadmeCountsMatchModel() throws IOException {
+    JsonNode model = readModel();
+    int moduleCount = model.path("nodes").size();
+    int edgeCount = model.path("relationships").size();
+    JsonNode view = model.path("plugins").path("generic-graph").path("views").get(0);
+    int heroViewEdgeCount = view.path("relationships").size();
+
+    String selfModelReadme =
+        Files.readString(PACKAGE_ROOT.resolve("README.md"), StandardCharsets.UTF_8);
+
+    // Digits, not English number-words: this is the package's own README, which spells its counts
+    // as bare numerals. Anchoring on surrounding prose keeps a stray matching digit elsewhere in
+    // the file from satisfying the assertion.
+    assertAll(
+        "docs/architecture/dediren.dediren/README.md counts must match model.json ("
+            + moduleCount
+            + " modules, "
+            + edgeCount
+            + " edges, "
+            + heroViewEdgeCount
+            + " hero-view edges)",
+        () ->
+            assertThat(selfModelReadme)
+                .as("should read 'the " + moduleCount + " shipped'")
+                .contains("the " + moduleCount + " shipped"),
+        () ->
+            assertThat(selfModelReadme)
+                .as("should read 'all " + edgeCount + " direct dependency edges'")
+                .contains("all " + edgeCount + " direct dependency edges"),
+        () ->
+            assertThat(selfModelReadme)
+                .as("should read 'the hero view shows " + heroViewEdgeCount + "'")
+                .contains("the hero view shows " + heroViewEdgeCount));
+  }
+
+  private static JsonNode readModel() throws IOException {
+    return JsonSupport.objectMapper()
+        .readTree(Files.readString(PACKAGE_ROOT.resolve("model.json"), StandardCharsets.UTF_8));
   }
 
   private static List<String> reactorModuleIds(Path repoRoot) throws IOException {
