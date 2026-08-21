@@ -188,9 +188,13 @@ enforcement authority for how wide a change may reach.
   4. `docs/architecture/dediren.dediren/generated/` — the four published
      self-model views and both exports, rebuilt with
      `"$BUNDLE/bin/dediren" build --package docs/architecture/dediren.dediren/package.json`
-     from a bundle built from the working tree. **No test pins stage 4**, so it
-     goes stale silently while the README hero and the Pages site keep serving
-     it; check it explicitly rather than trusting a green build.
+     from a bundle built from the working tree. `SelfModelFreshnessTest` (cli)
+     is the always-on gate: it runs the product's own `dediren status` over the
+     package and fails on any `stale`/`unstamped` artifact, and separately pins
+     every reactor module into `model.json` and both READMEs' counts to the
+     model. Bootstrapping note — editing the model reddens that gate, and
+     `-Pdist-build` runs `verify`, so build the bundle with
+     `-Dmaven.test.skip=true`, regenerate, then run the gate.
   Pinned geometry literals in tests move with stage 1 too — `SequenceSelfMessageHookTest`
   carries a `d=` path, and `LayoutQualityFixtureSweepTest` pins per-fixture
   crossing counts.
