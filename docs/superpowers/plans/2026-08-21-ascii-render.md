@@ -147,3 +147,27 @@ own lane stays green).
   versions (check during leaf 1).
 - Exact pruned op chain in `stale-policy-migration.json` (derive from
   `composedPath` semantics; the failing test confirms).
+
+## Execution outcome (2026-08-21)
+
+All nine leaves completed and verified on branch `ascii-render`; full gate green
+(`./mvnw test` 13s, `-Pquality verify`, `-Pdist-smoke`, `git diff --check`).
+Delegated leaf fleet ran edit-only; the parent ran every acceptance centrally.
+Parent remediations during acceptance: KnownSchemaVersionsTest shipped-history
+expectation (leaf 1), EngineResult accessor names + throws clause (leaf 3),
+one over-asserting canvas test (leaf 4), envelope JSON pointer (leaf 6),
+shape-hinted mermaid input in the MCP test (leaf 7), text-block newline escape
+and schema-version pointer in the smoke (leaf 9).
+
+Post-plan refinement grounded in real ELK output: edge endpoints land 1-2px off
+node borders, which detached every drawn edge by one cell. `CoordinateGrid` now
+snaps edge-point anchors within 2.0 units of a node/group border onto the
+border anchor (`BORDER_SNAP`), pinned by
+`edgePointsWithinTwoUnitsOfABorderAdoptTheBorderAnchor` /
+`edgePointsBeyondTheSnapToleranceKeepTheirOwnAnchor`.
+
+The planning-ledger run for this plan was closed `blocked` after leaf 1 (the
+contract's `worktree_owner: "parent"` mis-fill made per-leaf integrate/cleanup
+transitions unsatisfiable); execution continued under plan-file tracking with
+the same bounded-return and two-attempt discipline. Leaf 1's bounded evidence
+lives in the closed ledger run.
