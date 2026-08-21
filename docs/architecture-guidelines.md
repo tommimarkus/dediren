@@ -74,6 +74,7 @@ Stable Dependencies Principle).
 | `engine-api` | `contracts`, `ir` | 1 — engine seam |
 | `core` | `contracts`, `engine-api`, `ir` | 2 — orchestration + `build` driver |
 | `render` (engine) | `engine-api`, `contracts`, `archimate`, `uml`, `ir` | 2 — leaf engine |
+| `ascii-render` (engine) | `engine-api`, `contracts`, `ir` | 2 — leaf engine |
 | `semantics-graph` (engine) | `engine-api`, `contracts`, `ir` | 2 — leaf engine |
 | `semantics-archimate` (engine) | `engine-api`, `contracts`, `archimate`, `ir` | 2 — leaf engine |
 | `semantics-uml` (engine) | `engine-api`, `contracts`, `uml`, `ir` | 2 — leaf engine |
@@ -215,10 +216,10 @@ charter below is the contract for "what changes for this reason lives here."
   boring, owned mechanics").
 
 - **Engines** (`dot-import`, `mermaid-import`, `drawio`, `render`,
-  `elk-layout`, `archimate-oef-export`, `uml-xmi-export`) — leaf library
+  `ascii-render`, `elk-layout`, `archimate-oef-export`, `uml-xmi-export`) — leaf library
   modules behind `engine-api`, each owning one backend concern: SVG rendering,
-  ELK layout, ArchiMate OEF export, UML/XMI export. Each owns its
-  backend-specific policy and *only* that. Styling lives in render; OEF
+  text rendering, ELK layout, ArchiMate OEF export, UML/XMI export. Each owns its
+  backend-specific policy and *only* that. Styling lives in render; text layout lives in ascii-render; OEF
   semantics in the OEF engine; XMI semantics in the XMI engine; layout
   geometry in ELK; DOT grammar recognition, normalization, and mapping in
   `dot-import`; Mermaid grammar recognition, normalization, and mapping in

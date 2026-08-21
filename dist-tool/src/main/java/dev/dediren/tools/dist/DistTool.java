@@ -71,6 +71,7 @@ public final class DistTool {
       Set.of(
           "archimate",
           "archimate-oef-export",
+          "ascii-render",
           "cli",
           "contracts",
           "core",
