@@ -94,7 +94,7 @@ class DocumentSkeletonParityTest {
    */
   private static ObjectNode policy() {
     ObjectNode policy = JsonSupport.objectMapper().createObjectNode();
-    policy.put("render_policy_schema_version", "render-policy.schema.v3");
+    policy.put("render_policy_schema_version", "render-policy.schema.v4");
     policy.put("semantic_profile", "uml");
     policy.putObject("page").put("width", 900).put("height", 520);
     policy.putObject("margin").put("top", 12).put("right", 12).put("bottom", 12).put("left", 12);

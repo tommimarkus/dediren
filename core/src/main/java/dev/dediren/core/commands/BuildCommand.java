@@ -785,9 +785,13 @@ public final class BuildCommand {
   }
 
   private static String renderExtension(String artifactKind) {
-    // render-result.schema.v5 admits only "svg", whose extension is the kind itself; the identity
-    // keeps a seam for any future kind whose extension differs.
-    return artifactKind;
+    // render-result.schema.v6 admits "svg" (extension = kind) and "text" (extension "txt"); the
+    // ascii render engine is not wired into build lanes today, so "text" is unreachable here,
+    // kept for the seam's promise.
+    return switch (artifactKind) {
+      case "text" -> "txt";
+      default -> artifactKind;
+    };
   }
 
   private static String exportExtension(String artifactKind) {

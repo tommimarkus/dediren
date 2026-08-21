@@ -6,4 +6,5 @@ public record RenderPolicy(
     Page page,
     Margin margin,
     SvgStylePolicy style,
-    SvgAccessibility accessibility) {}
+    SvgAccessibility accessibility,
+    TextRenderPolicy text) {}

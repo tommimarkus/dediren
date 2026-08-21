@@ -211,6 +211,35 @@ class DedirenToolsEngineBackedTest {
   }
 
   @Test
+  void confinedMermaidContentCanProduceInlineText(@TempDir Path root) throws Exception {
+    CallToolResult result =
+        new DedirenTools(root, EngineWiring.defaults(), Map.of())
+            .importSource(
+                new CallToolRequest(
+                    "dediren_import",
+                    Map.of(
+                        "content",
+                        "flowchart LR\n  start --> finish\n",
+                        "plugin",
+                        "mermaid",
+                        "output",
+                        "text")));
+
+    assertThat(result.isError()).isNotEqualTo(Boolean.TRUE);
+    assertThat(result.content()).hasSize(2);
+    assertThat(result.content().getFirst()).isInstanceOf(TextContent.class);
+    JsonNode envelope = envelopeOf(result);
+    assertThat(envelope.path("status").asText())
+        .describedAs(envelope.path("diagnostics").toString())
+        .isEqualTo("ok");
+    String diagram = ((TextContent) result.content().get(1)).text();
+    // The default render policy leaves text.charset at its default (unicode), so the ascii
+    // engine draws group/edge boxes with box-drawing characters rather than plain ASCII.
+    assertThat(diagram).containsAnyOf("─", "│");
+    assertThat(diagram).contains("start");
+  }
+
+  @Test
   void inlineMermaidSvgUsesAConfinedRenderPolicyOverride(@TempDir Path root) throws Exception {
     Files.copy(policy("dark-svg.json"), root.resolve("dark.json"));
 
@@ -404,7 +433,7 @@ class DedirenToolsEngineBackedTest {
               dev.dediren.contracts.render.RenderMetadata metadata) {
             return new EngineResult<>(
                 new RenderResult(
-                    "render-result.schema.v5", List.of(new RenderArtifact(artifactKind, content))),
+                    "render-result.schema.v6", List.of(new RenderArtifact(artifactKind, content))),
                 List.of());
           }
         };

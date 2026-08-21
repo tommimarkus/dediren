@@ -45,6 +45,7 @@ or the token-efficient authoring guide in
 | [Engine Runtime](engine-runtime.md) | The engine contract, the bundled first-party engines, and runtime diagnostics |
 | [Layout (ELK)](layout.md) | The official Java ELK plugin, layout modes (`flow`/`packed`/`auto`), and `validate-layout` quality metrics |
 | [SVG Rendering](svg-render.md) | The render plugin, render policies, and the `artifacts[]` result shape |
+| [Text (ASCII) Rendering](text-render.md) | The `ascii` render plugin, `text.charset` policy, and its degrade behaviors |
 | [Exports (OEF, XMI & draw.io)](exports.md) | ArchiMate Open Exchange Format 3.1, UML 2.5.1 XMI, and draw.io mxfile export, plus the supported UML notation coverage |
 | [Contracts & Schemas](contracts-and-schemas.md) | Public schemas, command envelopes, diagnostics, and version/compatibility signals |
 | [Distribution & Runtime](distribution-and-runtime.md) | The agent bundle, its single launcher, environment variables, supply-chain artifacts, and versioning |
@@ -89,6 +90,8 @@ described in [`CLAUDE.md`](../../CLAUDE.md).
   → update [Layout (ELK)](layout.md).
 - **Render policy field or styling behavior** → update
   [SVG Rendering](svg-render.md) alongside `schemas/render-policy.schema.json`.
+- **ASCII render behavior, charset, or degrade codes** → update
+  [Text (ASCII) Rendering](text-render.md).
 - **OEF/XMI export semantics or expanded UML notation coverage** → update
   [Exports (OEF, XMI & draw.io)](exports.md).
 - **Bundle layout, launcher behavior, environment variable, or release/version

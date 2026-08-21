@@ -275,6 +275,11 @@ convert the SVG with an external tool such as `rsvg-convert`, `resvg`,
 ImageMagick, or Inkscape. The MCP adapter can instead negotiate an optional PNG
 response attachment without widening the render contract.
 
+The same layout can also drive a text diagram instead of SVG: swap
+`--plugin render` for `--plugin ascii` (unicode box-drawing by default, or
+`fixtures/render-policy/ascii-text.json` for plain ASCII) — see
+[ASCII Render](docs/features/text-render.md).
+
 `"$BUNDLE/bin/dediren" --version` confirms the bundle is runnable. For
 ArchiMate/UML notations, exports, accessibility, and failure-repair rules,
 follow [`docs/agent-usage.md`](docs/agent-usage.md).

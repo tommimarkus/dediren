@@ -28,6 +28,7 @@
     <module>schema-cache</module>
     <module>uml</module>
     <module>engines/archimate-oef-export</module>
+    <module>engines/ascii-render</module>
     <module>engines/dot-import</module>
     <module>engines/drawio</module>
     <module>engines/elk-layout</module>
@@ -600,6 +601,7 @@
                 <param>dev.dediren.semantics.uml.*</param>
                 <param>dev.dediren.semantics.graph.*</param>
                 <param>dev.dediren.plugins.archimateoef.*</param>
+                <param>dev.dediren.plugins.asciirender.*</param>
                 <param>dev.dediren.plugins.dotimport.*</param>
                 <param>dev.dediren.plugins.drawio.*</param>
                 <param>dev.dediren.plugins.elklayout.*</param>

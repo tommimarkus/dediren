@@ -39,6 +39,7 @@ class ArchitectureRulesTest {
   // engines/ directory move). The fifth former engine, generic-graph, was carved into the
   // three dev.dediren.semantics.* modules below (Plan B P3).
   private static final String RENDER = "dev.dediren.plugins.render..";
+  private static final String ASCII_RENDER = "dev.dediren.plugins.asciirender..";
   private static final String ELK_LAYOUT = "dev.dediren.plugins.elklayout..";
   private static final String ARCHIMATE_OEF = "dev.dediren.plugins.archimateoef..";
   private static final String UML_XMI = "dev.dediren.plugins.umlxmi..";
@@ -70,6 +71,7 @@ class ArchitectureRulesTest {
     int coreClasses = 0;
     int engineApiClasses = 0;
     int renderClasses = 0;
+    int asciiRenderClasses = 0;
     int elkLayoutClasses = 0;
     int archimateOefClasses = 0;
     int umlXmiClasses = 0;
@@ -89,6 +91,8 @@ class ArchitectureRulesTest {
         engineApiClasses++;
       } else if (packageName.startsWith("dev.dediren.plugins.render")) {
         renderClasses++;
+      } else if (packageName.startsWith("dev.dediren.plugins.asciirender")) {
+        asciiRenderClasses++;
       } else if (packageName.startsWith("dev.dediren.plugins.elklayout")) {
         elkLayoutClasses++;
       } else if (packageName.startsWith("dev.dediren.plugins.archimateoef")) {
@@ -116,6 +120,9 @@ class ArchitectureRulesTest {
     assertThat(coreClasses).as("core production classes on the classpath").isPositive();
     assertThat(engineApiClasses).as("engine-api production classes on the classpath").isPositive();
     assertThat(renderClasses).as("render engine production classes on the classpath").isPositive();
+    assertThat(asciiRenderClasses)
+        .as("ascii-render engine production classes on the classpath")
+        .isPositive();
     assertThat(elkLayoutClasses)
         .as("elk-layout engine production classes on the classpath")
         .isPositive();
@@ -311,6 +318,7 @@ class ArchitectureRulesTest {
     Map<String, String> enginePackages =
         Map.of(
             "render", RENDER,
+            "ascii-render", ASCII_RENDER,
             "elk-layout", ELK_LAYOUT,
             "dot-import", DOT_IMPORT,
             "mermaid-import", MERMAID_IMPORT,

@@ -58,7 +58,7 @@ class CliValidateTest {
     assertThat(result.exitCode()).isZero();
     assertThat(envelope.get("status").asText()).isEqualTo("ok");
     assertThat(envelope.at("/data/render_policy_schema_version").asText())
-        .isEqualTo("render-policy.schema.v3");
+        .isEqualTo("render-policy.schema.v4");
   }
 
   @Test
@@ -99,7 +99,7 @@ class CliValidateTest {
     assertThat(envelope.at("/diagnostics/0/migration/from").asText())
         .isEqualTo("render-policy.schema.v2");
     assertThat(envelope.at("/diagnostics/0/migration/to").asText())
-        .isEqualTo("render-policy.schema.v3");
+        .isEqualTo("render-policy.schema.v4");
     assertThat(envelope.at("/diagnostics/0/migration/operations/0/op").asText())
         .isEqualTo("remove_key");
     assertThat(envelope.at("/diagnostics/0/migration/operations/0/pointer").asText())
@@ -147,7 +147,7 @@ class CliValidateTest {
     // Current version clears the gate; the missing required page/margin blocks must then fail
     // JSON Schema validation against the policy's own schema, not the model schema.
     Path policy = temp.resolve("invalid-policy.json");
-    Files.writeString(policy, "{\"render_policy_schema_version\":\"render-policy.schema.v3\"}");
+    Files.writeString(policy, "{\"render_policy_schema_version\":\"render-policy.schema.v4\"}");
 
     CliResult result =
         Main.executeForTesting(new String[] {"validate", "--input", policy.toString()}, "");

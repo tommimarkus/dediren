@@ -61,7 +61,7 @@ class PackageBuildCommandTest {
   private static final String RENDER_POLICY =
       """
       {
-        "render_policy_schema_version": "render-policy.schema.v3",
+        "render_policy_schema_version": "render-policy.schema.v4",
         "page": { "width": 100, "height": 100 },
         "margin": { "top": 0, "right": 0, "bottom": 0, "left": 0 }
       }
@@ -79,7 +79,7 @@ class PackageBuildCommandTest {
   private static final String RENDER_POLICY_WITH_A11Y =
       """
       {
-        "render_policy_schema_version": "render-policy.schema.v3",
+        "render_policy_schema_version": "render-policy.schema.v4",
         "page": { "width": 100, "height": 100 },
         "margin": { "top": 0, "right": 0, "bottom": 0, "left": 0 },
         "accessibility": { "title": "Policy Title" }
@@ -90,7 +90,7 @@ class PackageBuildCommandTest {
   private static final String RENDER_POLICY_WITH_LANGUAGE =
       """
       {
-        "render_policy_schema_version": "render-policy.schema.v3",
+        "render_policy_schema_version": "render-policy.schema.v4",
         "page": { "width": 100, "height": 100 },
         "margin": { "top": 0, "right": 0, "bottom": 0, "left": 0 },
         "accessibility": { "lang": "ja", "dir": "ltr" }
@@ -793,7 +793,7 @@ class PackageBuildCommandTest {
     assertThat(migration).describedAs(outcome.stdout()).isNotNull();
     assertThat(migration.isMissingNode()).describedAs(outcome.stdout()).isFalse();
     assertThat(migration.path("from").asText()).isEqualTo("render-policy.schema.v2");
-    assertThat(migration.path("to").asText()).isEqualTo("render-policy.schema.v3");
+    assertThat(migration.path("to").asText()).isEqualTo("render-policy.schema.v4");
     assertThat(migration.path("operations")).isNotEmpty();
     // The emitted result must satisfy its own published schema, migration payload included.
     List<String> errors =

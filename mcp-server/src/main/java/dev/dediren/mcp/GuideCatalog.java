@@ -51,6 +51,7 @@ public final class GuideCatalog {
     topics.put("diff-query", "Diff & Query");
     topics.put("provenance", "Provenance & Verify");
     topics.put("render-policy", "Render Policy Options");
+    topics.put("ascii-render", "ASCII Render");
     topics.put("uml-sequence", "UML Sequence Handoff");
     topics.put("uml-state-machine", "UML State Machine Handoff");
     topics.put("uml-use-case", "UML Use Case Handoff");

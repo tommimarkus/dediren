@@ -78,6 +78,11 @@
     </dependency>
     <dependency>
       <groupId>dev.dediren</groupId>
+      <artifactId>ascii-render</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>dev.dediren</groupId>
       <artifactId>uml-xmi-export</artifactId>
       <version>${project.version}</version>
     </dependency>

@@ -71,6 +71,7 @@ public final class DistTool {
       Set.of(
           "archimate",
           "archimate-oef-export",
+          "ascii-render",
           "cli",
           "contracts",
           "core",
@@ -505,6 +506,7 @@ public final class DistTool {
       Path request = temp.resolve("request.json");
       Path layout = temp.resolve("layout.json");
       Path render = temp.resolve("render.json");
+      Path ascii = temp.resolve("ascii.json");
       String projectOutput =
           runBundleCommand(
               dediren,
@@ -548,6 +550,22 @@ public final class DistTool {
               null);
       Files.writeString(render, renderOutput, StandardCharsets.UTF_8);
       assertSvgRenderOutput(renderOutput);
+
+      String asciiOutput =
+          runBundleCommand(
+              dediren,
+              bundle,
+              List.of(
+                  "render",
+                  "--plugin",
+                  "ascii",
+                  "--policy",
+                  bundle.resolve("fixtures/render-policy/ascii-text.json").toString(),
+                  "--input",
+                  layout.toString()),
+              null);
+      Files.writeString(ascii, asciiOutput, StandardCharsets.UTF_8);
+      assertTextRenderOutput(asciiOutput);
 
       String oefOutput =
           runBundleCommand(
@@ -1252,6 +1270,32 @@ public final class DistTool {
     }
   }
 
+  private static void assertTextRenderOutput(String stdout) throws IOException {
+    JsonNode envelope = JsonSupport.objectMapper().readTree(stdout);
+    if (!"ok".equals(envelope.path("status").asText())) {
+      throw new IllegalStateException("text render status should be ok: " + stdout);
+    }
+    if (!"render-result.schema.v6"
+        .equals(envelope.path("data").path("render_result_schema_version").asText())) {
+      throw new IllegalStateException(
+          "text render schema version should be render-result.schema.v6: " + stdout);
+    }
+    JsonNode artifacts = envelope.path("data").path("artifacts");
+    if (artifacts.size() != 1) {
+      throw new IllegalStateException(
+          "text render should have exactly one artifact, got " + artifacts.size() + ": " + stdout);
+    }
+    JsonNode artifact = artifacts.path(0);
+    if (!"text".equals(artifact.path("artifact_kind").asText())) {
+      throw new IllegalStateException("text render artifact_kind should be text: " + stdout);
+    }
+    String content = artifact.path("content").asText();
+    if (!content.contains("+--") || !content.contains("|")) {
+      throw new IllegalStateException(
+          "text render content should contain both '+--' and '|': " + content);
+    }
+  }
+
   /**
    * The smoke's export lanes deliberately run the unedited shipped default policies, so the
    * packaged bundle must answer exactly a {@code warning} envelope carrying the identity-tripwire
@@ -1355,6 +1399,7 @@ public final class DistTool {
         {"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"dediren_query","arguments":{"source":"fixtures/source/valid-archimate-oef.json","kind":"orphans"}}}
         {"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"dediren_import","arguments":{"source":"fixtures/mermaid/flowchart-v1.mmd","plugin":"mermaid"}}}
         {"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"dediren_build","arguments":{"source":"fixtures/source/valid-pipeline-rich.json","out":"mcp-png-build-out","render_policy":"fixtures/render-policy/rich-svg.json","output":"image","accepted_image_types":["image/png"]}}}
+        {"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"dediren_import","arguments":{"content":"flowchart LR\\n  start --> finish\\n","plugin":"mermaid","output":"text"}}}
         """,
         StandardCharsets.UTF_8);
 
@@ -1392,6 +1437,7 @@ public final class DistTool {
     assertMcpBuildAnswered(bundle, responses, stdout);
     assertMcpPngBuildAnswered(responses, stdout);
     assertMcpImportAnswered(responses, stdout);
+    assertMcpTextImportAnswered(responses, stdout);
     System.out.println(
         "mcp stdio smoke passed: 8 tools + resources, import/build/query answered,"
             + " protocol-only stdout");
@@ -1441,6 +1487,41 @@ public final class DistTool {
     if (!"model.schema.v1".equals(envelope.at("/data/model_schema_version").asText())) {
       throw new IllegalStateException(
           "mcp dediren_import did not return a source model: " + envelope);
+    }
+  }
+
+  private static void assertMcpTextImportAnswered(Map<String, JsonNode> responses, String stdout)
+      throws IOException {
+    JsonNode response = responses.get("11");
+    if (response == null) {
+      throw new IllegalStateException("mcp dediren_import response (id 11) is absent: " + stdout);
+    }
+    if (response.path("result").path("isError").asBoolean()) {
+      throw new IllegalStateException("mcp text dediren_import reported a tool error: " + response);
+    }
+    JsonNode contents = response.path("result").path("content");
+    if (contents.size() != 2) {
+      throw new IllegalStateException(
+          "mcp text dediren_import result should have exactly 2 content entries, got "
+              + contents.size()
+              + ": "
+              + response);
+    }
+    JsonNode firstContent = contents.path(0);
+    if (!"text".equals(firstContent.path("type").asText())) {
+      throw new IllegalStateException(
+          "mcp text dediren_import first content should be text: " + firstContent);
+    }
+    JsonNode secondContent = contents.path(1);
+    if (!"text".equals(secondContent.path("type").asText())) {
+      throw new IllegalStateException(
+          "mcp text dediren_import second content should be text: " + secondContent);
+    }
+    String text = secondContent.path("text").asText();
+    if ((!text.contains("─") && !text.contains("│")) || !text.contains("start")) {
+      throw new IllegalStateException(
+          "mcp text dediren_import diagram should contain box-drawing chars and 'start' node: "
+              + text);
     }
   }
 
