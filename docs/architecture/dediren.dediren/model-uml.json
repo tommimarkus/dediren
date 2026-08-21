@@ -23,7 +23,7 @@
       "label": "engine implementations",
       "properties": {
         "uml": { "kind": "package" },
-        "rationale": "The concrete engines wired in cli.EngineWiring, drawn from mermaid-import, dot-import, drawio, elk-layout, render, archimate-oef-export, uml-xmi-export, semantics-graph, semantics-archimate, and semantics-uml."
+        "rationale": "The concrete engines wired in cli.EngineWiring, drawn from mermaid-import, dot-import, drawio, elk-layout, render, ascii-render, archimate-oef-export, uml-xmi-export, semantics-graph, semantics-archimate, and semantics-uml."
       }
     },
 
@@ -169,6 +169,15 @@
       ] }, "rationale": "render module: SVG emitter." }
     },
     {
+      "id": "cls-ascii-render",
+      "type": "Class",
+      "label": "AsciiRenderEngine",
+      "properties": { "uml": { "package": "pkg-engines", "attributes": [], "operations": [
+        { "name": "id", "visibility": "public", "parameters": [], "return_type": "String" },
+        { "name": "render", "visibility": "public", "parameters": [ { "name": "layout", "type": "LaidOutScene" }, { "name": "policy", "type": "JsonNode" }, { "name": "metadataOrNull", "type": "RenderMetadata" } ], "return_type": "EngineResult<RenderResult>" }
+      ] }, "rationale": "ascii-render module: plain-text character-grid emitter, the same render capability as the SVG emitter." }
+    },
+    {
       "id": "cls-oef-export",
       "type": "Class",
       "label": "OefExportEngine",
@@ -195,6 +204,7 @@
     { "id": "real-router-semantics", "type": "Realization", "source": "cls-semantics-router", "target": "if-semantics-engine", "label": "realizes", "properties": {} },
     { "id": "real-elk-layout", "type": "Realization", "source": "cls-elk-engine", "target": "if-layout-engine", "label": "realizes", "properties": {} },
     { "id": "real-svg-render", "type": "Realization", "source": "cls-svg-render", "target": "if-render-engine", "label": "realizes", "properties": {} },
+    { "id": "real-ascii-render", "type": "Realization", "source": "cls-ascii-render", "target": "if-render-engine", "label": "realizes", "properties": {} },
     { "id": "real-oef-export", "type": "Realization", "source": "cls-oef-export", "target": "if-export-engine", "label": "realizes", "properties": {} },
     { "id": "real-xmi-export", "type": "Realization", "source": "cls-xmi-export", "target": "if-export-engine", "label": "realizes", "properties": {} },
     { "id": "real-graph-notation", "type": "Realization", "source": "cls-graph-notation", "target": "if-notation-semantics", "label": "realizes", "properties": {} },
@@ -214,15 +224,15 @@
             "if-semantics-engine", "if-layout-engine", "if-render-engine", "if-export-engine", "if-import-engine", "if-notation-semantics",
             "cls-mermaid-import", "cls-dot-import", "cls-drawio-export", "cls-drawio-import",
             "cls-semantics-router", "cls-graph-notation", "cls-archimate-notation", "cls-uml-notation",
-            "cls-elk-engine", "cls-svg-render", "cls-oef-export", "cls-xmi-export"
+            "cls-elk-engine", "cls-svg-render", "cls-ascii-render", "cls-oef-export", "cls-xmi-export"
           ],
           "relationships": [
-            "real-mermaid-import", "real-dot-import", "real-drawio-export", "real-drawio-import", "real-router-semantics", "real-elk-layout", "real-svg-render", "real-oef-export", "real-xmi-export",
+            "real-mermaid-import", "real-dot-import", "real-drawio-export", "real-drawio-import", "real-router-semantics", "real-elk-layout", "real-svg-render", "real-ascii-render", "real-oef-export", "real-xmi-export",
             "real-graph-notation", "real-archimate-notation", "real-uml-notation", "dep-router-notation"
           ],
           "groups": [
             { "id": "engine-api-boundary", "label": "engine-api", "role": "semantic-boundary", "semantic_source_id": "pkg-engine-api", "members": [ "if-semantics-engine", "if-layout-engine", "if-render-engine", "if-export-engine", "if-import-engine", "if-notation-semantics" ] },
-            { "id": "engines-boundary", "label": "engine implementations", "role": "semantic-boundary", "semantic_source_id": "pkg-engines", "members": [ "cls-mermaid-import", "cls-dot-import", "cls-drawio-export", "cls-drawio-import", "cls-semantics-router", "cls-graph-notation", "cls-archimate-notation", "cls-uml-notation", "cls-elk-engine", "cls-svg-render", "cls-oef-export", "cls-xmi-export" ] }
+            { "id": "engines-boundary", "label": "engine implementations", "role": "semantic-boundary", "semantic_source_id": "pkg-engines", "members": [ "cls-mermaid-import", "cls-dot-import", "cls-drawio-export", "cls-drawio-import", "cls-semantics-router", "cls-graph-notation", "cls-archimate-notation", "cls-uml-notation", "cls-elk-engine", "cls-svg-render", "cls-ascii-render", "cls-oef-export", "cls-xmi-export" ] }
           ],
           "layout_preferences": {
             "algorithm": "layered",
