@@ -79,7 +79,11 @@ final class CharCanvas {
     if (!inBounds(row, col)) {
       return;
     }
-    literal[row][col] = ch;
+    // The emitted text is destined for terminals and MCP clients that print it verbatim, and
+    // labels are untrusted model text (DOT import and hand-authored JSON admit raw control
+    // bytes), so this single sink neutralizes escape/control sequences the way the SVG lane's
+    // XML escaping does for its output.
+    literal[row][col] = Character.isISOControl(ch) ? ' ' : ch;
     bitmask[row][col] = null;
   }
 

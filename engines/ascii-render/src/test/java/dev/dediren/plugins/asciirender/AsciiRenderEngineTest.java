@@ -88,6 +88,70 @@ class AsciiRenderEngineTest {
   }
 
   @Test
+  void groupLabelTooWideForItsBorderIsTruncatedWithADiagnostic() throws Exception {
+    PlacedNode a = node("a", 0, 0, 24, 48, "A");
+    PlacedNode b = node("b", 40, 0, 24, 48, "B");
+    PlacedGroup g = group("g", -8, -16, 80, 80, List.of("a", "b"), "Group Label Way Too Long");
+    LaidOutScene scene = new LaidOutScene("v", List.of(a, b), List.of(), List.of(g), List.of());
+
+    EngineResult<?> result = engine.render(scene, minimalPolicy(), null);
+
+    assertThat(result.diagnostics())
+        .anySatisfy(
+            diagnostic -> {
+              assertThat(diagnostic.code()).isEqualTo("DEDIREN_ASCII_LABEL_TRUNCATED");
+              assertThat(diagnostic.severity()).isEqualTo(DiagnosticSeverity.WARNING);
+              assertThat(diagnostic.path()).isEqualTo("groups[g].label");
+            });
+    assertThat(asciiContent(result)).contains("…");
+  }
+
+  @Test
+  void blankGroupLabelRendersAPlainBorderWithoutDiagnostics() throws Exception {
+    PlacedNode a = node("a", 0, 0, 24, 48, "A");
+    PlacedGroup g = group("g", -8, -16, 48, 80, List.of("a"), null);
+    LaidOutScene scene = new LaidOutScene("v", List.of(a), List.of(), List.of(g), List.of());
+
+    EngineResult<?> result = engine.render(scene, minimalPolicy(), null);
+
+    assertThat(result.diagnostics()).isEmpty();
+    assertThat(asciiContent(result)).contains("┌");
+  }
+
+  @Test
+  void edgeLabelIsPlacedBesideItsLongestVerticalSegment() throws Exception {
+    RoutedEdge labeled = edge("e1", "s", "t", "hi", new Point(50, 0), new Point(50, 200));
+    RoutedEdge spacer = edge("e2", "x", "y", "", new Point(200, 500), new Point(220, 500));
+    LaidOutScene scene =
+        new LaidOutScene("v", List.of(), List.of(labeled, spacer), List.of(), List.of());
+    CoordinateGrid grid = CoordinateGrid.of(scene);
+
+    EngineResult<?> result = engine.render(scene, minimalPolicy(), null);
+    String[] lines = asciiContent(result).split("\n", -1);
+
+    int midRow = (grid.rowOf(0) + grid.rowOf(200)) / 2;
+    int labelCol = grid.colOf(50) + 1;
+    assertThat(result.diagnostics()).isEmpty();
+    assertThat(lines[midRow].substring(labelCol)).startsWith("hi");
+  }
+
+  @Test
+  void edgeLabelOnAVerticalSegmentWithNoClearColumnIsDropped() throws Exception {
+    RoutedEdge labeled = edge("e1", "s", "t", "TOOLONGLABEL", new Point(0, 0), new Point(0, 200));
+    LaidOutScene scene = new LaidOutScene("v", List.of(), List.of(labeled), List.of(), List.of());
+
+    EngineResult<?> result = engine.render(scene, minimalPolicy(), null);
+
+    assertThat(result.diagnostics())
+        .anySatisfy(
+            diagnostic -> {
+              assertThat(diagnostic.code()).isEqualTo("DEDIREN_ASCII_EDGE_LABEL_DROPPED");
+              assertThat(diagnostic.severity()).isEqualTo(DiagnosticSeverity.WARNING);
+              assertThat(diagnostic.path()).isEqualTo("edges[e1].label");
+            });
+  }
+
+  @Test
   void edgeLabelIsPlacedAboveItsLongestHorizontalSegment() throws Exception {
     RoutedEdge labeled = edge("e1", "s", "t", "hi", new Point(0, 50), new Point(200, 50));
     RoutedEdge spacer = edge("e2", "x", "y", "", new Point(500, 0), new Point(500, 20));

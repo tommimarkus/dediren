@@ -48,7 +48,7 @@ class CharCanvasTest {
     CharCanvas canvas = new CharCanvas(3, 1);
     canvas.text(0, 1, "hello");
     String line = canvas.emit(GlyphSet.UNICODE);
-    assertThat(line).startsWith(" h");
+    assertThat(line).isEqualTo(" he\n");
   }
 
   @Test
@@ -74,6 +74,16 @@ class CharCanvasTest {
     String out = canvas.emit(GlyphSet.UNICODE);
     assertThat(out).endsWith("x\n");
     assertThat(out).doesNotEndWith("\n\n");
+  }
+
+  @Test
+  void controlCharactersAreReplacedWithSpacesNotEmitted() {
+    CharCanvas canvas = new CharCanvas(7, 1);
+    canvas.text(0, 0, "a\u001B[2Jb");
+    canvas.literal(0, 6, '\u0007');
+    String out = canvas.emit(GlyphSet.UNICODE);
+    assertThat(out).doesNotContain("\u001B").doesNotContain("\u0007");
+    assertThat(out).isEqualTo("a [2Jb\n");
   }
 
   @Test

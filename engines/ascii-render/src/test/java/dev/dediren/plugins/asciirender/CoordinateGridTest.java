@@ -156,8 +156,7 @@ class CoordinateGridTest {
             List.of(),
             List.of());
     CoordinateGrid grid = CoordinateGrid.of(scene);
-    assertThat(grid.colOf(85)).isNotEqualTo(grid.colOf(80));
-    assertThat(grid.colOf(85)).isNotEqualTo(grid.colOf(100));
+    assertThat(grid.colOf(85)).isBetween(grid.colOf(80) + 1, grid.colOf(100) - 1);
   }
 
   @Test

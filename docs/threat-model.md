@@ -350,7 +350,12 @@ Controls:
   response adaptation over the same in-memory import → render lane the SVG
   attachment path uses, swapped to the `ascii` render engine — no new parser,
   no filesystem writes, and the same inline decoded-content byte budget as the
-  other `dediren_import` output modes.
+  other `dediren_import` output modes. Because this output is printed verbatim
+  by terminals and MCP clients while labels are untrusted model text (the DOT
+  importer and hand-authored source JSON admit raw control bytes), the engine's
+  character sink (`CharCanvas`) replaces every ISO control character with a
+  space — the text lane's counterpart to the SVG lane's XML escaping, closing
+  the terminal escape-sequence injection path.
 - **Package declared outputs.** `dediren build --package` (and `dediren_build` with
   a `package` argument) add a caller-*declared* write surface: each view and export
   names the path its artifact lands at. Every declared output path — and every
