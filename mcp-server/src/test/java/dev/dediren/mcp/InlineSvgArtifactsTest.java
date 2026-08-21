@@ -18,7 +18,7 @@ class InlineSvgArtifactsTest {
         {
           "build_result_schema_version": "build-result.schema.v1",
           "views": [{
-            "artifacts": [{"artifact_kind": "svg", "path": "../outside.svg"}]
+            "artifacts": [{"artifact_kind": "svg+xml", "path": "../outside.svg"}]
           }]
         }
         """;

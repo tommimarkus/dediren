@@ -162,7 +162,7 @@ public final class DedirenTools {
       }
       String svg =
           rendered.render().artifacts().stream()
-              .filter(artifact -> "svg".equals(artifact.artifactKind()))
+              .filter(artifact -> "svg+xml".equals(artifact.artifactKind()))
               .map(artifact -> artifact.content())
               .findFirst()
               .orElse(null);
@@ -215,7 +215,7 @@ public final class DedirenTools {
     }
     String diagram =
         rendered.render().artifacts().stream()
-            .filter(artifact -> "text".equals(artifact.artifactKind()))
+            .filter(artifact -> "ascii+text".equals(artifact.artifactKind()))
             .map(artifact -> artifact.content())
             .findFirst()
             .orElse(null);
@@ -688,7 +688,7 @@ public final class DedirenTools {
           throw new InlineArtifactException("view does not declare artifacts");
         }
         for (JsonNode artifact : artifacts) {
-          if ("svg".equals(artifact.path("artifact_kind").asText())
+          if ("svg+xml".equals(artifact.path("artifact_kind").asText())
               && artifact.path("path").isTextual()) {
             paths.add(artifact.path("path").asText());
           }

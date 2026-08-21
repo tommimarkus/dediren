@@ -218,7 +218,7 @@ class DedirenImportTextOutputTest {
     public EngineResult<RenderResult> render(
         LaidOutScene scene, JsonNode policy, RenderMetadata metadataOrNull) throws EngineException {
       List<RenderArtifact> artifacts =
-          content == null ? List.of() : List.of(new RenderArtifact("text", content));
+          content == null ? List.of() : List.of(new RenderArtifact("ascii+text", content));
       return new EngineResult<>(
           new RenderResult(
               dev.dediren.contracts.ContractVersions.RENDER_RESULT_SCHEMA_VERSION, artifacts),
