@@ -69,7 +69,7 @@ class SchemaValidatorTest {
     String template =
         """
         {
-          "render_policy_schema_version": "render-policy.schema.v3",
+          "render_policy_schema_version": "render-policy.schema.v4",
           "page": { "width": 100, "height": 100 },
           "margin": { "top": 0, "right": 0, "bottom": 0, "left": 0 },
           "style": { "node": { "shape": "%s" } }
@@ -94,13 +94,13 @@ class SchemaValidatorTest {
   @Test
   void renderPolicyRejectsRetiredInteractiveField() throws Exception {
     // interactive-svg was retired: the `interactive` mode field and the `style.interaction` object
-    // are gone from render-policy.schema.v3. additionalProperties:false must reject either, so a
+    // are gone as of render-policy.schema.v3. additionalProperties:false must reject either, so a
     // stale policy fails loudly at the schema boundary rather than being silently ignored.
     var mapper = dev.dediren.contracts.json.JsonSupport.objectMapper();
     String base =
         """
         {
-          "render_policy_schema_version": "render-policy.schema.v3",
+          "render_policy_schema_version": "render-policy.schema.v4",
           "page": { "width": 100, "height": 100 },
           "margin": { "top": 0, "right": 0, "bottom": 0, "left": 0 }%s
         }
@@ -122,6 +122,34 @@ class SchemaValidatorTest {
                         ",\n          \"style\": { \"interaction\": { \"highlight_stroke\":"
                             + " \"#fff\" } }"))))
         .describedAs("retired style.interaction object must be rejected")
+        .isNotEmpty();
+  }
+
+  @Test
+  void renderPolicyAcceptsKnownTextCharsetAndRejectsUnknown() throws Exception {
+    var mapper = dev.dediren.contracts.json.JsonSupport.objectMapper();
+    String template =
+        """
+        {
+          "render_policy_schema_version": "render-policy.schema.v4",
+          "page": { "width": 100, "height": 100 },
+          "margin": { "top": 0, "right": 0, "bottom": 0, "left": 0 },
+          "text": { "charset": "%s" }
+        }
+        """;
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(),
+                "schemas/render-policy.schema.json",
+                mapper.readTree(String.format(template, "unicode"))))
+        .describedAs("unicode charset must validate")
+        .isEmpty();
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(),
+                "schemas/render-policy.schema.json",
+                mapper.readTree(String.format(template, "bogus"))))
+        .describedAs("unknown text charset must be rejected by the schema")
         .isNotEmpty();
   }
 

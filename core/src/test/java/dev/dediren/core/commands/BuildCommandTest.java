@@ -88,7 +88,7 @@ class BuildCommandTest {
   // Stub policies that carry a current schema version, so they clear SchemaVersionGate; the fake
   // engines in this file ignore the policy body entirely, so the version field alone is enough.
   private static final String RENDER_POLICY =
-      "{\"render_policy_schema_version\":\"render-policy.schema.v3\"}";
+      "{\"render_policy_schema_version\":\"render-policy.schema.v4\"}";
   private static final String OEF_POLICY =
       "{\"oef_export_policy_schema_version\":\"oef-export-policy.schema.v1\"}";
   private static final String XMI_POLICY =

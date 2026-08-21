@@ -1774,6 +1774,13 @@ Interactive SVG was retired. Remove the top-level `interactive` key (`none`,
 `render_policy_schema_version` to `render-policy.schema.v3`. There is no
 replacement: renders are static.
 
+### render-policy.schema.v3 → render-policy.schema.v4
+
+Purely additive: it adds the `text` block for the text/ASCII render lane. Set
+`render_policy_schema_version` to `render-policy.schema.v4`; optionally add
+`"text": {"charset": "ascii"}` to request ASCII output (the default,
+`unicode`, needs no change).
+
 ### layout-request.schema.v1 → layout-request.schema.v2
 
 Usually not a hand edit: `dediren project` always emits the current version,

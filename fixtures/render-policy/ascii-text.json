@@ -9,5 +9,8 @@
     "right": 32,
     "bottom": 32,
     "left": 32
+  },
+  "text": {
+    "charset": "ascii"
   }
 }

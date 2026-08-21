@@ -141,7 +141,7 @@ class ContractVersionsTest {
     assertThat(ContractVersions.QUERY_RESULT_SCHEMA_VERSION).isEqualTo("query-result.schema.v1");
     assertThat(ContractVersions.VERIFY_RESULT_SCHEMA_VERSION).isEqualTo("verify-result.schema.v1");
     assertThat(ContractVersions.STATUS_RESULT_SCHEMA_VERSION).isEqualTo("status-result.schema.v1");
-    assertThat(ContractVersions.RENDER_POLICY_SCHEMA_VERSION).isEqualTo("render-policy.schema.v3");
+    assertThat(ContractVersions.RENDER_POLICY_SCHEMA_VERSION).isEqualTo("render-policy.schema.v4");
     assertThat(ContractVersions.RENDER_METADATA_SCHEMA_VERSION)
         .isEqualTo("render-metadata.schema.v1");
     assertThat(ContractVersions.EXPORT_REQUEST_SCHEMA_VERSION)

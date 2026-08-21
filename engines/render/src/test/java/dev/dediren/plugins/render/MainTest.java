@@ -1306,7 +1306,7 @@ class MainTest {
               .readTree(
                   """
                     {
-                      "render_policy_schema_version": "render-policy.schema.v3",
+                      "render_policy_schema_version": "render-policy.schema.v4",
                       "semantic_profile": "archimate",
                       "page": { "width": 400, "height": 240 },
                       "margin": { "top": 24, "right": 24, "bottom": 24, "left": 24 },
@@ -1390,7 +1390,7 @@ class MainTest {
               .readTree(
                   """
                     {
-                      "render_policy_schema_version": "render-policy.schema.v3",
+                      "render_policy_schema_version": "render-policy.schema.v4",
                       "semantic_profile": "archimate",
                       "page": { "width": 400, "height": 240 },
                       "margin": { "top": 24, "right": 24, "bottom": 24, "left": 24 }
@@ -4314,7 +4314,7 @@ class MainTest {
     // A normal render must only ever emit an svg artifact, never a png branch.
     String policy =
         """
-            {"render_policy_schema_version":"render-policy.schema.v3",
+            {"render_policy_schema_version":"render-policy.schema.v4",
              "page":{"width":800,"height":600},
              "margin":{"top":0,"right":0,"bottom":0,"left":0}}""";
     String stdin = renderInputJson(MINIMAL_LAYOUT, null, policy);
@@ -4374,7 +4374,7 @@ class MainTest {
     layout.set("warnings", JsonSupport.objectMapper().createArrayNode());
 
     ObjectNode policy = JsonSupport.objectMapper().createObjectNode();
-    policy.put("render_policy_schema_version", "render-policy.schema.v3");
+    policy.put("render_policy_schema_version", "render-policy.schema.v4");
     ObjectNode page = policy.putObject("page");
     page.put("width", 640);
     page.put("height", 360);
