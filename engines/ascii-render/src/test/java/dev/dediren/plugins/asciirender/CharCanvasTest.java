@@ -70,8 +70,9 @@ class CharCanvasTest {
   @Test
   void emitEndsWithSingleTrailingNewline() {
     CharCanvas canvas = new CharCanvas(2, 2);
+    canvas.literal(1, 0, 'x');
     String out = canvas.emit(GlyphSet.UNICODE);
-    assertThat(out).endsWith("\n");
+    assertThat(out).endsWith("x\n");
     assertThat(out).doesNotEndWith("\n\n");
   }
 
