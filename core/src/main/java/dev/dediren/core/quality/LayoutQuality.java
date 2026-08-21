@@ -989,9 +989,6 @@ public final class LayoutQuality {
       for (int j = i + 1; j < result.edges().size(); j++) {
         LaidOutEdge left = result.edges().get(i);
         LaidOutEdge right = result.edges().get(j);
-        if (edgesShareEndpointNode(left, right)) {
-          continue;
-        }
         if (routesProperlyCross(left.points(), right.points())) {
           count++;
         }

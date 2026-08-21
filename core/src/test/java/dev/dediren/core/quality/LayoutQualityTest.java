@@ -1106,7 +1106,7 @@ class LayoutQualityTest {
   }
 
   @Test
-  void allSharedEndpointCombinationsAreExcludedFromCrossings() {
+  void allSharedEndpointCombinationsCountRemoteProperCrossings() {
     var crossing = List.of(new Point(0.0, 0.0), new Point(200.0, 200.0));
     var counterCrossing = List.of(new Point(0.0, 200.0), new Point(200.0, 0.0));
 
@@ -1120,13 +1120,27 @@ class LayoutQualityTest {
     assertThat(
             LayoutQuality.validateLayout(layoutResult(List.of(), sharedTarget, List.of()))
                 .edgeCrossingCount())
-        .isZero();
+        .isEqualTo(1);
     assertThat(
             LayoutQuality.validateLayout(layoutResult(List.of(), sourceIsOthersTarget, List.of()))
                 .edgeCrossingCount())
-        .isZero();
+        .isEqualTo(1);
     assertThat(
             LayoutQuality.validateLayout(layoutResult(List.of(), targetIsOthersSource, List.of()))
+                .edgeCrossingCount())
+        .isEqualTo(1);
+  }
+
+  @Test
+  void sharedEndpointMetadataDoesNotTurnTouchesOrCollinearOverlapIntoCrossings() {
+    var touchA = edge("touch-a", "hub", "left", List.of(new Point(0.0, 0.0), new Point(200.0, 0.0)));
+    var touchB = edge("touch-b", "hub", "right", List.of(new Point(100.0, -50.0), new Point(100.0, 0.0)));
+    var overlapA = edge("overlap-a", "hub", "left", List.of(new Point(0.0, 20.0), new Point(200.0, 20.0)));
+    var overlapB = edge("overlap-b", "hub", "right", List.of(new Point(100.0, 20.0), new Point(300.0, 20.0)));
+
+    assertThat(
+            LayoutQuality.validateLayout(
+                    layoutResult(List.of(), List.of(touchA, touchB, overlapA, overlapB), List.of()))
                 .edgeCrossingCount())
         .isZero();
   }

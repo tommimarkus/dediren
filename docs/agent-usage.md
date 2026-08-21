@@ -1347,7 +1347,9 @@ Message legitimately anchors to the lifeline axis inside the head box),
 `invalid_route_count`, `route_detour_count`, `route_close_parallel_count`,
 `group_boundary_issue_count`, `group_label_band_issue_count`,
 `label_space_issue_count`, `edge_label_dissociation_count`,
-`edge_crossing_count` (informational only), and
+`edge_crossing_count` (informational only; counts proper route-interior
+intersections even when the edges share an endpoint node, while endpoint touches
+and collinear overlaps remain excluded), and
 `warning_count`. The payload `data.status` is `ok` only when all
 non-informational counts and warnings are zero; otherwise it is `warning`, and
 the command envelope now restates that verdict so consumers reading only
