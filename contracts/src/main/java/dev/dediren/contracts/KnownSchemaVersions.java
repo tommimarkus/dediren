@@ -97,6 +97,7 @@ public final class KnownSchemaVersions {
               "svg-render-policy.schema.v1",
               "render-policy.schema.v1",
               "render-policy.schema.v2",
+              "render-policy.schema.v3",
               ContractVersions.RENDER_POLICY_SCHEMA_VERSION),
           List.of(
               new MigrationPath(
@@ -116,10 +117,16 @@ public final class KnownSchemaVersions {
                           "/render_policy_schema_version", "render-policy.schema.v2"))),
               new MigrationPath(
                   "render-policy.schema.v2",
-                  ContractVersions.RENDER_POLICY_SCHEMA_VERSION,
+                  "render-policy.schema.v3",
                   List.of(
                       MigrationOperation.removeKey("/interactive"),
                       MigrationOperation.removeKey("/style/interaction"),
+                      MigrationOperation.setVersion(
+                          "/render_policy_schema_version", "render-policy.schema.v3"))),
+              new MigrationPath(
+                  "render-policy.schema.v3",
+                  ContractVersions.RENDER_POLICY_SCHEMA_VERSION,
+                  List.of(
                       MigrationOperation.setVersion(
                           "/render_policy_schema_version",
                           ContractVersions.RENDER_POLICY_SCHEMA_VERSION)))));

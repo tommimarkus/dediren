@@ -5,7 +5,7 @@
   "additionalProperties": false,
   "required": ["render_policy_schema_version", "page", "margin"],
   "properties": {
-    "render_policy_schema_version": { "const": "render-policy.schema.v3" },
+    "render_policy_schema_version": { "const": "render-policy.schema.v4" },
     "semantic_profile": {
       "type": "string",
       "minLength": 1,
@@ -33,7 +33,14 @@
       }
     },
     "style": { "$ref": "#/$defs/style" },
-    "accessibility": { "$ref": "#/$defs/accessibility" }
+    "accessibility": { "$ref": "#/$defs/accessibility" },
+    "text": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "charset": { "enum": ["unicode", "ascii"], "default": "unicode" }
+      }
+    }
   },
   "$defs": {
     "color": {

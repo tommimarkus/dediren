@@ -28,7 +28,10 @@ class KnownSchemaVersionsTest {
   void renderPolicyCarriesItsShippedHistoryOldestFirst() {
     assertThat(KnownSchemaVersions.RENDER_POLICY.priorVersions())
         .containsExactly(
-            "svg-render-policy.schema.v1", "render-policy.schema.v1", "render-policy.schema.v2");
+            "svg-render-policy.schema.v1",
+            "render-policy.schema.v1",
+            "render-policy.schema.v2",
+            "render-policy.schema.v3");
   }
 
   @Test

@@ -129,11 +129,11 @@ public final class DedirenTools {
       }
       text = content;
     }
-    String output = outputArg(request);
+    String output = outputArg(request, IMPORT_OUTPUTS);
     if (output == null) {
       return error(
           DiagnosticCode.COMMAND_INPUT_INVALID,
-          "'output' must be 'data', 'svg', or 'image'",
+          "'output' must be 'data', 'svg', 'image', or 'text'",
           "output");
     }
     ImageSelection selection;
@@ -145,7 +145,13 @@ public final class DedirenTools {
     try {
       CoreCommands.ImportedSourceResult imported =
           CoreCommands.importSource(plugin, text, env, engines);
-      if (("data".equals(output) || selection == ImageSelection.NONE) || !imported.succeeded()) {
+      if (!imported.succeeded()) {
+        return envelope(imported.outcome().stdout(), imported.outcome().exitCode() != 0);
+      }
+      if ("text".equals(output)) {
+        return importTextOutput(imported, readImportRenderPolicy(request));
+      }
+      if ("data".equals(output) || selection == ImageSelection.NONE) {
         return envelope(imported.outcome().stdout(), imported.outcome().exitCode() != 0);
       }
       String policy = readImportRenderPolicy(request);
@@ -192,6 +198,40 @@ public final class DedirenTools {
     } catch (PolicyReadException failure) {
       return readFailure(failure.argument(), failure.candidate(), failure.ioCause());
     }
+  }
+
+  /**
+   * The {@code output: "text"} lane: renders the imported model's {@code main} view through the
+   * {@code ascii} render engine and returns the envelope plus the rendered diagram as a second text
+   * content, mirroring the SVG lane's image-attachment shape but with an inline text artifact in
+   * place of an {@link ImageContent}.
+   */
+  private CallToolResult importTextOutput(
+      CoreCommands.ImportedSourceResult imported, String policy) {
+    CoreCommands.ImportedRenderResult rendered =
+        CoreCommands.renderImportedMain(imported.source(), policy, "ascii", env, engines);
+    if (!rendered.succeeded()) {
+      return envelope(rendered.outcome().stdout(), true);
+    }
+    String diagram =
+        rendered.render().artifacts().stream()
+            .filter(artifact -> "text".equals(artifact.artifactKind()))
+            .map(artifact -> artifact.content())
+            .findFirst()
+            .orElse(null);
+    if (diagram == null) {
+      return error(
+          DiagnosticCode.COMMAND_IO_FAILED, "render did not produce a text artifact", null);
+    }
+    if (utf8Bytes(diagram) > INLINE_BYTES) {
+      return error(
+          DiagnosticCode.INPUT_FILE_TOO_LARGE, "decoded text artifact exceeds 64 MiB", null);
+    }
+    return CallToolResult.builder()
+        .addTextContent(imported.outcome().stdout())
+        .addTextContent(diagram)
+        .isError(false)
+        .build();
   }
 
   public CallToolResult guide(CallToolRequest request) {
@@ -391,7 +431,7 @@ public final class DedirenTools {
   }
 
   public CallToolResult build(CallToolRequest request) {
-    String output = outputArg(request);
+    String output = outputArg(request, BUILD_OUTPUTS);
     if (output == null) {
       return error(
           DiagnosticCode.COMMAND_INPUT_INVALID,
@@ -780,15 +820,15 @@ public final class DedirenTools {
     return bytes;
   }
 
-  private static String outputArg(CallToolRequest request) {
+  private static final Set<String> BUILD_OUTPUTS = Set.of("data", "svg", "image");
+  private static final Set<String> IMPORT_OUTPUTS = Set.of("data", "svg", "image", "text");
+
+  private static String outputArg(CallToolRequest request, Set<String> allowed) {
     Object value = request.arguments().get("output");
     if (value == null) {
       return "data";
     }
-    return value instanceof String output
-            && ("data".equals(output) || "svg".equals(output) || "image".equals(output))
-        ? output
-        : null;
+    return value instanceof String output && allowed.contains(output) ? output : null;
   }
 
   static final class InlineArtifactException extends Exception {

@@ -1,0 +1,323 @@
+{
+  "contract_version": 3,
+  "objective": "Add a text render engine (engines/ascii-render, id 'ascii') so mermaid/dot snippets render as ASCII/Unicode box diagrams via 'dediren render --plugin ascii' and an MCP dediren_import text output mode.",
+  "scope_summary": "New leaf engine module consuming LaidOutScene behind the existing RenderEngine seam; render-policy v3->v4 bump adding an optional text.charset block (registered family, migration entry); render-result v5->v6 widening artifact_kind to [svg,text]; MCP dediren_import gains output 'text'; docs/smoke updated. Build lanes and package model are explicitly out of scope (documented resting state, drawio precedent).",
+  "approved_decisions": [
+    "New module engines/ascii-render with deps contracts, engine-api, ir only; zero new third-party dependencies; engine id 'ascii'.",
+    "Charset is policy-selectable: render-policy.schema.v4 optional text block, charset enum [unicode, ascii], default unicode box-drawing.",
+    "render-result.schema.v6 widens artifact_kind enum to [svg, text]; engine-seam bump only (no family).",
+    "Surfaces: standalone 'dediren render --plugin ascii' plus MCP dediren_import output 'text' (envelope first, diagram as second TextContent); dediren build and package model untouched.",
+    "Algorithm: anchor-preserving quantization (epsilon-merged coordinate anchors, min-gap-1 monotone mapping, content-driven widening), bitmask CharCanvas with GlyphSet UNICODE/ASCII tables.",
+    "Degrades: non-orthogonal segments L-routed with DEDIREN_ASCII_EDGE_APPROXIMATED; labels truncate with diagnostic; edge labels drop with diagnostic; UML sequence views render generically with DEDIREN_ASCII_SEQUENCE_VIEW_GENERIC.",
+    "CoreCommands.renderImportedMain gains an engine-id overload; 4-arg signature delegates with 'render'.",
+    "Implementation in worktree .worktrees/ascii-render; delegated leaves are edit-only (no Maven); parent runs every acceptance command centrally."
+  ],
+  "work_units": [
+    { "id": "wu-contracts", "original_size": "large" },
+    { "id": "wu-engine", "original_size": "large" },
+    { "id": "wu-surfaces", "original_size": "medium" },
+    { "id": "wu-dist-docs", "original_size": "medium" }
+  ],
+  "leaves": [
+    {
+      "id": "render-policy-v4",
+      "dependencies": [],
+      "task": "Bump render-policy schema v3->v4: add optional top-level text block {charset: enum[unicode,ascii]}; append v3 as prior version in KnownSchemaVersions.RENDER_POLICY with a set_version-only MigrationPath (replace the three constant usages in the v2->v3 path with the v3 literal); add RenderPolicy.text field (TextRenderPolicy record + TextRenderCharset enum, Jackson names 'unicode'/'ascii'); bump all 6 fixtures/render-policy/*.json and add fixtures/render-policy/ascii-text.json; add agent-usage '### render-policy.schema.v3 -> render-policy.schema.v4' Migration subsection; sweep every enumerated 'render-policy.schema.v3' pin (contracts/core/cli/engines-render tests, fixtures/package-build-result/stale-policy-migration.json message+to+pruned op chain, docs/architecture/dediren.dediren/render-policy*.json, docs/assets/pipeline.render-policy.json). Write failing test updates first (ContractVersionsTest, SchemaValidatorTest v4 accept/reject cases, MigrationPathApplicationTest v3->v4 case). Leave docs/superpowers/* historical files untouched.",
+      "boundary": "Contracts, schemas, fixtures, migration docs, and existing tests pinning render-policy.schema.v3; no engine or MCP code.",
+      "read_set": [
+        "schemas/render-policy.schema.json",
+        "contracts/src/main/java/dev/dediren/contracts/KnownSchemaVersions.java",
+        "contracts/src/main/java/dev/dediren/contracts/ContractVersions.java",
+        "contracts/src/main/java/dev/dediren/contracts/render/RenderPolicy.java",
+        "contracts/src/main/java/dev/dediren/contracts/SchemaVersionGate.java",
+        "docs/agent-usage.md"
+      ],
+      "write_set": [
+        "schemas/render-policy.schema.json",
+        "contracts/src/main/java/dev/dediren/contracts/ContractVersions.java",
+        "contracts/src/main/java/dev/dediren/contracts/KnownSchemaVersions.java",
+        "contracts/src/main/java/dev/dediren/contracts/render/RenderPolicy.java",
+        "contracts/src/main/java/dev/dediren/contracts/render/TextRenderPolicy.java",
+        "contracts/src/main/java/dev/dediren/contracts/render/TextRenderCharset.java",
+        "fixtures/render-policy/",
+        "fixtures/package-build-result/stale-policy-migration.json",
+        "docs/agent-usage.md",
+        "docs/architecture/dediren.dediren/",
+        "docs/assets/pipeline.render-policy.json",
+        "contracts/src/test/",
+        "core/src/test/",
+        "cli/src/test/",
+        "engines/render/src/test/"
+      ],
+      "settled_decisions": {
+        "charset_enum": "unicode|ascii, default unicode",
+        "migration_ops": "single set_version step; SchemaVersionGate.composedPath prunes intermediate set_versions so a v2 doc composes to [remove /interactive, remove /style/interaction, set_version v4]",
+        "svg_engine_behavior": "SVG engine tolerates the text block silently (RenderPolicy field is mandatory because FAIL_ON_UNKNOWN_PROPERTIES=true)"
+      },
+      "size": "large",
+      "portable_tier": "standard",
+      "open_implementation_choice": "Exact pruned op-chain content of the stale-policy-migration fixture; derive from SchemaVersionGate.composedPath semantics and let the failing test confirm.",
+      "worktree_owner": "parent",
+      "acceptance_command": "./mvnw test",
+      "return_contract": "bounded-step-return-v1",
+      "stop_conditions": ["missing_load_bearing_information"],
+      "work_unit_id": "wu-contracts",
+      "max_attempts": 2
+    },
+    {
+      "id": "render-result-v6",
+      "dependencies": ["render-policy-v4"],
+      "task": "Bump render-result schema v5->v6: schemas/render-result.schema.json const -> v6 and artifact_kind enum -> [svg,text]; ContractVersions.RENDER_RESULT_SCHEMA_VERSION -> v6; sweep 'render-result.schema.v5' pins (ContractVersionsTest, ContractRoundTripTest, engines/render MainTest line 58 literal, cli DedirenToolsEngineBackedTest fake-engine literal); change BuildCommand.renderExtension to switch mapping 'text'->'txt' with updated seam comment. Failing test updates first.",
+      "boundary": "Engine-seam schema, its constant, enumerated pins, and the renderExtension seam; no new fixtures (none exist for render-result).",
+      "read_set": [
+        "schemas/render-result.schema.json",
+        "core/src/main/java/dev/dediren/core/commands/BuildCommand.java"
+      ],
+      "write_set": [
+        "schemas/render-result.schema.json",
+        "contracts/src/main/java/dev/dediren/contracts/ContractVersions.java",
+        "contracts/src/test/java/dev/dediren/contracts/ContractVersionsTest.java",
+        "contracts/src/test/java/dev/dediren/contracts/ContractRoundTripTest.java",
+        "engines/render/src/test/java/dev/dediren/plugins/render/MainTest.java",
+        "cli/src/test/java/dev/dediren/cli/DedirenToolsEngineBackedTest.java",
+        "core/src/main/java/dev/dediren/core/commands/BuildCommand.java"
+      ],
+      "settled_decisions": {
+        "enum": "artifact_kind [svg, text]; encoding enum unchanged (utf-8)",
+        "renderExtension": "text -> txt; unreachable from build lanes today (ascii not wired there) but the seam comment promised this mapping"
+      },
+      "size": "small",
+      "portable_tier": "mechanical",
+      "worktree_owner": "parent",
+      "acceptance_command": "./mvnw test",
+      "return_contract": "bounded-step-return-v1",
+      "stop_conditions": ["missing_load_bearing_information"],
+      "work_unit_id": "wu-contracts",
+      "max_attempts": 2
+    },
+    {
+      "id": "module-scaffold",
+      "dependencies": ["render-result-v6"],
+      "task": "Scaffold engines/ascii-render and register it everywhere per the drawio checklist (commit 6ea22a7): module pom (deps contracts, engine-api, ir + test-support/assertj/junit/jackson), package-info, skeleton AsciiRenderEngine (id 'ascii', empty text artifact, ContractVersions.RENDER_RESULT_SCHEMA_VERSION); root pom modules + PIT targetClasses dev.dediren.plugins.asciirender.*; cli/pom.xml compile dep; coverage-report/pom.xml runtime dep (coverage profile); EngineWiring adds new AsciiRenderEngine() beside SvgRenderEngine; DistTool.FIRST_PARTY_ARTIFACTS 'ascii-render'; dist-tool ArchitectureRulesTest 3 spots (ASCII_RENDER package constant, class counter + isPositive, enginePackages pairwise map; do NOT add to formatEnginesDoNotImportIr); docs/architecture-guidelines.md edge table row + engines prose. Failing tests first: AsciiEngineIdentityTest (mirror DrawioEngineIdentityTest) + ArchitectureRulesTest additions. No DistHermeticityTest change, no bundle-shrink rule, no attributions.",
+      "boundary": "Module scaffold and registration surfaces only; no rendering logic beyond the skeleton.",
+      "read_set": [
+        "cli/src/main/java/dev/dediren/cli/EngineWiring.java",
+        "engines/drawio/pom.xml",
+        "dist-tool/src/test/java/dev/dediren/tools/dist/ArchitectureRulesTest.java",
+        "dist-tool/src/main/java/dev/dediren/tools/dist/DistTool.java"
+      ],
+      "write_set": [
+        "engines/ascii-render/",
+        "pom.xml",
+        "cli/pom.xml",
+        "coverage-report/pom.xml",
+        "cli/src/main/java/dev/dediren/cli/EngineWiring.java",
+        "dist-tool/src/main/java/dev/dediren/tools/dist/DistTool.java",
+        "dist-tool/src/test/java/dev/dediren/tools/dist/ArchitectureRulesTest.java",
+        "docs/architecture-guidelines.md"
+      ],
+      "settled_decisions": {
+        "package": "dev.dediren.plugins.asciirender (the plugins prefix is load-bearing for four ArchUnit rules)",
+        "deps": "contracts, engine-api, ir; pairwise rule automatically bans SVG-emitter and elk imports"
+      },
+      "size": "medium",
+      "portable_tier": "mechanical",
+      "worktree_owner": "parent",
+      "acceptance_command": "./mvnw -pl dist-tool -am test",
+      "return_contract": "bounded-step-return-v1",
+      "stop_conditions": ["missing_load_bearing_information"],
+      "work_unit_id": "wu-engine",
+      "max_attempts": 2
+    },
+    {
+      "id": "ascii-grid",
+      "dependencies": ["module-scaffold"],
+      "task": "Implement CoordinateGrid (epsilon-merge 0.5px anchors from node/group borders and edge points; sorted gaps max(1, round(delta/SCALE)) with SCALE_X=8, SCALE_Y=16; content-driven widening by prefix sums, deficit added to the interval's last gap; colOf/rowOf lookups), CharCanvas (cells = line bitmask N1/E2/S4/W8 or literal char; drawHLine/drawVLine OR bits; text(); clearInterior(); emit right-trimmed lines joined with newline), GlyphSet (enum UNICODE/ASCII; glyph(bitmask) tables; arrowheads; truncation marker). Failing tests first: CoordinateGridTest (monotonicity, min-gap collision, widening), CharCanvasTest, GlyphSetTest (both charsets, junction merges, trim).",
+      "boundary": "New classes and tests inside engines/ascii-render only.",
+      "read_set": [
+        "ir/src/main/java/dev/dediren/ir/LaidOutScene.java",
+        "ir/src/main/java/dev/dediren/ir/PlacedNode.java",
+        "ir/src/main/java/dev/dediren/ir/RoutedEdge.java",
+        "ir/src/main/java/dev/dediren/ir/PlacedGroup.java"
+      ],
+      "write_set": ["engines/ascii-render/"],
+      "settled_decisions": {
+        "quantization": "anchor-preserving hybrid, no repair pass; distinct anchors always map to distinct cells",
+        "caps": "label inner width cap 32, wrapped line cap 6",
+        "glyphs": "UNICODE box-drawing set incl. junctions; ASCII -|+ with ^v<> arrowheads"
+      },
+      "size": "medium",
+      "portable_tier": "standard",
+      "open_implementation_choice": "Internal API shapes between CoordinateGrid/CharCanvas/GlyphSet as named in the brief; exact widening arithmetic pinned by the tests.",
+      "worktree_owner": "parent",
+      "acceptance_command": "./mvnw -pl engines/ascii-render -am test",
+      "return_contract": "bounded-step-return-v1",
+      "stop_conditions": ["missing_load_bearing_information"],
+      "work_unit_id": "wu-engine",
+      "max_attempts": 2
+    },
+    {
+      "id": "ascii-renderers",
+      "dependencies": ["ascii-grid"],
+      "task": "Implement NodeBox (bitmask borders, interior clear, word-wrap with hard-break fallback, centered block, truncation diagnostic), GroupBox (label in top border, drawn first), EdgeTracer (map polylines; L-route non-axis-aligned source segments with DEDIREN_ASCII_EDGE_APPROXIMATED once per edge; end arrowhead oriented by last segment), EdgeLabelPlacer (centered on longest segment, opposite-side retry, drop diagnostic; labels may overwrite line cells), and the full AsciiRenderEngine (bind RenderPolicy, DEDIREN_ASCII_POLICY_INVALID exit 3 on binding failure, paint order groups->edges->nodes->node labels->edge labels, local sequence detection over RenderMetadata emitting DEDIREN_ASCII_SEQUENCE_VIEW_GENERIC, do not forward scene.warnings()). Add the five-code DEDIREN_ASCII_* block to DiagnosticCode. Failing golden-string AsciiRenderEngineTest first: two-nodes-one-edge exact output in both charsets, group-behind-nodes, edge label placed/dropped, truncation, diagonal degrade, sequence warning, null metadata, bad charset error.",
+      "boundary": "engines/ascii-render plus the DiagnosticCode ASCII block; agent-usage Repair Rules entries land in docs-sweep (AgentUsageDocConsistencyTest lives in dist-tool, so this leaf's lane stays green).",
+      "read_set": [
+        "engines/render/src/main/java/dev/dediren/plugins/render/SvgRenderEngine.java",
+        "engines/render/src/main/java/dev/dediren/plugins/render/UmlSequenceRenderer.java",
+        "contracts/src/main/java/dev/dediren/contracts/DiagnosticCode.java"
+      ],
+      "write_set": [
+        "engines/ascii-render/",
+        "contracts/src/main/java/dev/dediren/contracts/DiagnosticCode.java"
+      ],
+      "settled_decisions": {
+        "codes": "ASCII_EDGE_APPROXIMATED, ASCII_EDGE_LABEL_DROPPED, ASCII_LABEL_TRUNCATED, ASCII_POLICY_INVALID, ASCII_SEQUENCE_VIEW_GENERIC (contiguous alphabetical block; emit only via enum)",
+        "sequence_views": "generic render + warning, never hard failure; detection reimplemented locally over contracts RenderMetadata",
+        "policy_fields": "page/margin/style/accessibility silently tolerated and unused"
+      },
+      "size": "large",
+      "portable_tier": "standard",
+      "open_implementation_choice": "Edge-label side-selection details and junction behavior on shared border cells; pinned by golden tests.",
+      "worktree_owner": "parent",
+      "acceptance_command": "./mvnw -pl engines/ascii-render -am test",
+      "return_contract": "bounded-step-return-v1",
+      "stop_conditions": ["missing_load_bearing_information"],
+      "work_unit_id": "wu-engine",
+      "max_attempts": 2
+    },
+    {
+      "id": "cli-envelope",
+      "dependencies": ["ascii-renderers"],
+      "task": "Add CLI envelope regression rows only (zero CLI production code; RenderCommand already passes --plugin through): EngineEnvelopeContractTest gains renderAsciiEmitsOkEnvelope (fixtures/render-policy/ascii-text.json + existing layout fixture, asserts artifact_kind 'text' and render-result v6) and a published error row (bad charset -> DEDIREN_ASCII_POLICY_INVALID, exit 3). Watch both fail before the wiring assertions pass.",
+      "boundary": "cli test sources only.",
+      "read_set": [
+        "cli/src/test/java/dev/dediren/cli/EngineEnvelopeContractTest.java",
+        "fixtures/render-policy/ascii-text.json"
+      ],
+      "write_set": ["cli/src/test/java/dev/dediren/cli/EngineEnvelopeContractTest.java"],
+      "settled_decisions": {
+        "no_cli_code": "CoreCommands.renderCommand is already engine-agnostic via --plugin"
+      },
+      "size": "small",
+      "portable_tier": "mechanical",
+      "worktree_owner": "parent",
+      "acceptance_command": "./mvnw -pl engines/ascii-render,cli -am test",
+      "return_contract": "bounded-step-return-v1",
+      "stop_conditions": ["missing_load_bearing_information"],
+      "work_unit_id": "wu-surfaces",
+      "max_attempts": 2
+    },
+    {
+      "id": "mcp-text-mode",
+      "dependencies": ["ascii-renderers"],
+      "task": "Add MCP dediren_import output 'text': ToolSchemas.IMPORT output enum -> [data,svg,image,text] with description; DedirenTools.outputArg gains per-tool allowed sets (build keeps its triple and message); importSource branches on 'text' BEFORE ImageSelection plumbing (the selection==NONE short-circuit would silently degrade text to data); flow = readImportRenderPolicy fallback unchanged, render via new CoreCommands.renderImportedMain overload taking a render engine id ('ascii'; 4-arg signature delegates with 'render'), extract first 'text' artifact (COMMAND_IO_FAILED if absent), INLINE_BYTES guard, return envelope TextContent first + diagram as second TextContent. Failing tests first: mcp-server unit test with fake engines (mirror DedirenToolsEngineBackedTest fake RenderResult shape) + cli engine-backed test (mermaid import output 'text' returns two text contents; build rejects output 'text').",
+      "boundary": "mcp-server tool surface plus the one CoreCommands overload; no GuideCatalog or docs edits (docs-sweep owns those).",
+      "read_set": [
+        "mcp-server/src/main/java/dev/dediren/mcp/DedirenTools.java",
+        "mcp-server/src/main/java/dev/dediren/mcp/ToolSchemas.java",
+        "core/src/main/java/dev/dediren/core/commands/CoreCommands.java",
+        "cli/src/test/java/dev/dediren/cli/DedirenToolsEngineBackedTest.java"
+      ],
+      "write_set": [
+        "mcp-server/src/main/java/dev/dediren/mcp/ToolSchemas.java",
+        "mcp-server/src/main/java/dev/dediren/mcp/DedirenTools.java",
+        "core/src/main/java/dev/dediren/core/commands/CoreCommands.java",
+        "mcp-server/src/test/",
+        "cli/src/test/java/dev/dediren/cli/DedirenToolsEngineBackedTest.java"
+      ],
+      "settled_decisions": {
+        "mode_name": "'text' not 'ascii' (names the payload; charset is the policy's business, default unicode)",
+        "content_shape": "envelope first, diagram as second TextContent; no ResvgRasterizer involvement; --read-only safe (no writes)"
+      },
+      "size": "medium",
+      "portable_tier": "standard",
+      "open_implementation_choice": "Exact per-tool allowed-set refactor shape for outputArg and error message wording.",
+      "worktree_owner": "parent",
+      "acceptance_command": "./mvnw -pl mcp-server,cli -am test",
+      "return_contract": "bounded-step-return-v1",
+      "stop_conditions": ["missing_load_bearing_information"],
+      "work_unit_id": "wu-surfaces",
+      "max_attempts": 2
+    },
+    {
+      "id": "docs-sweep",
+      "dependencies": ["ascii-renderers", "mcp-text-mode"],
+      "task": "All remaining prose in one leaf (avoids agent-usage merge conflicts): docs/agent-usage.md new '## ASCII Render' section (usage, charset policy block, ignored policy fields, degrade behavior) + Repair Rules entries for all five DEDIREN_ASCII_* codes individually + MCP Server import bullet gains 'text' (and fix the stale 'mermaid or dot' plugin list to include drawio) + Artifact Map prose mention of ascii-text.json; GuideCatalog.TOPICS entry 'ascii-render' (GuideCatalogTest is bidirectional); README render-lane paragraph + engines list mention; docs/features section incl. the documented resting state (ascii absent from build lanes and package model by design, drawio Known-limits precedent); docs/threat-model.md MCP bullet (text output is response adaptation over the in-memory import->render lane, no new parser, no writes); CLAUDE.md verification lane './mvnw -pl engines/ascii-render,cli -am test'. Enforcing tests: AgentUsageDocConsistencyTest + GuideCatalogTest.",
+      "boundary": "Documentation surfaces plus GuideCatalog.java; no engine or tool-logic changes.",
+      "read_set": [
+        "docs/agent-usage.md",
+        "mcp-server/src/main/java/dev/dediren/mcp/GuideCatalog.java",
+        "docs/features/exports.md",
+        "README.md"
+      ],
+      "write_set": [
+        "docs/agent-usage.md",
+        "mcp-server/src/main/java/dev/dediren/mcp/GuideCatalog.java",
+        "README.md",
+        "docs/features/",
+        "docs/threat-model.md",
+        "CLAUDE.md"
+      ],
+      "settled_decisions": {
+        "repair_rules": "five codes documented individually, not via bare wildcard family line",
+        "resting_state": "ascii absent from build/package lanes is documented by design"
+      },
+      "size": "medium",
+      "portable_tier": "standard",
+      "open_implementation_choice": "Whether the features write-up lands in pipeline-and-commands.md or a new text-render.md indexed in the features README.",
+      "worktree_owner": "parent",
+      "acceptance_command": "./mvnw -pl dist-tool -am test",
+      "return_contract": "bounded-step-return-v1",
+      "stop_conditions": ["missing_load_bearing_information"],
+      "work_unit_id": "wu-dist-docs",
+      "max_attempts": 2
+    },
+    {
+      "id": "dist-smoke",
+      "dependencies": ["docs-sweep"],
+      "task": "Extend the packaged-bundle smoke: CLI step 'render --plugin ascii --policy fixtures/render-policy/ascii-text.json --input <layout.json>' + assertTextRenderOutput (artifact_kind 'text', content contains '+--' and a known node label) beside assertSvgRenderOutput; MCP stdio request id 11 (dediren_import, small mermaid flowchart, output 'text') + assertMcpTextImportAnswered (two text contents, second contains a box glyph and a node label). The smoke run is itself the failing-then-passing check.",
+      "boundary": "DistTool smoke code only.",
+      "read_set": ["dist-tool/src/main/java/dev/dediren/tools/dist/DistTool.java"],
+      "write_set": ["dist-tool/src/main/java/dev/dediren/tools/dist/DistTool.java"],
+      "settled_decisions": {
+        "assertions": "ascii charset via ascii-text.json in the CLI step ('+--'); unicode default via the MCP step (box glyph)"
+      },
+      "size": "small",
+      "portable_tier": "mechanical",
+      "worktree_owner": "parent",
+      "acceptance_command": "./mvnw -pl dist-tool -am verify -Pdist-smoke",
+      "return_contract": "bounded-step-return-v1",
+      "stop_conditions": ["missing_load_bearing_information"],
+      "work_unit_id": "wu-dist-docs",
+      "max_attempts": 2
+    }
+  ],
+  "execution_cost": {
+    "schema": "planning-execution-cost-v1",
+    "mode": "advisory",
+    "expected_attempts": 1,
+    "leaf_attempt_overrides": {},
+    "declared_model_tokens": {
+      "parent_baseline": null,
+      "worker_attempts": {},
+      "parent_turns": null,
+      "retained_return_context": null,
+      "final_verification": null
+    },
+    "final_verification_commands": [
+      "./mvnw -Pquality spotless:apply",
+      "./mvnw test",
+      "./mvnw -pl dist-tool -am verify -Pdist-smoke"
+    ],
+    "assumptions": [
+      "Sandboxed Maven runs need MAVEN_OPTS=-Djava.io.tmpdir=$TMPDIR (known session gotcha); parent handles at execution.",
+      "Worktree .worktrees/ascii-render needs the wrapper jar and an absolute -Dmaven.repo.local; delegated leaves receive absolute paths.",
+      "Chromium paint lane and raster goldens are untouched (no SVG geometry changes).",
+      "No release/version bump in this task; CalVer bump only if a release is requested after integration."
+    ],
+    "unknowns": [
+      "Whether dist-tool SourceFixtureVersionConsistencyTest pins render-policy versions (verify during render-policy-v4).",
+      "Exact pruned op chain in fixtures/package-build-result/stale-policy-migration.json after the v4 hop."
+    ]
+  }
+}

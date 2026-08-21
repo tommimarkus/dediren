@@ -40,7 +40,7 @@ class MigrationPathApplicationTest {
         JsonSupport.readTree(
             """
             {
-              "render_policy_schema_version": "render-policy.schema.v3",
+              "render_policy_schema_version": "render-policy.schema.v4",
               "page": { "width": 800, "height": 600 },
               "margin": { "top": 12, "right": 12, "bottom": 12, "left": 12 },
               "style": {}
@@ -51,7 +51,34 @@ class MigrationPathApplicationTest {
   }
 
   @Test
-  void oldestRenderPolicyMigratesAcrossAllThreeBumpsInOneApplication() {
+  void renderPolicyV3PathProducesTheExpectedCurrentDocument() {
+    JsonNode stale =
+        JsonSupport.readTree(
+            """
+            {
+              "render_policy_schema_version": "render-policy.schema.v3",
+              "page": { "width": 800, "height": 600 },
+              "margin": { "top": 12, "right": 12, "bottom": 12, "left": 12 }
+            }
+            """);
+
+    JsonNode migrated = apply(stale, pathFor(KnownSchemaVersions.RENDER_POLICY, stale));
+
+    JsonNode expected =
+        JsonSupport.readTree(
+            """
+            {
+              "render_policy_schema_version": "render-policy.schema.v4",
+              "page": { "width": 800, "height": 600 },
+              "margin": { "top": 12, "right": 12, "bottom": 12, "left": 12 }
+            }
+            """);
+    assertThat(migrated).isEqualTo(expected);
+    assertAcceptedByFamily(KnownSchemaVersions.RENDER_POLICY, migrated);
+  }
+
+  @Test
+  void oldestRenderPolicyMigratesAcrossAllFourBumpsInOneApplication() {
     JsonNode stale =
         JsonSupport.readTree(
             """
@@ -72,7 +99,7 @@ class MigrationPathApplicationTest {
             {
               "page": { "width": 800, "height": 600 },
               "margin": { "top": 12, "right": 12, "bottom": 12, "left": 12 },
-              "render_policy_schema_version": "render-policy.schema.v3"
+              "render_policy_schema_version": "render-policy.schema.v4"
             }
             """);
     assertThat(migrated).isEqualTo(expected);

@@ -46,6 +46,7 @@ import dev.dediren.contracts.render.SvgEdgeLabelPresentation;
 import dev.dediren.contracts.render.SvgEdgeLineStyle;
 import dev.dediren.contracts.render.SvgEdgeMarkerEnd;
 import dev.dediren.contracts.render.SvgNodeDecorator;
+import dev.dediren.contracts.render.TextRenderCharset;
 import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.contracts.source.GenericGraphSemanticProfile;
 import dev.dediren.contracts.source.GenericGraphViewGroupRole;
@@ -505,7 +506,7 @@ class ContractRoundTripTest {
         JsonSupport.readValue(
             """
                 {
-                  "render_policy_schema_version": "render-policy.schema.v3",
+                  "render_policy_schema_version": "render-policy.schema.v4",
                   "semantic_profile": "archimate",
                   "page": { "width": 640, "height": 360 },
                   "margin": { "top": 24, "right": 24, "bottom": 24, "left": 24 },
@@ -521,7 +522,8 @@ class ContractRoundTripTest {
                         "marker_end": "hollow_triangle"
                       }
                     }
-                  }
+                  },
+                  "text": { "charset": "ascii" }
                 }
                 """,
             RenderPolicy.class);
@@ -532,6 +534,7 @@ class ContractRoundTripTest {
         .isEqualTo(SvgEdgeLineStyle.DASHED);
     assertThat(decoratorPolicy.style().edgeTypeOverrides().get("Realization").markerEnd())
         .isEqualTo(SvgEdgeMarkerEnd.HOLLOW_TRIANGLE);
+    assertThat(decoratorPolicy.text().charset()).isEqualTo(TextRenderCharset.ASCII);
     assertThat(
             JsonSupport.objectMapper()
                 .valueToTree(result)
@@ -543,7 +546,7 @@ class ContractRoundTripTest {
                 .valueToTree(result)
                 .at("/render_result_schema_version")
                 .asText())
-        .isEqualTo("render-result.schema.v5");
+        .isEqualTo("render-result.schema.v6");
   }
 
   @Test

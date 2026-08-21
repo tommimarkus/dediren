@@ -24,9 +24,9 @@ final class ToolSchemas {
           },
           "output": {
             "type": "string",
-            "enum": ["data", "svg", "image"],
+            "enum": ["data", "svg", "image", "text"],
             "default": "data",
-            "description": "data returns the imported model envelope only; svg forces image/svg+xml; image negotiates an optional image attachment."
+            "description": "data returns the imported model envelope only; svg forces image/svg+xml; image negotiates an optional image attachment; text returns the rendered text diagram inline as a second text content."
           },
           "accepted_image_types": {
             "type": "array",

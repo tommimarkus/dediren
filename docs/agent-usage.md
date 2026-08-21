@@ -190,12 +190,16 @@ Eight tools in writable mode:
 - `dediren_guide` — this document, one section at a time. Pass `topic`, or omit
   it to list the topics. Start with `topic: "source-json"`.
 - `dediren_import` — pass exactly one of `source` (a confined file path) or
-  inline `content`, with `plugin: "mermaid"` or `"dot"`. Select
-  `output: "data"` (default), `"svg"`, or `"image"`. `"svg"` strictly forces
-  an `image/svg+xml` attachment; `"image"` negotiates against
-  `accepted_image_types`. When either mode selects an attachment, import falls
-  back to the bundled `fixtures/render-policy/default-svg.json` unless
-  `render_policy` is given.
+  inline `content`, with `plugin: "mermaid"`, `"dot"`, or `"drawio"`. Select
+  `output: "data"` (default), `"svg"`, `"image"`, or `"text"`. `"svg"` strictly
+  forces an `image/svg+xml` attachment; `"image"` negotiates against
+  `accepted_image_types`; `"text"` renders the imported model's `main` view
+  through the `ascii` engine and returns the envelope as the first
+  `TextContent` with the rendered diagram as a second `TextContent` (see
+  `## ASCII Render`). When any mode selects an attachment or the text lane,
+  import falls back to the bundled `fixtures/render-policy/default-svg.json`
+  unless `render_policy` is given — the default policy's `unicode` charset
+  applies unless `render_policy` names an ascii-charset policy.
   Prompt-first examples are
   `content: "flowchart LR\n  a --> b"` and `content: "digraph { a -> b }"`.
   Returns the envelope without writing files and remains available under
@@ -319,13 +323,17 @@ not a Dediren runtime dependency and has no Dediren
 | UML/XMI assurance | No | `schemas/uml-xmi-assurance.schema.json` | `.data.assurance` in UML/XMI export stdout |
 | Build result | No | `schemas/build-result.schema.json` | command stdout (`build`) |
 
+The render policy schema also covers the `ascii` text-render lane —
+`fixtures/render-policy/ascii-text.json` is the shipped example, selecting
+`text.charset: "ascii"` (see `## ASCII Render`).
+
 ## Minimal Source JSON
 
 ```json
 {
   "model_schema_version": "model.schema.v1",
   "required_plugins": [
-    { "id": "generic-graph", "version": "2026.08.7" }
+    { "id": "generic-graph", "version": "2026.08.8" }
   ],
   "nodes": [
     { "id": "client", "type": "generic.actor", "label": "Client", "properties": {} },
@@ -418,8 +426,8 @@ profile and use ArchiMate type names:
 ```json
 {
   "required_plugins": [
-    { "id": "generic-graph", "version": "2026.08.7" },
-    { "id": "archimate-oef", "version": "2026.08.7" }
+    { "id": "generic-graph", "version": "2026.08.8" },
+    { "id": "archimate-oef", "version": "2026.08.8" }
   ],
   "plugins": {
     "generic-graph": {
@@ -964,6 +972,53 @@ options shape output:
   `data-dediren-edge-adornment="<source|target>_<multiplicity|role>"` group so
   consumers can find them.
 
+## ASCII Render
+
+The `ascii` render plugin turns a layout result into a text diagram — box-drawn
+nodes and wired edges on a character grid — for terminals, plans, and other
+places SVG cannot go. It reuses the same `project`/`layout` stages as SVG and
+swaps the `render` plugin:
+
+```bash
+"$BUNDLE/bin/dediren" project --target layout-request --plugin generic-graph \
+  --view main --input "$BUNDLE/fixtures/source/valid-basic.json" \
+  > layout-request.json
+
+"$BUNDLE/bin/dediren" layout --plugin elk-layout \
+  --input layout-request.json \
+  > layout-result.json
+
+"$BUNDLE/bin/dediren" render --plugin ascii \
+  --policy "$BUNDLE/fixtures/render-policy/ascii-text.json" \
+  --input layout-result.json \
+  > render-result.json
+
+jq -r '.data.artifacts[] | select(.artifact_kind=="text") | .content' render-result.json > diagram.txt
+```
+
+`render-result.json` holds a single `artifacts[]` entry with `artifact_kind`
+`text`. The render policy's `text.charset` field selects `unicode` (default —
+box-drawing lines and arrowheads: `─│┌┐├┼▶`) or `ascii` (plain-ASCII
+equivalents: `-|+ >v^<`), as shipped in
+`fixtures/render-policy/ascii-text.json`. An unrecognized `charset` fails with
+`DEDIREN_ASCII_POLICY_INVALID`.
+
+The lane ignores every other render-policy field — `page`, `margin`, `style`,
+`accessibility`, and `semantic_profile` carry no meaning for a character grid.
+It degrades rather than fails when the layout does not fit a grid cleanly: a
+non-orthogonal edge route is straightened to an L-shaped run
+(`DEDIREN_ASCII_EDGE_APPROXIMATED`), a label wider or taller than its box is
+truncated with `…`/`~` (`DEDIREN_ASCII_LABEL_TRUNCATED`), an edge label that
+cannot be placed without colliding is dropped
+(`DEDIREN_ASCII_EDGE_LABEL_DROPPED`), and a UML sequence view draws as generic
+boxes and wires rather than lifelines and messages
+(`DEDIREN_ASCII_SEQUENCE_VIEW_GENERIC`).
+
+The `ascii` plugin is standalone `render` and MCP `dediren_import` (`output:
+"text"`) only — it is not wired into `dediren build` lanes or the package
+model. That is a deliberate resting state, the same one the `drawio` export
+lane sits in today (see `docs/features/exports.md` "Known limits").
+
 ## UML Sequence Handoff
 
 Use `fixtures/source/valid-uml-sequence-basic.json` for the sequence MVP
@@ -1294,7 +1349,7 @@ deployment slots, and UMLDI.
 ## Runtime Probes
 
 ```bash
-VERSION=2026.08.7
+VERSION=2026.08.8
 BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}
 
 "$BUNDLE/bin/dediren" --version
@@ -1660,6 +1715,21 @@ you can recover from stdout JSON alone.
   over symbols too small to hold them. Add `semantic_profile` to the render
   policy (see `## Render`), or ignore it if a deliberately generic rendering of
   a notation view is what you want.
+- `DEDIREN_ASCII_POLICY_INVALID`: the render policy's `text.charset` is not
+  `unicode` or `ascii`. Fix the value (see `## ASCII Render`).
+- `DEDIREN_ASCII_EDGE_APPROXIMATED`: informational degrade (a `warning`; the
+  diagram was rendered) — a non-orthogonal edge route was straightened to an
+  L-shaped run to fit the character grid. Switch the model or layout to
+  orthogonal routing if the exact route geometry matters.
+- `DEDIREN_ASCII_EDGE_LABEL_DROPPED`: an edge label could not be placed
+  without colliding with other content (a `warning`; the diagram was rendered
+  without it). Shorten the edge label or give the diagram more room.
+- `DEDIREN_ASCII_LABEL_TRUNCATED`: a node or group label is wider or taller
+  than its box, so it was truncated with `…`/`~` (a `warning`; the diagram was
+  rendered). Shorten the label.
+- `DEDIREN_ASCII_SEQUENCE_VIEW_GENERIC`: expected for UML sequence views in
+  this lane (a `warning`; the diagram was rendered as generic boxes and wires,
+  not lifelines and messages) — use the SVG render lane for sequence notation.
 - `DEDIREN_EXPORT_SCHEMA_CONFORMANCE`: informational (`info`, rides an `ok`
   envelope) — names exactly which standards schema the export was validated
   against and its provenance (pinned SHA-256-verified download, or the
@@ -1775,6 +1845,13 @@ Interactive SVG was retired. Remove the top-level `interactive` key (`none`,
 `highlight_stroke` and `highlight_stroke_width` keys), then set
 `render_policy_schema_version` to `render-policy.schema.v3`. There is no
 replacement: renders are static.
+
+### render-policy.schema.v3 → render-policy.schema.v4
+
+Purely additive: it adds the `text` block for the text/ASCII render lane. Set
+`render_policy_schema_version` to `render-policy.schema.v4`; optionally add
+`"text": {"charset": "ascii"}` to request ASCII output (the default,
+`unicode`, needs no change).
 
 ### layout-request.schema.v1 → layout-request.schema.v2
 

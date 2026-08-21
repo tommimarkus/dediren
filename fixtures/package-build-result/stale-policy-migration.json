@@ -10,18 +10,18 @@
         {
           "code": "DEDIREN_SCHEMA_VERSION_OUTDATED",
           "severity": "error",
-          "message": "'render-policy.schema.v2' is a superseded render-policy schema version; this build accepts 'render-policy.schema.v3'. To fix, apply the attached migration operations.",
+          "message": "'render-policy.schema.v2' is a superseded render-policy schema version; this build accepts 'render-policy.schema.v4'. To fix, apply the attached migration operations.",
           "path": "$.render_policy_schema_version",
           "migration": {
             "from": "render-policy.schema.v2",
-            "to": "render-policy.schema.v3",
+            "to": "render-policy.schema.v4",
             "operations": [
               { "op": "remove_key", "pointer": "/interactive" },
               { "op": "remove_key", "pointer": "/style/interaction" },
               {
                 "op": "set_version",
                 "pointer": "/render_policy_schema_version",
-                "value": "render-policy.schema.v3"
+                "value": "render-policy.schema.v4"
               }
             ]
           }

@@ -4,6 +4,7 @@ import dev.dediren.contracts.source.GenericGraphSemanticProfile;
 import dev.dediren.engine.Engines;
 import dev.dediren.engine.NotationSemantics;
 import dev.dediren.plugins.archimateoef.OefExportEngine;
+import dev.dediren.plugins.asciirender.AsciiRenderEngine;
 import dev.dediren.plugins.dotimport.DotImportEngine;
 import dev.dediren.plugins.drawio.DrawioExportEngine;
 import dev.dediren.plugins.drawio.DrawioImportEngine;
@@ -41,7 +42,7 @@ public final class EngineWiring {
     return Engines.of(
         List.of(new SemanticsRouterEngine(notations)),
         List.of(new ElkEngine()),
-        List.of(new SvgRenderEngine()),
+        List.of(new SvgRenderEngine(), new AsciiRenderEngine()),
         List.of(new OefExportEngine(), new XmiExportEngine(), new DrawioExportEngine()),
         List.of(new DotImportEngine(), new MermaidImportEngine(), new DrawioImportEngine()));
   }
