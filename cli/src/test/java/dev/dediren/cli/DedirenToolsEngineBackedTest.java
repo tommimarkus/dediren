@@ -219,7 +219,7 @@ class DedirenToolsEngineBackedTest {
                     "dediren_import",
                     Map.of(
                         "content",
-                        "flowchart LR\n  a[Start] --> b[End]\n",
+                        "flowchart LR\n  start --> finish\n",
                         "plugin",
                         "mermaid",
                         "output",
@@ -229,12 +229,12 @@ class DedirenToolsEngineBackedTest {
     assertThat(result.content()).hasSize(2);
     assertThat(result.content().getFirst()).isInstanceOf(TextContent.class);
     JsonNode envelope = envelopeOf(result);
-    assertThat(envelope.path("status").asText()).isEqualTo("ok");
+    assertThat(envelope.path("status").asText()).describedAs(envelope.path("diagnostics").toString()).isEqualTo("ok");
     String diagram = ((TextContent) result.content().get(1)).text();
     // The default render policy leaves text.charset at its default (unicode), so the ascii
     // engine draws group/edge boxes with box-drawing characters rather than plain ASCII.
     assertThat(diagram).containsAnyOf("─", "│");
-    assertThat(diagram).contains("Start");
+    assertThat(diagram).contains("start");
   }
 
   @Test
