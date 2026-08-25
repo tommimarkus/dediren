@@ -205,6 +205,14 @@
         <artifactId>error_prone_annotations</artifactId>
         <version>${error-prone-annotations.version}</version>
       </dependency>
+      <!-- guava resolves jspecify 1.0.1; reactor-core (a transitive of mcp-core, pinned above)
+           resolves jspecify 1.0.0. Pin the newer line so the dependencyConvergence enforcer
+           stays green. -->
+      <dependency>
+        <groupId>org.jspecify</groupId>
+        <artifactId>jspecify</artifactId>
+        <version>1.0.1</version>
+      </dependency>
       <!-- Build-time only: dist-tool's bundle shrinker. The shrunk output ships; this library
            never does (it is not on any launcher classpath). -->
       <dependency>
