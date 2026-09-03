@@ -31,7 +31,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up Java
-        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
         with:
           distribution: temurin
           java-version: "21"
@@ -73,7 +73,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up Java
-        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
         with:
           distribution: temurin
           java-version: "21"
@@ -90,7 +90,7 @@ jobs:
         run: ./mvnw -B -ntp -Psbom org.cyclonedx:cyclonedx-maven-plugin:makeAggregateBom
 
       - name: Scan SBOM for known vulnerabilities
-        uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7.4.0
+        uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
         with:
           sbom: target/bom.json
           fail-build: true
