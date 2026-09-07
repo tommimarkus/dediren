@@ -172,8 +172,8 @@ and [custom data attribute rules](https://www.w3.org/TR/SVG2/struct.html#DataAtt
 
 The opt-in `render-paint` Maven profile validates behavior that byte-exact SVG
 goldens and XML inspection do not cover. The repository wrapper installs only
-Chromium headless shell 149.0.7827.55 (revision 1228) into
-`.cache/playwright`, then runs the Playwright Java 1.61.0 lane:
+Chromium headless shell 151.0.7922.34 (revision 1234) into
+`.cache/playwright`, then runs the Playwright Java 1.62.0 lane:
 
 ```bash
 ./scripts/test-render-paint.sh
@@ -258,7 +258,7 @@ environment changes.
 Maven state stays in `.cache/maven`; the browser shell stays in
 `.cache/playwright`. These repository-local caches are ignored, recoverable,
 and never shipped; commit no native binary, browser cache, or new font. The
-Thursday 06:00 UTC/manual job runs in the digest-pinned Playwright Java 1.61.0
+Thursday 06:00 UTC/manual job runs in the digest-pinned Playwright Java 1.62.0
 Noble image, which remains a good environment but is no longer *required* to
 regenerate — determinism comes from the repository, not the image: Playwright
 downloads a pinned Chromium and the font is embedded as a data URI, so the host

@@ -4,15 +4,15 @@
   "renderer" : {
     "name" : "Chromium headless shell via Playwright Java",
     "playwright" : {
-      "version" : "1.61.0",
-      "mavenArtifact" : "com.microsoft.playwright:playwright:1.61.0",
+      "version" : "1.62.0",
+      "mavenArtifact" : "com.microsoft.playwright:playwright:1.62.0",
       "scope" : "render-paint-test-profile-only",
       "upstream" : "https://playwright.dev/java/",
       "license" : "Apache-2.0"
     },
     "chromium" : {
-      "version" : "149.0.7827.55",
-      "revision" : "1228",
+      "version" : "151.0.7922.34",
+      "revision" : "1234",
       "distribution" : "chromium-headless-shell",
       "cache" : ".cache/playwright",
       "downloadedBy" : "playwright install --only-shell chromium",

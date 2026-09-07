@@ -5,10 +5,12 @@ import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.impl.driver.Driver;
 import com.microsoft.playwright.options.ColorScheme;
 import com.microsoft.playwright.options.ReducedMotion;
 import com.microsoft.playwright.options.ScreenshotAnimations;
 import com.microsoft.playwright.options.ServiceWorkerPolicy;
+import dev.dediren.contracts.json.JsonSupport;
 import java.awt.Font;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
@@ -45,9 +47,9 @@ import org.xml.sax.InputSource;
 /** Deterministic, test-only Chromium boundary for static SVG paint inspection. */
 final class BrowserTestSupport {
 
-  static final String PINNED_PLAYWRIGHT_VERSION = "1.61.0";
-  static final String PINNED_CHROMIUM_VERSION = "149.0.7827.55";
-  static final String PINNED_CHROMIUM_REVISION = "1228";
+  static final String PINNED_PLAYWRIGHT_VERSION = "1.62.0";
+  static final String PINNED_CHROMIUM_VERSION = "151.0.7922.34";
+  static final String PINNED_CHROMIUM_REVISION = "1234";
   static final int PADDING = 32;
   static final Path WORKSPACE_ROOT = requiredPathProperty("dediren.workspace.root");
   static final Path OUTPUT_ROOT = WORKSPACE_ROOT.resolve(".test-output/render-paint");
@@ -360,6 +362,7 @@ final class BrowserTestSupport {
   }
 
   private static BrowserSession openBrowser(Viewport viewport) {
+    requireResolvedDriverMetadata();
     requireInstalledBrowser();
     Map<String, String> environment = new HashMap<>(System.getenv());
     environment.put("PLAYWRIGHT_BROWSERS_PATH", BROWSER_CACHE_PATH.toString());
@@ -515,9 +518,61 @@ final class BrowserTestSupport {
     return path;
   }
 
+  private static void requireResolvedDriverMetadata() {
+    String packageVersion = Playwright.class.getPackage().getImplementationVersion();
+    String driverVersion = Driver.class.getPackage().getImplementationVersion();
+    try (InputStream metadata =
+        BrowserTestSupport.class
+            .getClassLoader()
+            .getResourceAsStream("driver/package/browsers.json")) {
+      requireCompatibleDriverMetadata(
+          packageVersion, driverVersion, metadata == null ? null : metadata.readAllBytes());
+    } catch (IOException failure) {
+      throw new IllegalStateException("could not read Playwright driver metadata", failure);
+    }
+  }
+
+  static void requireCompatibleDriverMetadata(
+      String packageVersion, String driverVersion, byte[] driverMetadata) {
+    if (!PINNED_PLAYWRIGHT_VERSION.equals(packageVersion)
+        || !PINNED_PLAYWRIGHT_VERSION.equals(driverVersion)) {
+      throw new IllegalStateException(
+          "paint-test requires Playwright package and driver metadata version "
+              + PINNED_PLAYWRIGHT_VERSION
+              + ", observed package="
+              + packageVersion
+              + ", driver="
+              + driverVersion);
+    }
+    if (driverMetadata == null || driverMetadata.length == 0) {
+      throw new IllegalStateException("paint-test Playwright driver metadata is missing");
+    }
+    var browsers = JsonSupport.objectMapper().readTree(driverMetadata).path("browsers");
+    var shell =
+        browsers.isArray()
+            ? java.util.stream.StreamSupport.stream(browsers.spliterator(), false)
+                .filter(browser -> "chromium-headless-shell".equals(browser.path("name").asText()))
+                .findFirst()
+                .orElse(null)
+            : null;
+    if (shell == null
+        || !PINNED_CHROMIUM_REVISION.equals(shell.path("revision").asText())
+        || !PINNED_CHROMIUM_VERSION.equals(shell.path("browserVersion").asText())) {
+      throw new IllegalStateException(
+          "paint-test requires Chromium headless shell "
+              + PINNED_CHROMIUM_VERSION
+              + " revision "
+              + PINNED_CHROMIUM_REVISION
+              + " in Playwright driver metadata");
+    }
+  }
+
   private static void requireInstalledBrowser() {
-    Path revision =
-        BROWSER_CACHE_PATH.resolve("chromium_headless_shell-" + PINNED_CHROMIUM_REVISION);
+    requireInstalledBrowser(BROWSER_CACHE_PATH);
+  }
+
+  static void requireInstalledBrowser(Path browserCachePath) {
+    Path revision = browserCachePath.resolve("chromium_headless_shell-" + PINNED_CHROMIUM_REVISION);
     if (!Files.isDirectory(revision)) {
       throw new IllegalStateException(
           "pinned Chromium headless shell is not installed at "

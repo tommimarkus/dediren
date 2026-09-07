@@ -21,7 +21,7 @@ jobs:
     name: Verify SVG paint and raster goldens
     runs-on: ubuntu-24.04
     container:
-      image: mcr.microsoft.com/playwright/java:v1.61.0-noble@sha256:a23837c4bb84165c2156f64411ae79d7e42ef91c9d8f960691d06c5d43a684f4
+      image: mcr.microsoft.com/playwright/java:v1.62.0-noble@sha256:8c3c9d7c611c24ec695fd396aad1f1957bb4943a429687ea269e3c63b3e6c0bd
     timeout-minutes: 30
     steps:
       - name: Checkout
@@ -47,7 +47,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .cache/playwright
-          key: chromium-headless-shell-1228-playwright-java-1.61.0-${{ runner.os }}-${{ runner.arch }}
+          key: chromium-headless-shell-1234-playwright-java-1.62.0-${{ runner.os }}-${{ runner.arch }}
 
       - name: Check Chromium SVG paint
         run: ./scripts/test-render-paint.sh
