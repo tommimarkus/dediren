@@ -63,7 +63,9 @@
          is worth ~1.5s (29.1s -> 27.6s), but under the parallel build in .mvn/maven.config it is
          worth far more (16.8s -> 13.5s) because C2's compiler threads otherwise contend with the
          concurrent module forks for cores. -->
-    <dediren.test.jvmArgs>-Dfile.encoding=UTF-8 -Djava.awt.headless=true -XX:TieredStopAtLevel=1</dediren.test.jvmArgs>
+    <!-- Explicitly permit the existing fuzz-test agent. This also suppresses the JDK attach
+         warning that triggers Surefire 3.6.0's null-context-classloader reporting failure. -->
+    <dediren.test.jvmArgs>-Dfile.encoding=UTF-8 -Djava.awt.headless=true -XX:TieredStopAtLevel=1 -XX:+EnableDynamicAgentLoading</dediren.test.jvmArgs>
     <argLine>${dediren.test.jvmArgs} ${dediren.test.tmpdir.arg}</argLine>
     <!-- Force UTF-8 on the single packaged dediren launcher's JVM streams. If the ambient locale
          drives native.encoding to US-ASCII, an unset stdout.encoding would mangle all non-ASCII
