@@ -171,7 +171,7 @@ class SvgRenderEngineTest {
     String json =
         """
         {
-          "layout_result_schema_version": "layout-result.schema.v2",
+          "layout_result_schema_version": "layout-result.schema.v3",
           "view_id": "main",
           "nodes": [
             {
@@ -195,7 +195,7 @@ class SvgRenderEngineTest {
               "id": "client-calls-api", "source": "client", "target": "api",
               "source_id": "client-calls-api", "projection_id": "client-calls-api",
               "routing_hints": [],
-              "points": [ { "x": 172.0, "y": 52.0 }, { "x": 254.0, "y": 52.0 } ],
+              "route": {"kind": "polyline", "points": [ { "x": 172.0, "y": 52.0 }, { "x": 254.0, "y": 52.0 } ]},
               "label": "calls",
               "source_pointer": "/relationships/0"
             }

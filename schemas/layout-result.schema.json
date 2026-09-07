@@ -5,7 +5,7 @@
   "additionalProperties": false,
   "required": ["layout_result_schema_version", "view_id", "nodes", "edges", "groups", "warnings"],
   "properties": {
-    "layout_result_schema_version": { "const": "layout-result.schema.v2" },
+    "layout_result_schema_version": { "const": "layout-result.schema.v3" },
     "view_id": { "type": "string" },
     "nodes": { "type": "array", "items": { "$ref": "#/$defs/node" } },
     "edges": { "type": "array", "items": { "$ref": "#/$defs/edge" } },
@@ -33,7 +33,7 @@
     "edge": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "source", "target", "source_id", "projection_id", "points", "label"],
+      "required": ["id", "source", "target", "source_id", "projection_id", "route", "label"],
       "properties": {
         "id": { "type": "string" },
         "source": { "type": "string" },
@@ -46,7 +46,7 @@
             "enum": ["shared_source_junction", "shared_target_junction"]
           }
         },
-        "points": { "type": "array", "items": { "$ref": "#/$defs/point" } },
+        "route": { "$ref": "#/$defs/route" },
         "label": { "type": "string" },
         "source_pointer": { "type": "string", "pattern": "^/" }
       }
@@ -101,6 +101,44 @@
       "properties": {
         "x": { "type": "number" },
         "y": { "type": "number" }
+      }
+    },
+    "route": {
+      "oneOf": [
+        { "$ref": "#/$defs/polyline_route" },
+        { "$ref": "#/$defs/cubic_bezier_route" }
+      ]
+    },
+    "polyline_route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "points"],
+      "properties": {
+        "kind": { "const": "polyline" },
+        "points": { "type": "array", "items": { "$ref": "#/$defs/point" } }
+      }
+    },
+    "cubic_bezier_route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "start", "segments"],
+      "properties": {
+        "kind": { "const": "cubic_bezier" },
+        "start": { "$ref": "#/$defs/point" },
+        "segments": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/cubic_bezier_segment" }
+        }
+      }
+    },
+    "cubic_bezier_segment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["control1", "control2", "end"],
+      "properties": {
+        "control1": { "$ref": "#/$defs/point" },
+        "control2": { "$ref": "#/$defs/point" },
+        "end": { "$ref": "#/$defs/point" }
       }
     },
     "diagnostic": {

@@ -1,5 +1,7 @@
 package dev.dediren.plugins.asciirender;
 
+import static dev.dediren.ir.RouteGeometry.flatten;
+
 import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.DiagnosticSeverity;
@@ -67,7 +69,7 @@ final class EdgeTracer {
    * Shared with {@link EdgeLabelPlacer} so label placement reasons about the same drawn geometry.
    */
   static List<int[]> drawCells(CoordinateGrid grid, RoutedEdge edge, List<Diagnostic> diagnostics) {
-    List<Point> points = edge.points();
+    List<Point> points = flatten(edge.route());
     if (points.size() < 2) {
       return List.of();
     }

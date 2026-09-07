@@ -406,7 +406,7 @@ class OefExportEngineTest {
     // nonNegativeInteger constraint — an edge route leaving the positive quadrant breaks export
     // even when every node is in range.
     JsonNode inputJson = exportInputJson();
-    ((ObjectNode) inputJson.at("/layout_result/edges/0/points/0")).put("y", -3.0);
+    ((ObjectNode) inputJson.at("/layout_result/edges/0/route/points/0")).put("y", -3.0);
 
     EngineResult<ExportResult> result = exportResult(inputJson);
 
@@ -415,7 +415,7 @@ class OefExportEngineTest {
         .anySatisfy(
             diagnostic -> {
               assertThat(diagnostic.code()).isEqualTo("DEDIREN_OEF_GEOMETRY_CLAMPED");
-              assertThat(diagnostic.path()).isEqualTo("$.layout_result.edges[0].points[0].y");
+              assertThat(diagnostic.path()).isEqualTo("$.layout_result.edges[0].route.points[0].y");
             });
   }
 

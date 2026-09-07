@@ -1,5 +1,5 @@
 {
-  "layout_result_schema_version" : "layout-result.schema.v2",
+  "layout_result_schema_version" : "layout-result.schema.v3",
   "view_id" : "state-machine-multi-cycle-view",
   "nodes" : [ {
     "id" : "preparing",
@@ -49,13 +49,16 @@
     "source_id" : "t-start",
     "projection_id" : "t-start",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 161.75,
-      "y" : 149.0
-    }, {
-      "x" : 161.75,
-      "y" : 317.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 161.75,
+        "y" : 149.0
+      }, {
+        "x" : 161.75,
+        "y" : 317.0
+      } ]
+    },
     "label" : "start",
     "source_pointer" : "/relationships/2"
   }, {
@@ -65,19 +68,22 @@
     "source_id" : "t-pause",
     "projection_id" : "t-pause",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 161.75,
-      "y" : 391.0
-    }, {
-      "x" : 161.75,
-      "y" : 479.0
-    }, {
-      "x" : 172.5,
-      "y" : 479.0
-    }, {
-      "x" : 172.5,
-      "y" : 623.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 161.75,
+        "y" : 391.0
+      }, {
+        "x" : 161.75,
+        "y" : 479.0
+      }, {
+        "x" : 172.5,
+        "y" : 479.0
+      }, {
+        "x" : 172.5,
+        "y" : 623.0
+      } ]
+    },
     "label" : "pause",
     "source_pointer" : "/relationships/3"
   }, {
@@ -87,13 +93,16 @@
     "source_id" : "t-resume",
     "projection_id" : "t-resume",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 129.5,
-      "y" : 623.0
-    }, {
-      "x" : 129.5,
-      "y" : 391.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 129.5,
+        "y" : 623.0
+      }, {
+        "x" : 129.5,
+        "y" : 391.0
+      } ]
+    },
     "label" : "resume",
     "source_pointer" : "/relationships/4"
   }, {
@@ -103,19 +112,22 @@
     "source_id" : "t-review",
     "projection_id" : "t-review",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 194.0,
-      "y" : 391.0
-    }, {
-      "x" : 194.0,
-      "y" : 439.0
-    }, {
-      "x" : 351.5,
-      "y" : 439.0
-    }, {
-      "x" : 351.5,
-      "y" : 623.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 194.0,
+        "y" : 391.0
+      }, {
+        "x" : 194.0,
+        "y" : 439.0
+      }, {
+        "x" : 351.5,
+        "y" : 439.0
+      }, {
+        "x" : 351.5,
+        "y" : 623.0
+      } ]
+    },
     "label" : "review",
     "source_pointer" : "/relationships/5"
   }, {
@@ -125,19 +137,22 @@
     "source_id" : "t-rework",
     "projection_id" : "t-rework",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 394.5,
-      "y" : 623.0
-    }, {
-      "x" : 394.5,
-      "y" : 197.0
-    }, {
-      "x" : 204.75,
-      "y" : 197.0
-    }, {
-      "x" : 204.75,
-      "y" : 149.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 394.5,
+        "y" : 623.0
+      }, {
+        "x" : 394.5,
+        "y" : 197.0
+      }, {
+        "x" : 204.75,
+        "y" : 197.0
+      }, {
+        "x" : 204.75,
+        "y" : 149.0
+      } ]
+    },
     "label" : "rework",
     "source_pointer" : "/relationships/6"
   } ],

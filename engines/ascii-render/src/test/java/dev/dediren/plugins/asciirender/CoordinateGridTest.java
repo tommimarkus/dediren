@@ -3,6 +3,7 @@ package dev.dediren.plugins.asciirender;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import dev.dediren.contracts.layout.PolylineRoute;
 import dev.dediren.ir.LaidOutScene;
 import dev.dediren.ir.PlacedGroup;
 import dev.dediren.ir.PlacedNode;
@@ -92,7 +93,7 @@ class CoordinateGridTest {
             "e",
             "e",
             List.of(),
-            List.of(new dev.dediren.contracts.layout.Point(50, 50)),
+            new PolylineRoute(List.of(new dev.dediren.contracts.layout.Point(50, 50))),
             "",
             null);
     LaidOutScene scene =
@@ -118,9 +119,10 @@ class CoordinateGridTest {
             "e",
             "e",
             List.of(),
-            List.of(
-                new dev.dediren.contracts.layout.Point(81, 5),
-                new dev.dediren.contracts.layout.Point(99, 5)),
+            new PolylineRoute(
+                List.of(
+                    new dev.dediren.contracts.layout.Point(81, 5),
+                    new dev.dediren.contracts.layout.Point(99, 5))),
             "",
             null);
     LaidOutScene scene =
@@ -145,7 +147,7 @@ class CoordinateGridTest {
             "e",
             "e",
             List.of(),
-            List.of(new dev.dediren.contracts.layout.Point(85, 5)),
+            new PolylineRoute(List.of(new dev.dediren.contracts.layout.Point(85, 5))),
             "",
             null);
     LaidOutScene scene =

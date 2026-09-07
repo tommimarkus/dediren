@@ -1,5 +1,6 @@
 package dev.dediren.plugins.render.svg;
 
+import static dev.dediren.ir.RouteGeometry.flatten;
 import static dev.dediren.plugins.render.svg.EdgeRenderer.edgeLabel;
 import static dev.dediren.plugins.render.svg.EdgeRenderer.edgeLabelCandidate;
 import static dev.dediren.plugins.render.svg.EdgeRenderer.edgeLabelVisibleBox;
@@ -61,7 +62,8 @@ public final class EdgeEndAdornments {
       return List.of();
     }
     RenderMetadataSelector selector = metadata.edges().get(edge.id());
-    if (selector == null || selector.properties() == null || edge.points().size() < 2) {
+    List<Point> routePoints = flatten(edge.route());
+    if (selector == null || selector.properties() == null || routePoints.size() < 2) {
       return List.of();
     }
     JsonNode properties = selector.properties();
@@ -76,8 +78,8 @@ public final class EdgeEndAdornments {
       return List.of();
     }
     List<Adornment> adornments = new ArrayList<>();
-    EndDirection source = endDirection(edge.points(), true);
-    EndDirection target = endDirection(edge.points(), false);
+    EndDirection source = endDirection(routePoints, true);
+    EndDirection target = endDirection(routePoints, false);
     if (source != null) {
       addAdornment(
           adornments, "source_multiplicity", "source", source, 1, sourceMultiplicity, fontSize);

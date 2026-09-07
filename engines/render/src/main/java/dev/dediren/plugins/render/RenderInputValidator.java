@@ -3,8 +3,13 @@ package dev.dediren.plugins.render;
 import dev.dediren.archimate.Archimate;
 import dev.dediren.archimate.ArchimateTypeValidationException;
 import dev.dediren.contracts.DiagnosticCode;
+import dev.dediren.contracts.layout.CubicBezierRoute;
+import dev.dediren.contracts.layout.CubicBezierSegment;
+import dev.dediren.contracts.layout.EdgeRoute;
 import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LayoutResult;
+import dev.dediren.contracts.layout.Point;
+import dev.dediren.contracts.layout.PolylineRoute;
 import dev.dediren.contracts.render.RenderMetadata;
 import dev.dediren.contracts.render.RenderMetadataSelector;
 import dev.dediren.contracts.render.RenderPolicy;
@@ -16,6 +21,7 @@ import dev.dediren.contracts.render.SvgGradientStop;
 import dev.dediren.contracts.render.SvgGroupStyle;
 import dev.dediren.contracts.render.SvgNodeStyle;
 import dev.dediren.contracts.render.SvgStylePolicy;
+import dev.dediren.ir.RouteGeometry;
 import dev.dediren.uml.Uml;
 import dev.dediren.uml.UmlSequenceValidation;
 import dev.dediren.uml.UmlValidationException;
@@ -39,8 +45,10 @@ public final class RenderInputValidator {
   public static void validate(LayoutResult layout, RenderMetadata metadata, RenderPolicy policy)
       throws PolicyValidationException,
           RenderMetadataUsageException,
+          RouteGeometryValidationException,
           ArchimateTypeValidationException,
           UmlValidationException {
+    validateRouteGeometry(layout);
     validateRenderPolicy(policy);
     validateGenericShapePolicy(policy);
     validateRenderMetadataUsage(policy, metadata);
@@ -48,6 +56,85 @@ public final class RenderInputValidator {
     validateArchimateRenderMetadata(layout, metadata);
     validateUmlPolicyTypes(policy);
     validateUmlRenderMetadata(layout, metadata);
+  }
+
+  private static void validateRouteGeometry(LayoutResult layout)
+      throws RouteGeometryValidationException {
+    for (int edgeIndex = 0; edgeIndex < layout.edges().size(); edgeIndex++) {
+      LaidOutEdge edge = layout.edges().get(edgeIndex);
+      String base = "$.edges[" + edgeIndex + "].route";
+      EdgeRoute route = edge.route();
+      if (route == null) {
+        throw routeGeometryFailure(
+            DiagnosticCode.LAYOUT_ROUTE_POINTS_EMPTY, base, "edge route is required");
+      }
+      if (route instanceof PolylineRoute polyline) {
+        if (polyline.points().isEmpty()) {
+          throw routeGeometryFailure(
+              DiagnosticCode.LAYOUT_ROUTE_POINTS_EMPTY,
+              base + ".points",
+              "edge route must contain points");
+        }
+        for (int pointIndex = 0; pointIndex < polyline.points().size(); pointIndex++) {
+          requireFinite(polyline.points().get(pointIndex), base + ".points[" + pointIndex + "]");
+        }
+        if (polyline.points().size() < 2) {
+          throw routeGeometryFailure(
+              DiagnosticCode.LAYOUT_ROUTE_POINTS_INSUFFICIENT,
+              base + ".points",
+              "edge route must contain at least two points");
+        }
+        requireNonDegenerate(route, base);
+        continue;
+      }
+      CubicBezierRoute cubic = (CubicBezierRoute) route;
+      requireFinite(cubic.start(), base + ".start");
+      if (cubic.segments().isEmpty()) {
+        throw routeGeometryFailure(
+            DiagnosticCode.LAYOUT_ROUTE_POINTS_INSUFFICIENT,
+            base + ".segments",
+            "cubic route must contain a segment");
+      }
+      for (int segmentIndex = 0; segmentIndex < cubic.segments().size(); segmentIndex++) {
+        CubicBezierSegment segment = cubic.segments().get(segmentIndex);
+        String segmentBase = base + ".segments[" + segmentIndex + "]";
+        if (segment == null) {
+          throw routeGeometryFailure(
+              DiagnosticCode.LAYOUT_NON_FINITE_GEOMETRY,
+              segmentBase,
+              "cubic route segment is required");
+        }
+        requireFinite(segment.control1(), segmentBase + ".control1");
+        requireFinite(segment.control2(), segmentBase + ".control2");
+        requireFinite(segment.end(), segmentBase + ".end");
+      }
+      requireNonDegenerate(route, base);
+    }
+  }
+
+  private static void requireNonDegenerate(EdgeRoute route, String path)
+      throws RouteGeometryValidationException {
+    if (RouteGeometry.length(route) <= 1.0e-9) {
+      throw routeGeometryFailure(
+          DiagnosticCode.LAYOUT_ROUTE_POINTS_INSUFFICIENT,
+          path,
+          "edge route must contain non-coincident geometry");
+    }
+  }
+
+  private static void requireFinite(Point point, String path)
+      throws RouteGeometryValidationException {
+    if (point == null || !Double.isFinite(point.x()) || !Double.isFinite(point.y())) {
+      throw routeGeometryFailure(
+          DiagnosticCode.LAYOUT_NON_FINITE_GEOMETRY,
+          path,
+          "edge route contains missing or non-finite geometry");
+    }
+  }
+
+  private static RouteGeometryValidationException routeGeometryFailure(
+      DiagnosticCode code, String path, String message) {
+    return new RouteGeometryValidationException(code.code(), path, message);
   }
 
   private static void validateRenderMetadataUsage(RenderPolicy policy, RenderMetadata metadata)
@@ -670,6 +757,25 @@ public final class RenderInputValidator {
     private final String path;
 
     private RenderMetadataUsageException(String code, String path, String message) {
+      super(message);
+      this.code = code;
+      this.path = path;
+    }
+
+    public String code() {
+      return code;
+    }
+
+    public String path() {
+      return path;
+    }
+  }
+
+  public static final class RouteGeometryValidationException extends Exception {
+    private final String code;
+    private final String path;
+
+    private RouteGeometryValidationException(String code, String path, String message) {
       super(message);
       this.code = code;
       this.path = path;

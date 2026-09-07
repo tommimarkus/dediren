@@ -7,6 +7,7 @@ import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.layout.Point;
+import dev.dediren.contracts.layout.PolylineRoute;
 import dev.dediren.contracts.render.RenderMetadata;
 import dev.dediren.contracts.render.RenderMetadataSelector;
 import dev.dediren.contracts.render.RenderResult;
@@ -313,7 +314,8 @@ class AsciiRenderEngineTest {
 
   private static RoutedEdge edge(
       String id, String source, String target, String label, Point... points) {
-    return new RoutedEdge(id, source, target, id, id, List.of(), List.of(points), label, null);
+    return new RoutedEdge(
+        id, source, target, id, id, List.of(), new PolylineRoute(List.of(points)), label, null);
   }
 
   private static ObjectNode minimalPolicy() {

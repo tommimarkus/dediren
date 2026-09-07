@@ -4,6 +4,9 @@ import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.DiagnosticSeverity;
+import dev.dediren.contracts.layout.CubicBezierRoute;
+import dev.dediren.contracts.layout.CubicBezierSegment;
+import dev.dediren.contracts.layout.EdgeRoute;
 import dev.dediren.contracts.layout.GroupProvenance;
 import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LaidOutGroup;
@@ -16,8 +19,10 @@ import dev.dediren.contracts.layout.LayoutPreferences;
 import dev.dediren.contracts.layout.LayoutRequest;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.layout.Point;
+import dev.dediren.contracts.layout.PolylineRoute;
 import dev.dediren.ir.LayoutIntent;
 import dev.dediren.ir.LayoutIntentCodec;
+import dev.dediren.ir.RouteGeometry;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -29,6 +34,7 @@ import java.util.Set;
 import org.eclipse.elk.core.RecursiveGraphLayoutEngine;
 import org.eclipse.elk.core.options.CoreOptions;
 import org.eclipse.elk.core.options.Direction;
+import org.eclipse.elk.core.options.EdgeRouting;
 import org.eclipse.elk.core.options.PortConstraints;
 import org.eclipse.elk.core.options.PortSide;
 import org.eclipse.elk.core.util.BasicProgressMonitor;
@@ -201,7 +207,7 @@ final class ElkLayoutEngine {
                 edge.sourceId(),
                 edge.id(),
                 portPlan.routingHints(edge.id()),
-                points(elkEdge),
+                route(elkEdge),
                 edge.label(),
                 edgePointers.get(edge.id())));
       } else if (sequenceMode
@@ -219,7 +225,7 @@ final class ElkLayoutEngine {
                 edge.sourceId(),
                 edge.id(),
                 portPlan.routingHints(edge.id()),
-                selfLoopPlaceholderRoute(elkNodes.get(edge.source())),
+                new PolylineRoute(selfLoopPlaceholderRoute(elkNodes.get(edge.source()))),
                 edge.label(),
                 edgePointers.get(edge.id())));
       }
@@ -633,19 +639,22 @@ final class ElkLayoutEngine {
     for (LayoutEdge edge : list(request.edges())) {
       ElkEdge elkEdge = elkEdges.get(edge.id());
       if (elkEdge != null) {
-        List<Point> routePoints = points(elkEdge);
+        EdgeRoute route = route(elkEdge);
         if (portPlan.reversed(edge.id())) {
           // The edge was handed to ELK reversed to avoid feedback routing; flip the geometry back
           // so the route runs from the declared source to the declared target.
-          Collections.reverse(routePoints);
+          route = RouteGeometry.reverse(route);
         }
-        routePoints =
-            OrthogonalRouteNormalizer.collapseStairSteps(
-                routePoints,
-                nodes,
-                edge.source(),
-                edge.target(),
-                !portPlan.mergesSourceEndpoint(edge.id()));
+        if (route instanceof PolylineRoute polyline) {
+          route =
+              new PolylineRoute(
+                  OrthogonalRouteNormalizer.collapseStairSteps(
+                      polyline.points(),
+                      nodes,
+                      edge.source(),
+                      edge.target(),
+                      !portPlan.mergesSourceEndpoint(edge.id())));
+        }
         edges.add(
             new LaidOutEdge(
                 edge.id(),
@@ -654,7 +663,7 @@ final class ElkLayoutEngine {
                 edge.sourceId(),
                 edge.id(),
                 portPlan.routingHints(edge.id()),
-                routePoints,
+                route,
                 edge.label(),
                 edgePointers.get(edge.id())));
       }
@@ -1026,20 +1035,112 @@ final class ElkLayoutEngine {
     return y;
   }
 
-  private static List<Point> points(ElkEdge edge) {
-    List<Point> points = new ArrayList<>();
+  static EdgeRoute route(ElkEdge edge) {
+    List<ElkEdgeSection> sections = sourceToTargetSections(edge);
     double offsetX = edge.getContainingNode() == null ? 0.0 : absoluteX(edge.getContainingNode());
     double offsetY = edge.getContainingNode() == null ? 0.0 : absoluteY(edge.getContainingNode());
-    for (ElkEdgeSection section : edge.getSections()) {
-      if (points.isEmpty()) {
-        points.add(new Point(section.getStartX() + offsetX, section.getStartY() + offsetY));
+    if (edgeRouting(edge) == EdgeRouting.SPLINES) {
+      return cubicRoute(sections, offsetX, offsetY);
+    }
+    List<Point> points = new ArrayList<>();
+    Point previousEnd = null;
+    for (ElkEdgeSection section : sections) {
+      Point sectionStart = new Point(section.getStartX() + offsetX, section.getStartY() + offsetY);
+      if (previousEnd != null && !samePoint(previousEnd, sectionStart)) {
+        return new PolylineRoute(List.of());
+      }
+      if (previousEnd == null) {
+        points.add(sectionStart);
       }
       section
           .getBendPoints()
           .forEach(bend -> points.add(new Point(bend.getX() + offsetX, bend.getY() + offsetY)));
-      points.add(new Point(section.getEndX() + offsetX, section.getEndY() + offsetY));
+      previousEnd = new Point(section.getEndX() + offsetX, section.getEndY() + offsetY);
+      points.add(previousEnd);
     }
-    return points;
+    return new PolylineRoute(points);
+  }
+
+  private static EdgeRouting edgeRouting(ElkEdge edge) {
+    if (edge.hasProperty(CoreOptions.EDGE_ROUTING)) {
+      return edge.getProperty(CoreOptions.EDGE_ROUTING);
+    }
+    ElkNode node = edge.getContainingNode();
+    while (node != null) {
+      if (node.hasProperty(CoreOptions.EDGE_ROUTING)) {
+        return node.getProperty(CoreOptions.EDGE_ROUTING);
+      }
+      node = node.getParent();
+    }
+    return EdgeRouting.UNDEFINED;
+  }
+
+  private static CubicBezierRoute cubicRoute(
+      List<ElkEdgeSection> sections, double offsetX, double offsetY) {
+    if (sections.isEmpty()) {
+      return new CubicBezierRoute(null, List.of());
+    }
+    Point routeStart =
+        point(sections.getFirst().getStartX(), sections.getFirst().getStartY(), offsetX, offsetY);
+    Point previousEnd = routeStart;
+    List<CubicBezierSegment> segments = new ArrayList<>();
+    for (ElkEdgeSection section : sections) {
+      Point sectionStart = point(section.getStartX(), section.getStartY(), offsetX, offsetY);
+      List<org.eclipse.elk.graph.ElkBendPoint> controls = section.getBendPoints();
+      if (!samePoint(previousEnd, sectionStart) || controls.size() % 3 != 2) {
+        return new CubicBezierRoute(routeStart, List.of());
+      }
+      for (int index = 0; index < controls.size(); index += 3) {
+        Point control1 =
+            point(controls.get(index).getX(), controls.get(index).getY(), offsetX, offsetY);
+        Point control2 =
+            point(controls.get(index + 1).getX(), controls.get(index + 1).getY(), offsetX, offsetY);
+        Point end =
+            index + 2 < controls.size()
+                ? point(
+                    controls.get(index + 2).getX(),
+                    controls.get(index + 2).getY(),
+                    offsetX,
+                    offsetY)
+                : point(section.getEndX(), section.getEndY(), offsetX, offsetY);
+        segments.add(new CubicBezierSegment(control1, control2, end));
+        previousEnd = end;
+      }
+    }
+    return new CubicBezierRoute(routeStart, segments);
+  }
+
+  private static List<ElkEdgeSection> sourceToTargetSections(ElkEdge edge) {
+    List<ElkEdgeSection> sections = new ArrayList<>(edge.getSections());
+    if (sections.size() < 2) {
+      return sections;
+    }
+    ElkEdgeSection current =
+        sections.stream()
+            .filter(section -> section.getIncomingSections().isEmpty())
+            .findFirst()
+            .orElse(sections.getFirst());
+    List<ElkEdgeSection> ordered = new ArrayList<>(sections.size());
+    Set<ElkEdgeSection> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+    while (current != null && visited.add(current)) {
+      ordered.add(current);
+      current =
+          current.getOutgoingSections().isEmpty() ? null : current.getOutgoingSections().getFirst();
+    }
+    for (ElkEdgeSection section : sections) {
+      if (visited.add(section)) {
+        ordered.add(section);
+      }
+    }
+    return ordered;
+  }
+
+  private static Point point(double x, double y, double offsetX, double offsetY) {
+    return new Point(x + offsetX, y + offsetY);
+  }
+
+  private static boolean samePoint(Point left, Point right) {
+    return Double.compare(left.x(), right.x()) == 0 && Double.compare(left.y(), right.y()) == 0;
   }
 
   private static String semanticBackedSourceId(GroupProvenance provenance, String fallback) {

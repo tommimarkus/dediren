@@ -1,5 +1,6 @@
 package dev.dediren.cli;
 
+import static dev.dediren.ir.RouteGeometry.flatten;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 
@@ -686,7 +687,7 @@ class SequenceLayoutPropertyTest {
             .filter(edge -> "m-delete".equals(edge.id()))
             .findFirst()
             .orElseThrow(() -> new AssertionError("no m-delete edge in scene for " + model));
-    var lastPoint = deleteMessage.points().getLast();
+    var lastPoint = flatten(deleteMessage.route()).getLast();
 
     boolean sourceDeclaredRightOfCovered =
         destruction.deleteSourceLifelineIndex() > destruction.coveredLifelineIndex();

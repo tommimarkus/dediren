@@ -1,5 +1,5 @@
 {
-  "layout_result_schema_version" : "layout-result.schema.v2",
+  "layout_result_schema_version" : "layout-result.schema.v3",
   "view_id" : "state-machine-two-node-cycle-view",
   "nodes" : [ {
     "id" : "idle",
@@ -29,19 +29,22 @@
     "source_id" : "t-engage",
     "projection_id" : "t-engage",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 227.0,
-      "y" : 103.83333333333333
-    }, {
-      "x" : 324.0,
-      "y" : 103.83333333333333
-    }, {
-      "x" : 324.0,
-      "y" : 336.1666666666667
-    }, {
-      "x" : 372.0,
-      "y" : 336.1666666666667
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 227.0,
+        "y" : 103.83333333333333
+      }, {
+        "x" : 324.0,
+        "y" : 103.83333333333333
+      }, {
+        "x" : 324.0,
+        "y" : 336.1666666666667
+      }, {
+        "x" : 372.0,
+        "y" : 336.1666666666667
+      } ]
+    },
     "label" : "engage",
     "source_pointer" : "/relationships/0"
   }, {
@@ -51,19 +54,22 @@
     "source_id" : "t-disengage",
     "projection_id" : "t-disengage",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 372.0,
-      "y" : 319.83333333333337
-    }, {
-      "x" : 275.0,
-      "y" : 319.83333333333337
-    }, {
-      "x" : 275.0,
-      "y" : 120.16666666666666
-    }, {
-      "x" : 227.0,
-      "y" : 120.16666666666666
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 372.0,
+        "y" : 319.83333333333337
+      }, {
+        "x" : 275.0,
+        "y" : 319.83333333333337
+      }, {
+        "x" : 275.0,
+        "y" : 120.16666666666666
+      }, {
+        "x" : 227.0,
+        "y" : 120.16666666666666
+      } ]
+    },
     "label" : "disengage",
     "source_pointer" : "/relationships/1"
   } ],

@@ -7,6 +7,7 @@ import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.layout.Point;
+import dev.dediren.contracts.layout.PolylineRoute;
 import dev.dediren.plugins.umlxmi.build.IdentifierMap;
 import dev.dediren.plugins.umlxmi.schema.SchemaValidation;
 import java.io.ByteArrayInputStream;
@@ -66,7 +67,7 @@ final class DiagramWriterConformanceTest {
             "order-has-lines",
             "order-has-lines",
             List.of(),
-            ORDER_HAS_LINES_POINTS,
+            new PolylineRoute(ORDER_HAS_LINES_POINTS),
             "lines");
     // Edge to the skipped visual node: no target shape, so it must be skipped.
     var danglingEdge =
@@ -77,10 +78,10 @@ final class DiagramWriterConformanceTest {
             "order-status-dependency",
             "order-status-dependency",
             List.of(),
-            List.of(new Point(1.0, 2.0)),
+            new PolylineRoute(List.of(new Point(1.0, 2.0))),
             "uses");
     return new LayoutResult(
-        "layout-result.schema.v2",
+        "layout-result.schema.v3",
         "class-view",
         List.of(order, orderLine, visualOnly),
         List.of(hasLines, danglingEdge),

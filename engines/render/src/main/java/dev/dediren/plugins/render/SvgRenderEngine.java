@@ -67,6 +67,8 @@ public final class SvgRenderEngine implements RenderEngine {
       throw failure(DiagnosticCode.SVG_POLICY_INVALID.code(), error.getMessage(), error.path());
     } catch (RenderInputValidator.RenderMetadataUsageException error) {
       throw failure(error.code(), error.getMessage(), error.path());
+    } catch (RenderInputValidator.RouteGeometryValidationException error) {
+      throw EngineException.structuralFailure(error.code(), error.getMessage(), error.path());
     } catch (ArchimateTypeValidationException error) {
       throw failure(error.code(), error.message(), error.path());
     } catch (UmlValidationException error) {

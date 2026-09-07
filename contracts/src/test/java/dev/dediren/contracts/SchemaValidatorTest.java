@@ -353,7 +353,7 @@ class SchemaValidatorTest {
     noPolicy.putObject("source").put("model_schema_version", "model.schema.v1");
     noPolicy
         .putObject("layout_result")
-        .put("layout_result_schema_version", "layout-result.schema.v2");
+        .put("layout_result_schema_version", "layout-result.schema.v3");
     assertThat(
             SchemaAssertions.validate(
                 workspaceRoot(), "schemas/export-request.schema.json", noPolicy))
@@ -382,7 +382,7 @@ class SchemaValidatorTest {
     request.putObject("source").put("model_schema_version", "model.schema.v1");
     request
         .putObject("layout_result")
-        .put("layout_result_schema_version", "layout-result.schema.v2");
+        .put("layout_result_schema_version", "layout-result.schema.v3");
     request.set("policy", policy);
     return request;
   }

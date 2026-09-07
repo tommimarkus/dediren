@@ -1,5 +1,6 @@
 package dev.dediren.plugins.elklayout;
 
+import static dev.dediren.ir.RouteGeometry.flatten;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -192,7 +193,7 @@ class ElkLayoutEngineTest {
     assertEquals("client-calls-api", edge.sourceId());
     assertEquals("client-calls-api", edge.projectionId());
     assertTrue(api.x() > client.x(), "layered layout should place target after source");
-    assertTrue(edge.points().size() >= 2, "layout must include start and end points");
+    assertTrue(flatten(edge.route()).size() >= 2, "layout must include start and end points");
     assertEquals(List.of(), result.warnings());
   }
 
@@ -227,7 +228,7 @@ class ElkLayoutEngineTest {
     LaidOutNode service = nodeById(result, "service");
     double stemX = service.x() + service.width() / 2.0;
     LaidOutEdge m2 = edgeById(result, "m2");
-    List<Point> hook = m2.points();
+    List<Point> hook = flatten(m2.route());
 
     assertEquals(4, hook.size(), "self-message hook has four points, m2=" + hook);
     assertEquals(stemX, hook.get(0).x(), GEOMETRY_EPSILON, "hook starts on the service stem");
@@ -322,7 +323,7 @@ class ElkLayoutEngineTest {
     double expectedBottom =
         Math.max(customer.y() + customer.height(), service.y() + service.height());
     for (LaidOutEdge edge : result.edges()) {
-      for (Point point : edge.points()) {
+      for (Point point : flatten(edge.route())) {
         expectedBottom = Math.max(expectedBottom, point.y());
       }
     }
@@ -352,11 +353,11 @@ class ElkLayoutEngineTest {
     assertTrue(
         firstMessageY < secondMessageY && secondMessageY < thirdMessageY,
         "sequence message routes should follow constraint order, m1="
-            + edgeById(result, "m1").points()
+            + flatten(edgeById(result, "m1").route())
             + ", m2="
-            + edgeById(result, "m2").points()
+            + flatten(edgeById(result, "m2").route())
             + ", m3="
-            + edgeById(result, "m3").points());
+            + flatten(edgeById(result, "m3").route()));
     assertTrue(
         secondMessageY - firstMessageY >= 32.0,
         "adjacent sequence rows need readable label clearance, first="
@@ -505,10 +506,12 @@ class ElkLayoutEngineTest {
     // m2 (storefront -> orderservice) was the message that degenerated into a backwards stub
     // between the merged box's own edges; it must now read left-to-right.
     LaidOutEdge m2 = edgeById(result, "m2");
-    assertEquals(2, m2.points().size(), "lifeline-to-lifeline message should be a direct segment");
+    assertEquals(
+        2, flatten(m2.route()).size(), "lifeline-to-lifeline message should be a direct segment");
     assertTrue(
-        m2.points().getFirst().x() < m2.points().getLast().x(),
-        "forward sequence message should span its columns left-to-right, m2=" + m2.points());
+        flatten(m2.route()).getFirst().x() < flatten(m2.route()).getLast().x(),
+        "forward sequence message should span its columns left-to-right, m2="
+            + flatten(m2.route()));
   }
 
   @Test
@@ -859,23 +862,23 @@ class ElkLayoutEngineTest {
         sameVerticalOrder(
             centerY(sourceA), centerY(sourceB), targetPortY(edgeA), targetPortY(edgeB)),
         "target ports should follow incoming source order, a="
-            + edgeA.points()
+            + flatten(edgeA.route())
             + ", b="
-            + edgeB.points());
+            + flatten(edgeB.route()));
     assertTrue(
         sameVerticalOrder(
             centerY(sourceB), centerY(sourceC), targetPortY(edgeB), targetPortY(edgeC)),
         "target ports should follow incoming source order, b="
-            + edgeB.points()
+            + flatten(edgeB.route())
             + ", c="
-            + edgeC.points());
+            + flatten(edgeC.route()));
     assertTrue(
         sameVerticalOrder(
             centerY(sourceA), centerY(sourceC), targetPortY(edgeA), targetPortY(edgeC)),
         "target ports should follow incoming source order, a="
-            + edgeA.points()
+            + flatten(edgeA.route())
             + ", c="
-            + edgeC.points());
+            + flatten(edgeC.route()));
   }
 
   @Test
@@ -918,23 +921,23 @@ class ElkLayoutEngineTest {
         sameHorizontalOrder(
             centerX(sourceA), centerX(sourceB), targetPortX(edgeA), targetPortX(edgeB)),
         "target ports should follow incoming source order, a="
-            + edgeA.points()
+            + flatten(edgeA.route())
             + ", b="
-            + edgeB.points());
+            + flatten(edgeB.route()));
     assertTrue(
         sameHorizontalOrder(
             centerX(sourceB), centerX(sourceC), targetPortX(edgeB), targetPortX(edgeC)),
         "target ports should follow incoming source order, b="
-            + edgeB.points()
+            + flatten(edgeB.route())
             + ", c="
-            + edgeC.points());
+            + flatten(edgeC.route()));
     assertTrue(
         sameHorizontalOrder(
             centerX(sourceA), centerX(sourceC), targetPortX(edgeA), targetPortX(edgeC)),
         "target ports should follow incoming source order, a="
-            + edgeA.points()
+            + flatten(edgeA.route())
             + ", c="
-            + edgeC.points());
+            + flatten(edgeC.route()));
   }
 
   @Test
@@ -979,17 +982,17 @@ class ElkLayoutEngineTest {
         0,
         routeCrossingCountNearSource(cachedEdge, staleEdge, decision),
         "compact decision fan-out routes should not cross near their shared endpoint, cached="
-            + cachedEdge.points()
+            + flatten(cachedEdge.route())
             + ", stale="
-            + staleEdge.points());
+            + flatten(staleEdge.route()));
     assertFalse(
         hasExcessiveRouteDetour(cachedEdge),
         "compact decision fan-out must not trade the crossing for a detour, cached="
-            + cachedEdge.points());
+            + flatten(cachedEdge.route()));
     assertFalse(
         hasExcessiveRouteDetour(staleEdge),
         "compact decision fan-out must not trade the crossing for a detour, stale="
-            + staleEdge.points());
+            + flatten(staleEdge.route()));
   }
 
   @Test
@@ -1005,20 +1008,22 @@ class ElkLayoutEngineTest {
     assertRouteEndpointOnSide(result, "resume-final", "final", false, PortSide.NORTH);
     assertRouteEndpointOnSide(result, "decision-final", "final", false, PortSide.EAST);
     assertTrue(
-        spine.points().stream()
-            .allMatch(point -> Math.abs(point.x() - spine.points().get(0).x()) < GEOMETRY_EPSILON),
-        "the primary route should stay on one vertical spine, points=" + spine.points());
+        flatten(spine.route()).stream()
+            .allMatch(
+                point ->
+                    Math.abs(point.x() - flatten(spine.route()).get(0).x()) < GEOMETRY_EPSILON),
+        "the primary route should stay on one vertical spine, points=" + flatten(spine.route()));
     assertEquals(
         0,
         routeCrossingCount(spine, sideReturn),
         "the side return must not cross the primary spine, spine="
-            + spine.points()
+            + flatten(spine.route())
             + ", return="
-            + sideReturn.points());
+            + flatten(sideReturn.route()));
     assertFalse(
         hasExcessiveRouteDetour(sideReturn),
         "the side return should use one outer corridor without an excessive dogleg, points="
-            + sideReturn.points());
+            + flatten(sideReturn.route()));
   }
 
   @ParameterizedTest(name = "{0} compact side return")
@@ -1345,8 +1350,8 @@ class ElkLayoutEngineTest {
     LaidOutNode webApp = nodeById(result, "web-app");
     LaidOutGroup application = groupById(result, "application-services");
     LaidOutEdge submitsOrder = edgeById(result, "client-submits-order");
-    Point submitStart = submitsOrder.points().get(0);
-    Point submitEnd = submitsOrder.points().get(submitsOrder.points().size() - 1);
+    Point submitStart = flatten(submitsOrder.route()).get(0);
+    Point submitEnd = flatten(submitsOrder.route()).get(flatten(submitsOrder.route()).size() - 1);
     double minX = result.nodes().stream().mapToDouble(LaidOutNode::x).min().orElse(0.0);
     double maxX =
         result.nodes().stream().mapToDouble(node -> node.x() + node.width()).max().orElse(0.0);
@@ -1538,14 +1543,14 @@ class ElkLayoutEngineTest {
             "gateway-queries-catalog")) {
       LaidOutEdge edge = edgeById(result, edgeId);
       assertRouted(edge);
-      int corners = cornerCount(edge.points());
+      int corners = cornerCount(flatten(edge.route()));
       assertTrue(
           corners <= 4,
           edgeId
               + " should keep a bounded ELK-routed corner count, got "
               + corners
               + " corners, points="
-              + edge.points());
+              + flatten(edge.route()));
     }
   }
 
@@ -1810,16 +1815,16 @@ class ElkLayoutEngineTest {
     assertTrue(
         sourcePortY(federatesEdge) < sourcePortY(cacheEdge),
         "source ports should keep diverging rightward channels from crossing, cache="
-            + cacheEdge.points()
+            + flatten(cacheEdge.route())
             + ", federates="
-            + federatesEdge.points());
+            + flatten(federatesEdge.route()));
     assertEquals(
         0,
         routeCrossingCountNearSource(federatesEdge, cacheEdge, source),
         "same-source routes should not cross immediately after leaving their source, cache="
-            + cacheEdge.points()
+            + flatten(cacheEdge.route())
             + ", federates="
-            + federatesEdge.points());
+            + flatten(federatesEdge.route()));
   }
 
   @Test
@@ -1875,16 +1880,16 @@ class ElkLayoutEngineTest {
             centerY(productDb),
             centerY(sessionCache)),
         "same-source ports should follow outgoing target order to avoid crossings, reads="
-            + readsEdge.points()
+            + flatten(readsEdge.route())
             + ", cache="
-            + cacheEdge.points());
+            + flatten(cacheEdge.route()));
     assertEquals(
         0,
         routeCrossingCountNearSource(readsEdge, cacheEdge, source),
         "same-source data routes should not cross immediately after leaving their source, reads="
-            + readsEdge.points()
+            + flatten(readsEdge.route())
             + ", cache="
-            + cacheEdge.points());
+            + flatten(cacheEdge.route()));
   }
 
   @Test
@@ -1976,9 +1981,9 @@ class ElkLayoutEngineTest {
         sameVerticalOrder(
             centerY(web), centerY(mobile), targetPortY(webEdge), targetPortY(mobileEdge)),
         "same-target west ports should follow incoming source order to avoid CDN-side crossings, web="
-            + webEdge.points()
+            + flatten(webEdge.route())
             + ", mobile="
-            + mobileEdge.points()
+            + flatten(mobileEdge.route())
             + ", webNode="
             + web
             + ", mobileNode="
@@ -2453,9 +2458,9 @@ class ElkLayoutEngineTest {
     assertTrue(
         sourcePortY(dispatchEdge) < sourcePortY(orderEdge),
         "junction dispatch source port should be above the direct order branch, dispatch="
-            + dispatchEdge.points()
+            + flatten(dispatchEdge.route())
             + ", order="
-            + orderEdge.points());
+            + flatten(orderEdge.route()));
   }
 
   @Test
@@ -2680,8 +2685,8 @@ class ElkLayoutEngineTest {
       assertOrthogonalRoute(edge);
       assertNoDegenerateRouteSegments(edge);
       assertTrue(
-          cornerCount(edge.points()) <= 8,
-          edge.id() + " should keep a bounded corner count, points=" + edge.points());
+          cornerCount(flatten(edge.route())) <= 8,
+          edge.id() + " should keep a bounded corner count, points=" + flatten(edge.route()));
       assertEquals(
           0,
           endpointBoundaryOverlapCount(result, edge),
@@ -2775,7 +2780,7 @@ class ElkLayoutEngineTest {
       // Mirrors core LayoutQuality's junction check: the rendered dot radius tracks
       // min(w,h)/2 and 2.0 is core's JUNCTION_ROUTE_TOLERANCE.
       double reach = Math.min(junction.width(), junction.height()) / 2.0 + 2.0;
-      double distance = minDistanceToRoute(centerX, centerY, edge.points());
+      double distance = minDistanceToRoute(centerX, centerY, flatten(edge.route()));
       assertTrue(
           distance <= reach,
           "junction must sit on the route of "
@@ -2787,7 +2792,7 @@ class ElkLayoutEngineTest {
               + ", junction="
               + junction
               + ", points="
-              + edge.points());
+              + flatten(edge.route()));
     }
     assertEquals(
         3,
@@ -3141,12 +3146,12 @@ class ElkLayoutEngineTest {
 
   private static double firstSegmentY(LaidOutEdge edge) {
     assertRouted(edge);
-    return edge.points().get(0).y();
+    return flatten(edge.route()).get(0).y();
   }
 
   private static void assertRouted(LaidOutEdge edge) {
     assertTrue(
-        edge.points().size() >= 2,
+        flatten(edge.route()).size() >= 2,
         "edge " + edge.id() + " should include ELK-generated route points");
   }
 
@@ -3181,8 +3186,12 @@ class ElkLayoutEngineTest {
       LayoutResult result, String edgeId, String nodeId, boolean start, PortSide side) {
     LaidOutEdge edge = edgeById(result, edgeId);
     LaidOutNode node = nodeById(result, nodeId);
-    assertTrue(edge.points().size() >= 2, "edge " + edgeId + " should have route endpoints");
-    Point point = start ? edge.points().get(0) : edge.points().get(edge.points().size() - 1);
+    assertTrue(
+        flatten(edge.route()).size() >= 2, "edge " + edgeId + " should have route endpoints");
+    Point point =
+        start
+            ? flatten(edge.route()).get(0)
+            : flatten(edge.route()).get(flatten(edge.route()).size() - 1);
     assertPointOnSide(point, node, side, edgeId + " endpoint for " + nodeId);
   }
 
@@ -3194,7 +3203,10 @@ class ElkLayoutEngineTest {
     LaidOutEdge edge = edgeById(result, edgeId);
     LaidOutNode node = nodeById(result, nodeId);
     assertRouted(edge);
-    Point point = start ? edge.points().get(0) : edge.points().get(edge.points().size() - 1);
+    Point point =
+        start
+            ? flatten(edge.route()).get(0)
+            : flatten(edge.route()).get(flatten(edge.route()).size() - 1);
     assertEquals(
         node.x() + node.width() / 2.0,
         point.x(),
@@ -3208,8 +3220,8 @@ class ElkLayoutEngineTest {
   private static void assertRouteEndpointsOnNodePerimeters(LayoutResult result, String edgeId) {
     LaidOutEdge edge = edgeById(result, edgeId);
     assertRouted(edge);
-    Point sourcePoint = edge.points().get(0);
-    Point targetPoint = edge.points().get(edge.points().size() - 1);
+    Point sourcePoint = flatten(edge.route()).get(0);
+    Point targetPoint = flatten(edge.route()).get(flatten(edge.route()).size() - 1);
     LaidOutNode source = nodeById(result, edge.source());
     LaidOutNode target = nodeById(result, edge.target());
     assertTrue(
@@ -3221,7 +3233,7 @@ class ElkLayoutEngineTest {
             + ", node="
             + source
             + ", points="
-            + edge.points());
+            + flatten(edge.route()));
     assertTrue(
         routeEndpointSide(targetPoint, target) != null,
         "edge "
@@ -3231,7 +3243,7 @@ class ElkLayoutEngineTest {
             + ", node="
             + target
             + ", points="
-            + edge.points());
+            + flatten(edge.route()));
   }
 
   private static void assertPointOnSide(
@@ -3296,11 +3308,11 @@ class ElkLayoutEngineTest {
   }
 
   private static double sourcePortY(LaidOutEdge edge) {
-    return edge.points().get(0).y();
+    return flatten(edge.route()).get(0).y();
   }
 
   private static double targetPortY(LaidOutEdge edge) {
-    return edge.points().get(edge.points().size() - 1).y();
+    return flatten(edge.route()).get(flatten(edge.route()).size() - 1).y();
   }
 
   private static boolean sameVerticalOrder(
@@ -3326,7 +3338,7 @@ class ElkLayoutEngineTest {
   }
 
   private static double targetPortX(LaidOutEdge edge) {
-    return edge.points().get(edge.points().size() - 1).x();
+    return flatten(edge.route()).get(flatten(edge.route()).size() - 1).x();
   }
 
   // Horizontal analogue of sameVerticalOrder for Direction.DOWN fan-in, where the ordered axis
@@ -3377,9 +3389,9 @@ class ElkLayoutEngineTest {
   private static int connectorThroughNodeCount(LayoutResult result) {
     int count = 0;
     for (LaidOutEdge edge : result.edges()) {
-      for (int index = 0; index < edge.points().size() - 1; index++) {
-        Point start = edge.points().get(index);
-        Point end = edge.points().get(index + 1);
+      for (int index = 0; index < flatten(edge.route()).size() - 1; index++) {
+        Point start = flatten(edge.route()).get(index);
+        Point end = flatten(edge.route()).get(index + 1);
         for (LaidOutNode node : result.nodes()) {
           if (!node.id().equals(edge.source())
               && !node.id().equals(edge.target())
@@ -3408,14 +3420,14 @@ class ElkLayoutEngineTest {
   }
 
   private static boolean hasExcessiveRouteDetour(LaidOutEdge edge) {
-    if (edge.points().size() < 2) {
+    if (flatten(edge.route()).size() < 2) {
       return false;
     }
-    double routeLength = routeLength(edge.points());
-    Point start = edge.points().get(0);
-    Point end = edge.points().get(edge.points().size() - 1);
+    double routeLength = routeLength(flatten(edge.route()));
+    Point start = flatten(edge.route()).get(0);
+    Point end = flatten(edge.route()).get(flatten(edge.route()).size() - 1);
     double directLength = Math.abs(start.x() - end.x()) + Math.abs(start.y() - end.y());
-    double detourRatio = isSimpleSideReturn(edge.points()) ? 2.0 : 1.5;
+    double detourRatio = isSimpleSideReturn(flatten(edge.route())) ? 2.0 : 1.5;
     return directLength > 0.0
         && routeLength > directLength * detourRatio
         && routeLength - directLength > 240.0;
@@ -3446,15 +3458,15 @@ class ElkLayoutEngineTest {
       LaidOutEdge first, LaidOutEdge second, LaidOutNode source) {
     int count = 0;
     double nearSourceRight = source.x() + source.width() + 160.0;
-    for (int firstIndex = 0; firstIndex < first.points().size() - 1; firstIndex++) {
-      Point firstStart = first.points().get(firstIndex);
-      Point firstEnd = first.points().get(firstIndex + 1);
+    for (int firstIndex = 0; firstIndex < flatten(first.route()).size() - 1; firstIndex++) {
+      Point firstStart = flatten(first.route()).get(firstIndex);
+      Point firstEnd = flatten(first.route()).get(firstIndex + 1);
       if (Math.min(firstStart.x(), firstEnd.x()) > nearSourceRight) {
         continue;
       }
-      for (int secondIndex = 0; secondIndex < second.points().size() - 1; secondIndex++) {
-        Point secondStart = second.points().get(secondIndex);
-        Point secondEnd = second.points().get(secondIndex + 1);
+      for (int secondIndex = 0; secondIndex < flatten(second.route()).size() - 1; secondIndex++) {
+        Point secondStart = flatten(second.route()).get(secondIndex);
+        Point secondEnd = flatten(second.route()).get(secondIndex + 1);
         if (Math.min(secondStart.x(), secondEnd.x()) > nearSourceRight) {
           continue;
         }
@@ -3468,12 +3480,12 @@ class ElkLayoutEngineTest {
 
   private static int routeCrossingCount(LaidOutEdge first, LaidOutEdge second) {
     int count = 0;
-    for (int firstIndex = 0; firstIndex < first.points().size() - 1; firstIndex++) {
-      Point firstStart = first.points().get(firstIndex);
-      Point firstEnd = first.points().get(firstIndex + 1);
-      for (int secondIndex = 0; secondIndex < second.points().size() - 1; secondIndex++) {
-        Point secondStart = second.points().get(secondIndex);
-        Point secondEnd = second.points().get(secondIndex + 1);
+    for (int firstIndex = 0; firstIndex < flatten(first.route()).size() - 1; firstIndex++) {
+      Point firstStart = flatten(first.route()).get(firstIndex);
+      Point firstEnd = flatten(first.route()).get(firstIndex + 1);
+      for (int secondIndex = 0; secondIndex < flatten(second.route()).size() - 1; secondIndex++) {
+        Point secondStart = flatten(second.route()).get(secondIndex);
+        Point secondEnd = flatten(second.route()).get(secondIndex + 1);
         if (segmentsCross(firstStart, firstEnd, secondStart, secondEnd)) {
           count++;
         }
@@ -3542,7 +3554,7 @@ class ElkLayoutEngineTest {
   // raise the corner count. This asserts the very property those helpers quietly assume.
   private static void assertOrthogonalRoute(LaidOutEdge edge) {
     assertRouted(edge);
-    List<Point> points = edge.points();
+    List<Point> points = flatten(edge.route());
     for (int index = 0; index < points.size() - 1; index++) {
       Point start = points.get(index);
       Point end = points.get(index + 1);
@@ -3567,7 +3579,7 @@ class ElkLayoutEngineTest {
   // assembly (for example a section boundary duplicated when ELK edge sections are concatenated).
   private static void assertNoDegenerateRouteSegments(LaidOutEdge edge) {
     assertRouted(edge);
-    List<Point> points = edge.points();
+    List<Point> points = flatten(edge.route());
     for (int index = 0; index < points.size() - 1; index++) {
       Point start = points.get(index);
       Point end = points.get(index + 1);
@@ -3589,7 +3601,7 @@ class ElkLayoutEngineTest {
   // painted connector and makes hierarchy-crossing routes look more complicated than they are.
   private static void assertNoRedundantCollinearRoutePoints(LaidOutEdge edge) {
     assertRouted(edge);
-    List<Point> points = edge.points();
+    List<Point> points = flatten(edge.route());
     for (int index = 1; index < points.size() - 1; index++) {
       Point previous = points.get(index - 1);
       Point current = points.get(index);
@@ -3613,7 +3625,7 @@ class ElkLayoutEngineTest {
   // move across the flow axis once; a second step adds corners without adding routing meaning.
   private static void assertNoAlternatingStairSteps(LaidOutEdge edge) {
     assertRouted(edge);
-    List<Point> points = edge.points();
+    List<Point> points = flatten(edge.route());
     for (int index = 0; index < points.size() - 5; index++) {
       RouteOrientation first = routeOrientation(points.get(index), points.get(index + 1));
       RouteOrientation second = routeOrientation(points.get(index + 1), points.get(index + 2));
@@ -3638,7 +3650,7 @@ class ElkLayoutEngineTest {
   }
 
   private static void assertNoMicroDoglegs(LaidOutEdge edge) {
-    List<Point> points = edge.points();
+    List<Point> points = flatten(edge.route());
     // index 0 is deliberately excluded: a micro-dogleg anchored at the route's own first point (the
     // edge's source endpoint) is exactly the shape OrthogonalRouteNormalizer's source-boundary
     // dogleg pivot used to collapse -- and collapsing it always rides the source node's own face by
@@ -3672,8 +3684,8 @@ class ElkLayoutEngineTest {
   private static boolean hasSharedInteriorRoutePoint(List<LaidOutEdge> edges) {
     for (int edgeIndex = 0; edgeIndex < edges.size(); edgeIndex++) {
       LaidOutEdge edge = edges.get(edgeIndex);
-      for (int pointIndex = 1; pointIndex < edge.points().size() - 1; pointIndex++) {
-        Point point = edge.points().get(pointIndex);
+      for (int pointIndex = 1; pointIndex < flatten(edge.route()).size() - 1; pointIndex++) {
+        Point point = flatten(edge.route()).get(pointIndex);
         for (int otherIndex = edgeIndex + 1; otherIndex < edges.size(); otherIndex++) {
           if (containsInteriorPoint(edges.get(otherIndex), point)) {
             return true;
@@ -3685,8 +3697,8 @@ class ElkLayoutEngineTest {
   }
 
   private static boolean containsInteriorPoint(LaidOutEdge edge, Point candidate) {
-    for (int index = 1; index < edge.points().size() - 1; index++) {
-      if (samePoint(edge.points().get(index), candidate)) {
+    for (int index = 1; index < flatten(edge.route()).size() - 1; index++) {
+      if (samePoint(flatten(edge.route()).get(index), candidate)) {
         return true;
       }
     }
@@ -3713,8 +3725,8 @@ class ElkLayoutEngineTest {
   }
 
   private static int endpointBoundaryOverlapCount(LayoutResult result, LaidOutEdge edge) {
-    return boundaryOverlapCount(nodeById(result, edge.source()), edge.points())
-        + boundaryOverlapCount(nodeById(result, edge.target()), edge.points());
+    return boundaryOverlapCount(nodeById(result, edge.source()), flatten(edge.route()))
+        + boundaryOverlapCount(nodeById(result, edge.target()), flatten(edge.route()));
   }
 
   private static int boundaryOverlapCount(LaidOutNode node, List<Point> points) {

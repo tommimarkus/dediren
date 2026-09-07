@@ -15,6 +15,7 @@ import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.layout.LayoutNodeRole;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.layout.Point;
+import dev.dediren.contracts.layout.PolylineRoute;
 import dev.dediren.contracts.source.SourceDocument;
 import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.contracts.source.SourceRelationship;
@@ -127,11 +128,12 @@ class DrawioDocumentBuilderTest {
                         "a-serves-b",
                         null,
                         List.of(),
-                        List.of(
-                            new Point(172, 52),
-                            new Point(370, 52),
-                            new Point(370, 206),
-                            new Point(529, 206)),
+                        new PolylineRoute(
+                            List.of(
+                                new Point(172, 52),
+                                new Point(370, 52),
+                                new Point(370, 206),
+                                new Point(529, 206))),
                         "calls")),
                 List.of()),
             POLICY);
@@ -401,7 +403,7 @@ class DrawioDocumentBuilderTest {
                         "m1",
                         null,
                         List.of(),
-                        List.of(),
+                        new PolylineRoute(List.of()),
                         "placeOrder")),
                 List.of()),
             POLICY);
@@ -435,7 +437,7 @@ class DrawioDocumentBuilderTest {
                         "m1",
                         null,
                         List.of(),
-                        List.of(),
+                        new PolylineRoute(List.of()),
                         "placeOrder")),
                 List.of()),
             POLICY);
@@ -611,7 +613,14 @@ class DrawioDocumentBuilderTest {
                 List.of(laidOut("A node", 0, 0, 10, 10), laidOut("B node", 40, 0, 10, 10)),
                 List.of(
                     new LaidOutEdge(
-                        "r 1", "A node", "B node", "r 1", null, List.of(), List.of(), null)),
+                        "r 1",
+                        "A node",
+                        "B node",
+                        "r 1",
+                        null,
+                        List.of(),
+                        new PolylineRoute(List.of()),
+                        null)),
                 List.of()),
             POLICY);
 
@@ -873,9 +882,24 @@ class DrawioDocumentBuilderTest {
             layout(
                 List.of(laidOut("a", 0, 0, 150, 75), laidOut("b", 300, 0, 150, 75)),
                 List.of(
-                    new LaidOutEdge("owns", "a", "b", "owns", null, List.of(), List.of(), null),
                     new LaidOutEdge(
-                        "serves", "a", "b", "serves", null, List.of(), List.of(), null)),
+                        "owns",
+                        "a",
+                        "b",
+                        "owns",
+                        null,
+                        List.of(),
+                        new PolylineRoute(List.of()),
+                        null),
+                    new LaidOutEdge(
+                        "serves",
+                        "a",
+                        "b",
+                        "serves",
+                        null,
+                        List.of(),
+                        new PolylineRoute(List.of()),
+                        null)),
                 List.of()),
             POLICY);
 
@@ -904,7 +928,14 @@ class DrawioDocumentBuilderTest {
                 List.of(laidOut("base", 0, 0, 160, 80), laidOut("derived", 300, 0, 160, 80)),
                 List.of(
                     new LaidOutEdge(
-                        "isa", "derived", "base", "isa", null, List.of(), List.of(), null)),
+                        "isa",
+                        "derived",
+                        "base",
+                        "isa",
+                        null,
+                        List.of(),
+                        new PolylineRoute(List.of()),
+                        null)),
                 List.of()),
             POLICY);
 
@@ -923,7 +954,16 @@ class DrawioDocumentBuilderTest {
                 List.of(new SourceRelationship("odd", "Generalization", "a", "b", null, Map.of()))),
             layout(
                 List.of(laidOut("a", 0, 0, 150, 75), laidOut("b", 300, 0, 150, 75)),
-                List.of(new LaidOutEdge("odd", "a", "b", "odd", null, List.of(), List.of(), null)),
+                List.of(
+                    new LaidOutEdge(
+                        "odd",
+                        "a",
+                        "b",
+                        "odd",
+                        null,
+                        List.of(),
+                        new PolylineRoute(List.of()),
+                        null)),
                 List.of()),
             POLICY);
 

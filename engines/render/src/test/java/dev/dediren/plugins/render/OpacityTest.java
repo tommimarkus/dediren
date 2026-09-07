@@ -68,7 +68,7 @@ class OpacityTest {
   void groupFillOpacityIsEmitted() throws Exception {
     ObjectNode input = JsonSupport.objectMapper().createObjectNode();
     ObjectNode layout = input.putObject("layout_result");
-    layout.put("layout_result_schema_version", "layout-result.schema.v2");
+    layout.put("layout_result_schema_version", "layout-result.schema.v3");
     layout.put("view_id", "g");
     ArrayNode nodes = layout.putArray("nodes");
     ObjectNode n1 = nodes.addObject();

@@ -1,5 +1,5 @@
 {
-  "layout_result_schema_version" : "layout-result.schema.v2",
+  "layout_result_schema_version" : "layout-result.schema.v3",
   "view_id" : "sequence-fragments-view",
   "nodes" : [ {
     "id" : "interaction-place-order",
@@ -64,13 +64,16 @@
     "source_id" : "m1",
     "projection_id" : "m1",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 827.0,
-      "y" : 242.0
-    }, {
-      "x" : 1063.0,
-      "y" : 242.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 827.0,
+        "y" : 242.0
+      }, {
+        "x" : 1063.0,
+        "y" : 242.0
+      } ]
+    },
     "label" : "checkAvailability",
     "source_pointer" : "/relationships/0"
   }, {
@@ -80,13 +83,16 @@
     "source_id" : "m2",
     "projection_id" : "m2",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 1063.0,
-      "y" : 274.0
-    }, {
-      "x" : 827.0,
-      "y" : 274.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 1063.0,
+        "y" : 274.0
+      }, {
+        "x" : 827.0,
+        "y" : 274.0
+      } ]
+    },
     "label" : "inStock",
     "source_pointer" : "/relationships/1"
   }, {
@@ -96,13 +102,16 @@
     "source_id" : "m3",
     "projection_id" : "m3",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 827.0,
-      "y" : 374.0
-    }, {
-      "x" : 1063.0,
-      "y" : 374.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 827.0,
+        "y" : 374.0
+      }, {
+        "x" : 1063.0,
+        "y" : 374.0
+      } ]
+    },
     "label" : "requestBackorder",
     "source_pointer" : "/relationships/2"
   }, {
@@ -112,13 +121,16 @@
     "source_id" : "m4",
     "projection_id" : "m4",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 1063.0,
-      "y" : 406.0
-    }, {
-      "x" : 827.0,
-      "y" : 406.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 1063.0,
+        "y" : 406.0
+      }, {
+        "x" : 827.0,
+        "y" : 406.0
+      } ]
+    },
     "label" : "backorderAccepted",
     "source_pointer" : "/relationships/3"
   }, {
@@ -128,13 +140,16 @@
     "source_id" : "m5",
     "projection_id" : "m5",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 591.0,
-      "y" : 484.0
-    }, {
-      "x" : 827.0,
-      "y" : 484.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 591.0,
+        "y" : 484.0
+      }, {
+        "x" : 827.0,
+        "y" : 484.0
+      } ]
+    },
     "label" : "applyCoupon",
     "source_pointer" : "/relationships/4"
   }, {
@@ -144,13 +159,16 @@
     "source_id" : "m6",
     "projection_id" : "m6",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 827.0,
-      "y" : 516.0
-    }, {
-      "x" : 591.0,
-      "y" : 516.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 827.0,
+        "y" : 516.0
+      }, {
+        "x" : 591.0,
+        "y" : 516.0
+      } ]
+    },
     "label" : "couponAccepted",
     "source_pointer" : "/relationships/5"
   }, {
@@ -160,13 +178,16 @@
     "source_id" : "m7",
     "projection_id" : "m7",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 827.0,
-      "y" : 594.0
-    }, {
-      "x" : 1299.0,
-      "y" : 594.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 827.0,
+        "y" : 594.0
+      }, {
+        "x" : 1299.0,
+        "y" : 594.0
+      } ]
+    },
     "label" : "authorizePayment",
     "source_pointer" : "/relationships/6"
   }, {
@@ -176,13 +197,16 @@
     "source_id" : "m8",
     "projection_id" : "m8",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 1299.0,
-      "y" : 626.0
-    }, {
-      "x" : 827.0,
-      "y" : 626.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 1299.0,
+        "y" : 626.0
+      }, {
+        "x" : 827.0,
+        "y" : 626.0
+      } ]
+    },
     "label" : "retryNeeded",
     "source_pointer" : "/relationships/7"
   }, {
@@ -192,13 +216,16 @@
     "source_id" : "m9",
     "projection_id" : "m9",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 827.0,
-      "y" : 704.0
-    }, {
-      "x" : 1299.0,
-      "y" : 704.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 827.0,
+        "y" : 704.0
+      }, {
+        "x" : 1299.0,
+        "y" : 704.0
+      } ]
+    },
     "label" : "capturePayment",
     "source_pointer" : "/relationships/8"
   }, {
@@ -208,13 +235,16 @@
     "source_id" : "m10",
     "projection_id" : "m10",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 1299.0,
-      "y" : 736.0
-    }, {
-      "x" : 827.0,
-      "y" : 736.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 1299.0,
+        "y" : 736.0
+      }, {
+        "x" : 827.0,
+        "y" : 736.0
+      } ]
+    },
     "label" : "charged",
     "source_pointer" : "/relationships/9"
   }, {
@@ -224,13 +254,16 @@
     "source_id" : "m11",
     "projection_id" : "m11",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 827.0,
-      "y" : 836.0
-    }, {
-      "x" : 591.0,
-      "y" : 836.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 827.0,
+        "y" : 836.0
+      }, {
+        "x" : 591.0,
+        "y" : 836.0
+      } ]
+    },
     "label" : "sendConfirmation",
     "source_pointer" : "/relationships/10"
   }, {
@@ -240,13 +273,16 @@
     "source_id" : "m12",
     "projection_id" : "m12",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 591.0,
-      "y" : 868.0
-    }, {
-      "x" : 827.0,
-      "y" : 868.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 591.0,
+        "y" : 868.0
+      }, {
+        "x" : 827.0,
+        "y" : 868.0
+      } ]
+    },
     "label" : "confirmReceipt",
     "source_pointer" : "/relationships/11"
   } ],

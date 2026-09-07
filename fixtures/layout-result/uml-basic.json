@@ -1,5 +1,5 @@
 {
-  "layout_result_schema_version" : "layout-result.schema.v2",
+  "layout_result_schema_version" : "layout-result.schema.v3",
   "view_id" : "class-view",
   "nodes" : [ {
     "id" : "pkg-orders",
@@ -49,19 +49,22 @@
     "source_id" : "order-has-lines",
     "projection_id" : "order-has-lines",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 186.83333333333334,
-      "y" : 165.0
-    }, {
-      "x" : 186.83333333333334,
-      "y" : 213.0
-    }, {
-      "x" : 518.0,
-      "y" : 213.0
-    }, {
-      "x" : 518.0,
-      "y" : 261.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 186.83333333333334,
+        "y" : 165.0
+      }, {
+        "x" : 186.83333333333334,
+        "y" : 213.0
+      }, {
+        "x" : 518.0,
+        "y" : 213.0
+      }, {
+        "x" : 518.0,
+        "y" : 261.0
+      } ]
+    },
     "label" : "lines",
     "source_pointer" : "/relationships/0"
   }, {
@@ -71,19 +74,22 @@
     "source_id" : "order-status-dependency",
     "projection_id" : "order-status-dependency",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 121.16666666666667,
-      "y" : 165.0
-    }, {
-      "x" : 121.16666666666667,
-      "y" : 430.0
-    }, {
-      "x" : 518.0,
-      "y" : 430.0
-    }, {
-      "x" : 518.0,
-      "y" : 478.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 121.16666666666667,
+        "y" : 165.0
+      }, {
+        "x" : 121.16666666666667,
+        "y" : 430.0
+      }, {
+        "x" : 518.0,
+        "y" : 430.0
+      }, {
+        "x" : 518.0,
+        "y" : 478.0
+      } ]
+    },
     "label" : "uses",
     "source_pointer" : "/relationships/1"
   } ],

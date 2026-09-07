@@ -1,5 +1,7 @@
 package dev.dediren.plugins.drawio.write;
 
+import static dev.dediren.ir.RouteGeometry.flatten;
+
 import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.DiagnosticSeverity;
@@ -611,7 +613,7 @@ public final class DrawioDocumentBuilder {
    */
   private static MxGeometry edgeGeometry(
       LaidOutEdge edge, String sourceCellId, String targetCellId) {
-    List<Point> route = edge.points();
+    List<Point> route = flatten(edge.route());
     List<MxPoint> waypoints = new ArrayList<>();
     if (route.size() > 2) {
       for (Point point : route.subList(1, route.size() - 1)) {

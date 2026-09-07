@@ -1,5 +1,6 @@
 package dev.dediren.plugins.render;
 
+import static dev.dediren.ir.RouteGeometry.flatten;
 import static dev.dediren.plugins.render.PlacedElement.includeBox;
 import static dev.dediren.plugins.render.PlacedElement.includeCircleOnNode;
 import static dev.dediren.plugins.render.PlacedElement.includeStroked;
@@ -124,7 +125,7 @@ record PlacedScene(
       // Half the stroke lies outside the route on either side, and stroke-linecap="round" puts the
       // same half beyond each end of it, so one square per vertex covers the whole ribbon.
       double half = style.strokeWidth() / 2.0;
-      for (Point point : edge.points()) {
+      for (Point point : flatten(edge.route())) {
         includeStroked(bounds, point.x(), point.y(), 0.0, 0.0, style.strokeWidth());
       }
       for (MaskedLineJump masked : lineJumps) {

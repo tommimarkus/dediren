@@ -1,5 +1,6 @@
 package dev.dediren.plugins.render.svg;
 
+import static dev.dediren.ir.RouteGeometry.flatten;
 import static dev.dediren.plugins.render.svg.EdgeRenderer.nearlyEqual;
 
 import dev.dediren.contracts.layout.LaidOutEdge;
@@ -62,9 +63,10 @@ public final class Geometry {
   public static List<LabelBox> edgeRouteObstacleBoxes(List<LaidOutEdge> edges) {
     List<LabelBox> boxes = new ArrayList<>();
     for (LaidOutEdge edge : edges) {
-      for (int index = 0; index < edge.points().size() - 1; index++) {
-        Point start = edge.points().get(index);
-        Point end = edge.points().get(index + 1);
+      List<Point> routePoints = flatten(edge.route());
+      for (int index = 0; index < routePoints.size() - 1; index++) {
+        Point start = routePoints.get(index);
+        Point end = routePoints.get(index + 1);
         if (nearlyEqual(start.x(), end.x()) && nearlyEqual(start.y(), end.y())) {
           continue;
         }

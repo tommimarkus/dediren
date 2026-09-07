@@ -1,5 +1,5 @@
 {
-  "layout_result_schema_version" : "layout-result.schema.v2",
+  "layout_result_schema_version" : "layout-result.schema.v3",
   "view_id" : "component-view",
   "nodes" : [ {
     "id" : "component-order-api",
@@ -79,13 +79,16 @@
     "source_id" : "order-api-realizes-order-api",
     "projection_id" : "order-api-realizes-order-api",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 709.0,
-      "y" : 464.0
-    }, {
-      "x" : 365.0,
-      "y" : 464.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 709.0,
+        "y" : 464.0
+      }, {
+        "x" : 365.0,
+        "y" : 464.0
+      } ]
+    },
     "label" : "realizes",
     "source_pointer" : "/relationships/0"
   }, {
@@ -95,19 +98,22 @@
     "source_id" : "order-api-uses-payment",
     "projection_id" : "order-api-uses-payment",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 709.0,
-      "y" : 445.25
-    }, {
-      "x" : 413.0,
-      "y" : 445.25
-    }, {
-      "x" : 413.0,
-      "y" : 261.0
-    }, {
-      "x" : 365.0,
-      "y" : 261.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 709.0,
+        "y" : 445.25
+      }, {
+        "x" : 413.0,
+        "y" : 445.25
+      }, {
+        "x" : 413.0,
+        "y" : 261.0
+      }, {
+        "x" : 365.0,
+        "y" : 261.0
+      } ]
+    },
     "label" : "uses",
     "source_pointer" : "/relationships/1"
   }, {
@@ -117,13 +123,16 @@
     "source_id" : "payment-adapter-realizes-gateway",
     "projection_id" : "payment-adapter-realizes-gateway",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 613.0,
-      "y" : 228.0
-    }, {
-      "x" : 365.0,
-      "y" : 228.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 613.0,
+        "y" : 228.0
+      }, {
+        "x" : 365.0,
+        "y" : 228.0
+      } ]
+    },
     "label" : "realizes",
     "source_pointer" : "/relationships/2"
   }, {
@@ -133,19 +142,22 @@
     "source_id" : "order-api-depends-controller",
     "projection_id" : "order-api-depends-controller",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 709.0,
-      "y" : 482.75
-    }, {
-      "x" : 661.0,
-      "y" : 482.75
-    }, {
-      "x" : 661.0,
-      "y" : 656.0
-    }, {
-      "x" : 365.0,
-      "y" : 656.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 709.0,
+        "y" : 482.75
+      }, {
+        "x" : 661.0,
+        "y" : 482.75
+      }, {
+        "x" : 661.0,
+        "y" : 656.0
+      }, {
+        "x" : 365.0,
+        "y" : 656.0
+      } ]
+    },
     "label" : "uses",
     "source_pointer" : "/relationships/3"
   } ],

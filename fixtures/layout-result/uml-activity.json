@@ -1,5 +1,5 @@
 {
-  "layout_result_schema_version" : "layout-result.schema.v2",
+  "layout_result_schema_version" : "layout-result.schema.v3",
   "view_id" : "activity-view",
   "nodes" : [ {
     "id" : "initial-submit",
@@ -59,13 +59,16 @@
     "source_id" : "flow-start-enter",
     "projection_id" : "flow-start-enter",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 45.0,
-      "y" : 52.0
-    }, {
-      "x" : 141.0,
-      "y" : 52.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 45.0,
+        "y" : 52.0
+      }, {
+        "x" : 141.0,
+        "y" : 52.0
+      } ]
+    },
     "label" : "",
     "source_pointer" : "/relationships/2"
   }, {
@@ -75,13 +78,16 @@
     "source_id" : "flow-enter-valid",
     "projection_id" : "flow-enter-valid",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 303.0,
-      "y" : 52.0
-    }, {
-      "x" : 399.0,
-      "y" : 52.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 303.0,
+        "y" : 52.0
+      }, {
+        "x" : 399.0,
+        "y" : 52.0
+      } ]
+    },
     "label" : "",
     "source_pointer" : "/relationships/3"
   }, {
@@ -91,13 +97,16 @@
     "source_id" : "flow-valid-submit",
     "projection_id" : "flow-valid-submit",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 433.0,
-      "y" : 52.0
-    }, {
-      "x" : 625.0,
-      "y" : 52.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 433.0,
+        "y" : 52.0
+      }, {
+        "x" : 625.0,
+        "y" : 52.0
+      } ]
+    },
     "label" : "yes",
     "source_pointer" : "/relationships/4"
   }, {
@@ -107,13 +116,16 @@
     "source_id" : "flow-submit-final",
     "projection_id" : "flow-submit-final",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 787.0,
-      "y" : 52.0
-    }, {
-      "x" : 883.0,
-      "y" : 52.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 787.0,
+        "y" : 52.0
+      }, {
+        "x" : 883.0,
+        "y" : 52.0
+      } ]
+    },
     "label" : "",
     "source_pointer" : "/relationships/5"
   } ],

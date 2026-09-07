@@ -1,5 +1,6 @@
 package dev.dediren.plugins.umlxmi.write.diagram;
 
+import static dev.dediren.ir.RouteGeometry.flatten;
 import static dev.dediren.plugins.umlxmi.build.XmiHelpers.attr;
 
 import dev.dediren.contracts.layout.LaidOutEdge;
@@ -142,7 +143,7 @@ public final class DiagramWriter {
           .append("\" target=\"")
           .append(attr(targetShape))
           .append("\">");
-      writeWaypoints(xml, edge.points());
+      writeWaypoints(xml, flatten(edge.route()));
       xml.append("</umldi:UMLEdge>");
     }
     xml.append("</umldi:UMLClassDiagram>");

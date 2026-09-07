@@ -1,5 +1,6 @@
 package dev.dediren.plugins.elklayout;
 
+import static dev.dediren.ir.RouteGeometry.flatten;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -530,7 +531,7 @@ class ElkLayoutInvariantFuzzTest {
     // Route geometry: the route itself must read top-to-bottom, source to target, not the reverse.
     for (String edgeId : List.of("man-cli", "man-engines")) {
       LaidOutEdge edge = edgeById(result, edgeId);
-      List<Point> points = edge.points();
+      List<Point> points = flatten(edge.route());
       Point first = points.get(0);
       Point last = points.get(points.size() - 1);
       assertTrue(
@@ -786,10 +787,13 @@ class ElkLayoutInvariantFuzzTest {
       LaidOutNode target = nodeById(result, edge.target());
       if (source == null || target == null) {
         hard.add(
-            "edge " + edge.id() + " references a node absent from the result: " + edge.points());
+            "edge "
+                + edge.id()
+                + " references a node absent from the result: "
+                + flatten(edge.route()));
         continue;
       }
-      List<Point> points = edge.points();
+      List<Point> points = flatten(edge.route());
       if (points.size() < 2) {
         hard.add("edge " + edge.id() + " has no route: points=" + points);
         continue;

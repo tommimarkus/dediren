@@ -1,5 +1,5 @@
 {
-  "layout_result_schema_version" : "layout-result.schema.v2",
+  "layout_result_schema_version" : "layout-result.schema.v3",
   "view_id" : "sequence-view",
   "nodes" : [ {
     "id" : "interaction-lifecycle",
@@ -75,13 +75,16 @@
     "source_id" : "m1",
     "projection_id" : "m1",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 171.0,
-      "y" : 380.0
-    }, {
-      "x" : 407.0,
-      "y" : 380.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 171.0,
+        "y" : 380.0
+      }, {
+        "x" : 407.0,
+        "y" : 380.0
+      } ]
+    },
     "label" : "placeOrder",
     "source_pointer" : "/relationships/0"
   }, {
@@ -91,13 +94,16 @@
     "source_id" : "m2",
     "projection_id" : "m2",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 407.0,
-      "y" : 412.0
-    }, {
-      "x" : 643.0,
-      "y" : 412.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 407.0,
+        "y" : 412.0
+      }, {
+        "x" : 643.0,
+        "y" : 412.0
+      } ]
+    },
     "label" : "createWorker",
     "source_pointer" : "/relationships/1"
   }, {
@@ -107,13 +113,16 @@
     "source_id" : "m3",
     "projection_id" : "m3",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 407.0,
-      "y" : 444.0
-    }, {
-      "x" : 631.0,
-      "y" : 444.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 407.0,
+        "y" : 444.0
+      }, {
+        "x" : 631.0,
+        "y" : 444.0
+      } ]
+    },
     "label" : "destroyWorker",
     "source_pointer" : "/relationships/2"
   }, {
@@ -123,13 +132,16 @@
     "source_id" : "m4",
     "projection_id" : "m4",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 407.0,
-      "y" : 476.0
-    }, {
-      "x" : 171.0,
-      "y" : 476.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 407.0,
+        "y" : 476.0
+      }, {
+        "x" : 171.0,
+        "y" : 476.0
+      } ]
+    },
     "label" : "orderComplete",
     "source_pointer" : "/relationships/3"
   } ],

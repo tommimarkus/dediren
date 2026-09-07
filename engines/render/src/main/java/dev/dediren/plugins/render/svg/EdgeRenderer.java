@@ -1,11 +1,14 @@
 package dev.dediren.plugins.render.svg;
 
+import static dev.dediren.ir.RouteGeometry.flatten;
 import static dev.dediren.plugins.render.svg.Geometry.labelBox;
 import static dev.dediren.plugins.render.svg.Svg.dashArrayValue;
 import static dev.dediren.plugins.render.svg.Svg.f1;
 import static dev.dediren.plugins.render.svg.Svg.opacity;
 import static dev.dediren.plugins.render.svg.Svg.styleNumber;
 
+import dev.dediren.contracts.layout.CubicBezierRoute;
+import dev.dediren.contracts.layout.CubicBezierSegment;
 import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LaidOutGroup;
 import dev.dediren.contracts.layout.LayoutResult;
@@ -15,6 +18,7 @@ import dev.dediren.contracts.render.RenderPolicy;
 import dev.dediren.contracts.render.SvgEdgeLabelPresentation;
 import dev.dediren.contracts.render.SvgEdgeLabelVerticalSide;
 import dev.dediren.contracts.render.SvgEdgeMarkerEnd;
+import dev.dediren.ir.RouteGeometry;
 import dev.dediren.plugins.render.style.ResolvedEdgeStyle;
 import dev.dediren.plugins.render.style.ResolvedStyle;
 import dev.dediren.plugins.render.style.StyleResolver;
@@ -61,13 +65,17 @@ public final class EdgeRenderer {
    * the drawn one.
    */
   public static List<LabelBox> markerInkBoxes(LaidOutEdge edge, ResolvedEdgeStyle style) {
-    List<Point> points = edge.points();
-    if (points.isEmpty()) {
+    if (!hasRenderableGeometry(edge)) {
+      return List.of();
+    }
+    Point first = RouteGeometry.start(edge.route());
+    Point last = RouteGeometry.end(edge.route());
+    if (first == null || last == null) {
       return List.of();
     }
     List<LabelBox> boxes = new ArrayList<>();
-    Point first = points.getFirst();
-    Point last = points.getLast();
+    Point startTangent = RouteGeometry.startTangent(edge.route());
+    Point endTangent = RouteGeometry.endTangent(edge.route());
     LabelBox start =
         EdgeMarkers.inkBox(
             "start",
@@ -75,7 +83,7 @@ public final class EdgeRenderer {
             style.strokeWidth(),
             first.x(),
             first.y(),
-            markerAngleRadians(points, true));
+            Math.atan2(startTangent.y(), startTangent.x()));
     if (start != null) {
       boxes.add(start);
     }
@@ -86,31 +94,11 @@ public final class EdgeRenderer {
             style.strokeWidth(),
             last.x(),
             last.y(),
-            markerAngleRadians(points, false));
+            Math.atan2(endTangent.y(), endTangent.x()));
     if (end != null) {
       boxes.add(end);
     }
     return boxes;
-  }
-
-  // Direction of travel at the route's first or last vertex, taken from the nearest vertex that is
-  // actually somewhere else. A route whose points all coincide has no direction to orient to, and 0
-  // is what a renderer draws for it.
-  private static double markerAngleRadians(List<Point> points, boolean start) {
-    Point vertex = start ? points.getFirst() : points.getLast();
-    int step = start ? 1 : -1;
-    for (int index = start ? 1 : points.size() - 2;
-        index >= 0 && index < points.size();
-        index += step) {
-      Point other = points.get(index);
-      if (nearlyEqual(other.x(), vertex.x()) && nearlyEqual(other.y(), vertex.y())) {
-        continue;
-      }
-      return start
-          ? Math.atan2(other.y() - vertex.y(), other.x() - vertex.x())
-          : Math.atan2(vertex.y() - other.y(), vertex.x() - other.x());
-    }
-    return 0.0;
   }
 
   /** Writes the backdrop strokes that clear each jump. The fills arrive already resolved. */
@@ -163,7 +151,7 @@ public final class EdgeRenderer {
       List<LineJump> lineJumps,
       String markerStartReference,
       String markerEndReference) {
-    if (edge.points().isEmpty()) {
+    if (!hasRenderableGeometry(edge)) {
       return;
     }
     String data = pathData(edge, lineJumps);
@@ -256,10 +244,46 @@ public final class EdgeRenderer {
   }
 
   public static String pathData(LaidOutEdge edge, List<LineJump> lineJumps) {
-    if (lineJumps.isEmpty()) {
-      return roundedPathData(edge.points());
+    if (edge.route() instanceof CubicBezierRoute cubic) {
+      return cubicPathData(cubic);
     }
-    return roundedPathDataWithLineJumps(edge.points(), lineJumps);
+    if (lineJumps.isEmpty()) {
+      return roundedPathData(RouteGeometry.flatten(edge.route()));
+    }
+    return roundedPathDataWithLineJumps(RouteGeometry.flatten(edge.route()), lineJumps);
+  }
+
+  public static String cubicPathData(CubicBezierRoute route) {
+    if (!hasRenderableGeometry(route)) {
+      return "";
+    }
+    StringBuilder data = new StringBuilder();
+    data.append(String.format(Locale.ROOT, "M %.1f %.1f", route.start().x(), route.start().y()));
+    for (CubicBezierSegment segment : route.segments()) {
+      data.append(
+          String.format(
+              Locale.ROOT,
+              " C %.1f %.1f %.1f %.1f %.1f %.1f",
+              segment.control1().x(),
+              segment.control1().y(),
+              segment.control2().x(),
+              segment.control2().y(),
+              segment.end().x(),
+              segment.end().y()));
+    }
+    return data.toString();
+  }
+
+  private static boolean hasRenderableGeometry(LaidOutEdge edge) {
+    return hasRenderableGeometry(edge.route());
+  }
+
+  private static boolean hasRenderableGeometry(dev.dediren.contracts.layout.EdgeRoute route) {
+    try {
+      return RouteGeometry.flatten(route).size() >= 2;
+    } catch (IllegalArgumentException exception) {
+      return false;
+    }
   }
 
   public static String roundedPathDataWithLineJumps(List<Point> points, List<LineJump> lineJumps) {
@@ -401,23 +425,26 @@ public final class EdgeRenderer {
 
   public static List<LineJump> lineJumps(LaidOutEdge edge, List<LaidOutEdge> renderedEdges) {
     List<LineJump> jumps = new ArrayList<>();
-    for (int segmentIndex = 0; segmentIndex < edge.points().size() - 1; segmentIndex++) {
-      Point currentStart = edge.points().get(segmentIndex);
-      Point currentEnd = edge.points().get(segmentIndex + 1);
+    List<Point> currentPoints = flatten(edge.route());
+    List<List<Point>> previousRoutes =
+        renderedEdges.stream().map(previous -> flatten(previous.route())).toList();
+    for (int segmentIndex = 0; segmentIndex < currentPoints.size() - 1; segmentIndex++) {
+      Point currentStart = currentPoints.get(segmentIndex);
+      Point currentEnd = currentPoints.get(segmentIndex + 1);
       boolean currentVertical = nearlyEqual(currentStart.x(), currentEnd.x());
       boolean currentHorizontal = nearlyEqual(currentStart.y(), currentEnd.y());
       if (!currentVertical && !currentHorizontal) {
         continue;
       }
-      for (LaidOutEdge previousEdge : renderedEdges) {
+      for (int edgeIndex = 0; edgeIndex < renderedEdges.size(); edgeIndex++) {
+        LaidOutEdge previousEdge = renderedEdges.get(edgeIndex);
         if (isSharedJunctionPair(edge, previousEdge)) {
           continue;
         }
-        for (int previousIndex = 0;
-            previousIndex < previousEdge.points().size() - 1;
-            previousIndex++) {
-          Point previousStart = previousEdge.points().get(previousIndex);
-          Point previousEnd = previousEdge.points().get(previousIndex + 1);
+        List<Point> previousPoints = previousRoutes.get(edgeIndex);
+        for (int previousIndex = 0; previousIndex < previousPoints.size() - 1; previousIndex++) {
+          Point previousStart = previousPoints.get(previousIndex);
+          Point previousEnd = previousPoints.get(previousIndex + 1);
           boolean previousVertical = nearlyEqual(previousStart.x(), previousEnd.x());
           boolean previousHorizontal = nearlyEqual(previousStart.y(), previousEnd.y());
           if (currentVertical && previousHorizontal) {
@@ -555,8 +582,8 @@ public final class EdgeRenderer {
       }
       return leastOverlapLabel(candidates, occupiedBoxes, style.labelPresentation());
     }
-    List<Point> routePoints =
-        edge.points().isEmpty() ? List.of(new Point(0.0, 0.0)) : edge.points();
+    List<Point> flattened = flatten(edge.route());
+    List<Point> routePoints = flattened.isEmpty() ? List.of(new Point(0.0, 0.0)) : flattened;
     List<EdgeLabel> routeCandidates = new ArrayList<>();
     for (Point routePoint : routePoints) {
       routeCandidates.add(
@@ -689,8 +716,9 @@ public final class EdgeRenderer {
     }
     if (firstHorizontalSegment(edge).isEmpty()) {
       Segment segment = verticalSegments.get(0);
-      double minY = edge.points().stream().mapToDouble(Point::y).min().orElse(segment.start().y());
-      double maxY = edge.points().stream().mapToDouble(Point::y).max().orElse(segment.end().y());
+      List<Point> routePoints = flatten(edge.route());
+      double minY = routePoints.stream().mapToDouble(Point::y).min().orElse(segment.start().y());
+      double maxY = routePoints.stream().mapToDouble(Point::y).max().orElse(segment.end().y());
       return verticalLabelCandidates(
           edge, style, segment.start().x(), (minY + maxY) / 2.0, fontSize);
     }
@@ -725,9 +753,10 @@ public final class EdgeRenderer {
   }
 
   public static double autoHorizontalLabelOffset(LaidOutEdge edge, int segmentIndex) {
-    if (segmentIndex + 2 < edge.points().size()) {
-      Point segmentStart = edge.points().get(segmentIndex);
-      Point next = edge.points().get(segmentIndex + 2);
+    List<Point> routePoints = flatten(edge.route());
+    if (segmentIndex + 2 < routePoints.size()) {
+      Point segmentStart = routePoints.get(segmentIndex);
+      Point next = routePoints.get(segmentIndex + 2);
       if (next.y() < segmentStart.y()) {
         return -10.0;
       }
@@ -736,18 +765,19 @@ public final class EdgeRenderer {
   }
 
   public static Optional<Segment> firstHorizontalSegment(LaidOutEdge edge) {
+    List<Point> routePoints = flatten(edge.route());
     if (edge.routingHints().contains("shared_source_junction")) {
-      for (int index = edge.points().size() - 2; index >= 0; index--) {
-        Point start = edge.points().get(index);
-        Point end = edge.points().get(index + 1);
+      for (int index = routePoints.size() - 2; index >= 0; index--) {
+        Point start = routePoints.get(index);
+        Point end = routePoints.get(index + 1);
         if (nearlyEqual(start.y(), end.y()) && Math.abs(start.x() - end.x()) > 0.001) {
           return Optional.of(new Segment(index, start, end));
         }
       }
     }
-    for (int index = 0; index < edge.points().size() - 1; index++) {
-      Point start = edge.points().get(index);
-      Point end = edge.points().get(index + 1);
+    for (int index = 0; index < routePoints.size() - 1; index++) {
+      Point start = routePoints.get(index);
+      Point end = routePoints.get(index + 1);
       if (nearlyEqual(start.y(), end.y()) && Math.abs(start.x() - end.x()) > 0.001) {
         return Optional.of(new Segment(index, start, end));
       }
@@ -757,9 +787,10 @@ public final class EdgeRenderer {
 
   public static List<Segment> verticalSegments(LaidOutEdge edge) {
     List<Segment> segments = new ArrayList<>();
-    for (int index = 0; index < edge.points().size() - 1; index++) {
-      Point start = edge.points().get(index);
-      Point end = edge.points().get(index + 1);
+    List<Point> routePoints = flatten(edge.route());
+    for (int index = 0; index < routePoints.size() - 1; index++) {
+      Point start = routePoints.get(index);
+      Point end = routePoints.get(index + 1);
       if (nearlyEqual(start.x(), end.x()) && Math.abs(start.y() - end.y()) > 0.001) {
         segments.add(new Segment(index, start, end));
       }

@@ -1,5 +1,7 @@
 package dev.dediren.plugins.asciirender;
 
+import static dev.dediren.ir.RouteGeometry.flatten;
+
 import dev.dediren.contracts.layout.Point;
 import dev.dediren.ir.LaidOutScene;
 import dev.dediren.ir.PlacedGroup;
@@ -64,7 +66,7 @@ final class CoordinateGrid {
     }
     List<Double> all = new ArrayList<>(borders);
     for (RoutedEdge e : scene.edges()) {
-      for (Point p : e.points()) {
+      for (Point p : flatten(e.route())) {
         double v = isX ? p.x() : p.y();
         if (distanceToNearest(borders, v) > BORDER_SNAP) {
           all.add(v);

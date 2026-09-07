@@ -26,6 +26,7 @@ import org.eclipse.elk.alg.layered.options.LayeringStrategy;
 import org.eclipse.elk.alg.layered.options.NodePlacementStrategy;
 import org.eclipse.elk.alg.layered.options.OrderingStrategy;
 import org.eclipse.elk.alg.layered.options.PortSortingStrategy;
+import org.eclipse.elk.alg.layered.options.SplineRoutingMode;
 import org.eclipse.elk.alg.layered.options.WrappingStrategy;
 import org.eclipse.elk.core.math.ElkMargin;
 import org.eclipse.elk.core.math.ElkPadding;
@@ -118,10 +119,14 @@ final class ElkLayeredOptions {
     root.setProperty(
         LayeredOptions.NODE_PLACEMENT_BK_EDGE_STRAIGHTENING,
         EdgeStraighteningStrategy.IMPROVE_STRAIGHTNESS);
-    root.setProperty(LayeredOptions.UNNECESSARY_BENDPOINTS, false);
+    // Compound spline post-processing needs collinear join knots to preserve the 3n-1 Bezier
+    // control sequence across hierarchy sections. They are redundant only for line routes.
+    root.setProperty(
+        LayeredOptions.UNNECESSARY_BENDPOINTS, routingStyle(preferences) == EdgeRouting.SPLINES);
     boolean mergeEdges = endpointMergingEnabled(preferences);
     root.setProperty(LayeredOptions.MERGE_EDGES, mergeEdges);
     root.setProperty(LayeredOptions.MERGE_HIERARCHY_EDGES, mergeEdges);
+    root.setProperty(LayeredOptions.EDGE_ROUTING_SPLINES_MODE, SplineRoutingMode.CONSERVATIVE);
     CycleBreakingStrategy cycleBreaking = cycleBreakingStrategy(preferences);
     if (cycleBreaking != null) {
       root.setProperty(LayeredOptions.CYCLE_BREAKING_STRATEGY, cycleBreaking);

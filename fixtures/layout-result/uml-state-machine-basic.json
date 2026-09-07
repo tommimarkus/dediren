@@ -1,5 +1,5 @@
 {
-  "layout_result_schema_version" : "layout-result.schema.v2",
+  "layout_result_schema_version" : "layout-result.schema.v3",
   "view_id" : "state-machine-view",
   "nodes" : [ {
     "id" : "initial",
@@ -79,13 +79,16 @@
     "source_id" : "t-create",
     "projection_id" : "t-create",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 113.0,
-      "y" : 112.0
-    }, {
-      "x" : 257.0,
-      "y" : 112.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 113.0,
+        "y" : 112.0
+      }, {
+        "x" : 257.0,
+        "y" : 112.0
+      } ]
+    },
     "label" : "create",
     "source_pointer" : "/relationships/0"
   }, {
@@ -95,19 +98,22 @@
     "source_id" : "t-submit",
     "projection_id" : "t-submit",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 333.0,
-      "y" : 149.0
-    }, {
-      "x" : 333.0,
-      "y" : 197.0
-    }, {
-      "x" : 627.0,
-      "y" : 197.0
-    }, {
-      "x" : 627.0,
-      "y" : 245.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 333.0,
+        "y" : 149.0
+      }, {
+        "x" : 333.0,
+        "y" : 197.0
+      }, {
+        "x" : 627.0,
+        "y" : 197.0
+      }, {
+        "x" : 627.0,
+        "y" : 245.0
+      } ]
+    },
     "label" : "submit",
     "source_pointer" : "/relationships/1"
   }, {
@@ -117,13 +123,16 @@
     "source_id" : "t-check-payment",
     "projection_id" : "t-check-payment",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 703.0,
-      "y" : 282.0
-    }, {
-      "x" : 847.0,
-      "y" : 282.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 703.0,
+        "y" : 282.0
+      }, {
+        "x" : 847.0,
+        "y" : 282.0
+      } ]
+    },
     "label" : "authorize",
     "source_pointer" : "/relationships/2"
   }, {
@@ -133,13 +142,16 @@
     "source_id" : "t-approve",
     "projection_id" : "t-approve",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 885.0,
-      "y" : 284.5
-    }, {
-      "x" : 1053.0,
-      "y" : 284.5
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 885.0,
+        "y" : 284.5
+      }, {
+        "x" : 1053.0,
+        "y" : 284.5
+      } ]
+    },
     "label" : "[paymentAuthorized]",
     "source_pointer" : "/relationships/3"
   }, {
@@ -149,19 +161,22 @@
     "source_id" : "t-reject",
     "projection_id" : "t-reject",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 885.0,
-      "y" : 279.5
-    }, {
-      "x" : 933.0,
-      "y" : 279.5
-    }, {
-      "x" : 933.0,
-      "y" : 158.5
-    }, {
-      "x" : 1053.0,
-      "y" : 158.5
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 885.0,
+        "y" : 279.5
+      }, {
+        "x" : 933.0,
+        "y" : 279.5
+      }, {
+        "x" : 933.0,
+        "y" : 158.5
+      }, {
+        "x" : 1053.0,
+        "y" : 158.5
+      } ]
+    },
     "label" : "[paymentRejected]",
     "source_pointer" : "/relationships/4"
   }, {
@@ -171,13 +186,16 @@
     "source_id" : "t-close",
     "projection_id" : "t-close",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 1205.0,
-      "y" : 284.5
-    }, {
-      "x" : 1349.0,
-      "y" : 284.5
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 1205.0,
+        "y" : 284.5
+      }, {
+        "x" : 1349.0,
+        "y" : 284.5
+      } ]
+    },
     "label" : "deliver",
     "source_pointer" : "/relationships/5"
   } ],

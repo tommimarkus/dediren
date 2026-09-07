@@ -11,12 +11,11 @@ public record LaidOutEdge(
     String sourceId,
     String projectionId,
     List<String> routingHints,
-    List<Point> points,
+    EdgeRoute route,
     String label,
     String sourcePointer) {
   public LaidOutEdge {
     routingHints = listOrEmpty(routingHints);
-    points = listOrEmpty(points);
   }
 
   public LaidOutEdge(
@@ -26,8 +25,8 @@ public record LaidOutEdge(
       String sourceId,
       String projectionId,
       List<String> routingHints,
-      List<Point> points,
+      EdgeRoute route,
       String label) {
-    this(id, source, target, sourceId, projectionId, routingHints, points, label, null);
+    this(id, source, target, sourceId, projectionId, routingHints, route, label, null);
   }
 }

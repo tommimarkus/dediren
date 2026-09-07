@@ -1,5 +1,5 @@
 {
-  "layout_result_schema_version" : "layout-result.schema.v2",
+  "layout_result_schema_version" : "layout-result.schema.v3",
   "view_id" : "deployment-view",
   "nodes" : [ {
     "id" : "device-prod-node",
@@ -79,19 +79,22 @@
     "source_id" : "deploy-orders-service",
     "projection_id" : "deploy-orders-service",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 158.0,
-      "y" : 449.0
-    }, {
-      "x" : 158.0,
-      "y" : 497.0
-    }, {
-      "x" : 494.1666666666667,
-      "y" : 497.0
-    }, {
-      "x" : 494.1666666666667,
-      "y" : 712.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 158.0,
+        "y" : 449.0
+      }, {
+        "x" : 158.0,
+        "y" : 497.0
+      }, {
+        "x" : 494.1666666666667,
+        "y" : 497.0
+      }, {
+        "x" : 494.1666666666667,
+        "y" : 712.0
+      } ]
+    },
     "label" : "deploy",
     "source_pointer" : "/relationships/0"
   }, {
@@ -101,19 +104,22 @@
     "source_id" : "deploy-orders-spec",
     "projection_id" : "deploy-orders-spec",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 139.0,
-      "y" : 616.0
-    }, {
-      "x" : 139.0,
-      "y" : 664.0
-    }, {
-      "x" : 441.8333333333333,
-      "y" : 664.0
-    }, {
-      "x" : 441.8333333333333,
-      "y" : 712.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 139.0,
+        "y" : 616.0
+      }, {
+        "x" : 139.0,
+        "y" : 664.0
+      }, {
+        "x" : 441.8333333333333,
+        "y" : 664.0
+      }, {
+        "x" : 441.8333333333333,
+        "y" : 712.0
+      } ]
+    },
     "label" : "applies",
     "source_pointer" : "/relationships/1"
   }, {
@@ -123,13 +129,16 @@
     "source_id" : "artifact-manifests-order-api",
     "projection_id" : "artifact-manifests-order-api",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 234.0,
-      "y" : 413.0
-    }, {
-      "x" : 759.0,
-      "y" : 413.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 234.0,
+        "y" : 413.0
+      }, {
+        "x" : 759.0,
+        "y" : 413.0
+      } ]
+    },
     "label" : "manifests",
     "source_pointer" : "/relationships/2"
   }, {
@@ -139,13 +148,16 @@
     "source_id" : "orders-runtime-payment-path",
     "projection_id" : "orders-runtime-payment-path",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 559.0,
-      "y" : 761.0
-    }, {
-      "x" : 759.0,
-      "y" : 761.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 559.0,
+        "y" : 761.0
+      }, {
+        "x" : 759.0,
+        "y" : 761.0
+      } ]
+    },
     "label" : "HTTPS",
     "source_pointer" : "/relationships/3"
   } ],

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.Point;
+import dev.dediren.contracts.layout.PolylineRoute;
 import dev.dediren.contracts.render.SvgEdgeLabelHorizontalPosition;
 import dev.dediren.contracts.render.SvgEdgeLabelHorizontalSide;
 import dev.dediren.contracts.render.SvgEdgeLabelPresentation;
@@ -74,11 +75,12 @@ class EdgeRendererTest {
             "encounter.replaced",
             "encounter.replaced",
             List.of(),
-            List.of(
-                new Point(674.0, 861.0),
-                new Point(704.0, 861.0),
-                new Point(704.0, 878.0),
-                new Point(674.0, 878.0)),
+            new PolylineRoute(
+                List.of(
+                    new Point(674.0, 861.0),
+                    new Point(704.0, 861.0),
+                    new Point(704.0, 878.0),
+                    new Point(674.0, 878.0))),
             "encounter.replaced");
 
     ResolvedEdgeStyle style =

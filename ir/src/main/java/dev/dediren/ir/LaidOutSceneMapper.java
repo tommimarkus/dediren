@@ -39,7 +39,7 @@ public final class LaidOutSceneMapper {
                         e.sourceId(),
                         e.projectionId(),
                         e.routingHints(),
-                        e.points(),
+                        e.route(),
                         e.label(),
                         originOf(e.sourcePointer())))
             .toList();
@@ -90,7 +90,7 @@ public final class LaidOutSceneMapper {
                         e.sourceId(),
                         e.projectionId(),
                         e.routingHints(),
-                        e.points(),
+                        e.route(),
                         e.label(),
                         pointerValue(e.origin())))
             .toList();

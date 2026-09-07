@@ -84,7 +84,7 @@ class NodeLabelAlignBoundsTest {
   private static ObjectNode input(String labelAlign) throws Exception {
     ObjectNode input = JsonSupport.objectMapper().createObjectNode();
     ObjectNode layout = input.putObject("layout_result");
-    layout.put("layout_result_schema_version", "layout-result.schema.v2");
+    layout.put("layout_result_schema_version", "layout-result.schema.v3");
     layout.put("view_id", "label-align-bounds");
 
     ArrayNode nodes = layout.putArray("nodes");

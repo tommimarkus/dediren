@@ -1,5 +1,6 @@
 package dev.dediren.plugins.elklayout;
 
+import static dev.dediren.ir.RouteGeometry.flatten;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.dediren.contracts.ContractVersions;
@@ -352,7 +353,7 @@ class PortPlanTest {
   private static List<String> nodeBodyCrossings(LayoutResult result) {
     List<String> crossings = new ArrayList<>();
     for (LaidOutEdge edge : result.edges()) {
-      List<Point> points = edge.points();
+      List<Point> points = flatten(edge.route());
       for (int index = 0; index < points.size() - 1; index++) {
         Point start = points.get(index);
         Point end = points.get(index + 1);

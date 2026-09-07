@@ -1,5 +1,6 @@
 package dev.dediren.plugins.render.svg;
 
+import static dev.dediren.ir.RouteGeometry.flatten;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.dediren.contracts.layout.LaidOutEdge;
@@ -7,6 +8,7 @@ import dev.dediren.contracts.layout.LaidOutGroup;
 import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.layout.Point;
+import dev.dediren.contracts.layout.PolylineRoute;
 import dev.dediren.contracts.render.SvgEdgeLabelHorizontalPosition;
 import dev.dediren.contracts.render.SvgEdgeLabelHorizontalSide;
 import dev.dediren.contracts.render.SvgEdgeLabelPresentation;
@@ -76,10 +78,10 @@ class EdgeLabelPlacementTest {
               fontSize);
       placed.add(EdgeRenderer.edgeLabelVisibleBox(label, DEFAULT_STYLE.labelPresentation()));
 
-      double minX = edge.points().stream().mapToDouble(Point::x).min().orElseThrow();
-      double maxX = edge.points().stream().mapToDouble(Point::x).max().orElseThrow();
-      double minY = edge.points().stream().mapToDouble(Point::y).min().orElseThrow();
-      double maxY = edge.points().stream().mapToDouble(Point::y).max().orElseThrow();
+      double minX = flatten(edge.route()).stream().mapToDouble(Point::x).min().orElseThrow();
+      double maxX = flatten(edge.route()).stream().mapToDouble(Point::x).max().orElseThrow();
+      double minY = flatten(edge.route()).stream().mapToDouble(Point::y).min().orElseThrow();
+      double maxY = flatten(edge.route()).stream().mapToDouble(Point::y).max().orElseThrow();
 
       assertThat(label.y())
           .as("edge %s label y must stay beside its route [%.1f, %.1f]", edge.id(), minY, maxY)
@@ -244,10 +246,11 @@ class EdgeLabelPlacementTest {
                 List.of(
                     "order-service", "catalog-service", "payment-service", "fulfillment-service"),
                 "Core Services"));
-    return new LayoutResult("layout-result.schema.v2", "main", nodes, edges, groups, List.of());
+    return new LayoutResult("layout-result.schema.v3", "main", nodes, edges, groups, List.of());
   }
 
   private static LaidOutEdge edge(String id, String target, List<Point> points, String label) {
-    return new LaidOutEdge(id, "order-service", target, id, id, List.of(), points, label);
+    return new LaidOutEdge(
+        id, "order-service", target, id, id, List.of(), new PolylineRoute(points), label);
   }
 }

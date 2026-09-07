@@ -1,5 +1,5 @@
 {
-  "layout_result_schema_version" : "layout-result.schema.v2",
+  "layout_result_schema_version" : "layout-result.schema.v3",
   "view_id" : "complex-class-view",
   "nodes" : [ {
     "id" : "class-customer",
@@ -129,13 +129,16 @@
     "source_id" : "customer-places-order",
     "projection_id" : "customer-places-order",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 345.0,
-      "y" : 508.8571428571429
-    }, {
-      "x" : 489.0,
-      "y" : 508.8571428571429
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 345.0,
+        "y" : 508.8571428571429
+      }, {
+        "x" : 489.0,
+        "y" : 508.8571428571429
+      } ]
+    },
     "label" : "places",
     "source_pointer" : "/relationships/0"
   }, {
@@ -145,19 +148,22 @@
     "source_id" : "order-has-lines",
     "projection_id" : "order-has-lines",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 791.0,
-      "y" : 570.7857142857143
-    }, {
-      "x" : 879.0,
-      "y" : 570.7857142857143
-    }, {
-      "x" : 879.0,
-      "y" : 721.5
-    }, {
-      "x" : 1049.0,
-      "y" : 721.5
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 791.0,
+        "y" : 570.7857142857143
+      }, {
+        "x" : 879.0,
+        "y" : 570.7857142857143
+      }, {
+        "x" : 879.0,
+        "y" : 721.5
+      }, {
+        "x" : 1049.0,
+        "y" : 721.5
+      } ]
+    },
     "label" : "lines",
     "source_pointer" : "/relationships/1"
   }, {
@@ -167,19 +173,22 @@
     "source_id" : "order-has-payment",
     "projection_id" : "order-has-payment",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 791.0,
-      "y" : 446.92857142857144
-    }, {
-      "x" : 879.0,
-      "y" : 446.92857142857144
-    }, {
-      "x" : 879.0,
-      "y" : 296.0
-    }, {
-      "x" : 1039.0,
-      "y" : 296.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 791.0,
+        "y" : 446.92857142857144
+      }, {
+        "x" : 879.0,
+        "y" : 446.92857142857144
+      }, {
+        "x" : 879.0,
+        "y" : 296.0
+      }, {
+        "x" : 1039.0,
+        "y" : 296.0
+      } ]
+    },
     "label" : "payment",
     "source_pointer" : "/relationships/2"
   }, {
@@ -189,19 +198,22 @@
     "source_id" : "order-status-dependency",
     "projection_id" : "order-status-dependency",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 791.0,
-      "y" : 405.64285714285717
-    }, {
-      "x" : 839.0,
-      "y" : 405.64285714285717
-    }, {
-      "x" : 839.0,
-      "y" : 104.0
-    }, {
-      "x" : 1039.0,
-      "y" : 104.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 791.0,
+        "y" : 405.64285714285717
+      }, {
+        "x" : 839.0,
+        "y" : 405.64285714285717
+      }, {
+        "x" : 839.0,
+        "y" : 104.0
+      }, {
+        "x" : 1039.0,
+        "y" : 104.0
+      } ]
+    },
     "label" : "status",
     "source_pointer" : "/relationships/3"
   }, {
@@ -211,19 +223,22 @@
     "source_id" : "order-total-money",
     "projection_id" : "order-total-money",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 791.0,
-      "y" : 612.0714285714287
-    }, {
-      "x" : 839.0,
-      "y" : 612.0714285714287
-    }, {
-      "x" : 839.0,
-      "y" : 853.5
-    }, {
-      "x" : 1473.0,
-      "y" : 853.5
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 791.0,
+        "y" : 612.0714285714287
+      }, {
+        "x" : 839.0,
+        "y" : 612.0714285714287
+      }, {
+        "x" : 839.0,
+        "y" : 853.5
+      }, {
+        "x" : 1473.0,
+        "y" : 853.5
+      } ]
+    },
     "label" : "total",
     "source_pointer" : "/relationships/4"
   }, {
@@ -233,19 +248,22 @@
     "source_id" : "order-line-unit-price-money",
     "projection_id" : "order-line-unit-price-money",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 1271.0,
-      "y" : 721.5
-    }, {
-      "x" : 1425.0,
-      "y" : 721.5
-    }, {
-      "x" : 1425.0,
-      "y" : 820.5
-    }, {
-      "x" : 1473.0,
-      "y" : 820.5
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 1271.0,
+        "y" : 721.5
+      }, {
+        "x" : 1425.0,
+        "y" : 721.5
+      }, {
+        "x" : 1425.0,
+        "y" : 820.5
+      }, {
+        "x" : 1473.0,
+        "y" : 820.5
+      } ]
+    },
     "label" : "unit price",
     "source_pointer" : "/relationships/5"
   }, {
@@ -255,13 +273,16 @@
     "source_id" : "order-id-type",
     "projection_id" : "order-id-type",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 791.0,
-      "y" : 529.5
-    }, {
-      "x" : 1039.0,
-      "y" : 529.5
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 791.0,
+        "y" : 529.5
+      }, {
+        "x" : 1039.0,
+        "y" : 529.5
+      } ]
+    },
     "label" : "id type",
     "source_pointer" : "/relationships/6"
   }, {
@@ -271,19 +292,22 @@
     "source_id" : "card-payment-realizes-gateway",
     "projection_id" : "card-payment-realizes-gateway",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 1281.0,
-      "y" : 279.5
-    }, {
-      "x" : 1329.0,
-      "y" : 279.5
-    }, {
-      "x" : 1329.0,
-      "y" : 120.5
-    }, {
-      "x" : 1473.0,
-      "y" : 120.5
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 1281.0,
+        "y" : 279.5
+      }, {
+        "x" : 1329.0,
+        "y" : 279.5
+      }, {
+        "x" : 1329.0,
+        "y" : 120.5
+      }, {
+        "x" : 1473.0,
+        "y" : 120.5
+      } ]
+    },
     "label" : "implements",
     "source_pointer" : "/relationships/7"
   }, {
@@ -293,13 +317,16 @@
     "source_id" : "card-payment-state",
     "projection_id" : "card-payment-state",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 1281.0,
-      "y" : 312.5
-    }, {
-      "x" : 1473.0,
-      "y" : 312.5
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 1281.0,
+        "y" : 312.5
+      }, {
+        "x" : 1473.0,
+        "y" : 312.5
+      } ]
+    },
     "label" : "state",
     "source_pointer" : "/relationships/8"
   }, {
@@ -309,19 +336,22 @@
     "source_id" : "shipment-for-order",
     "projection_id" : "shipment-for-order",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 2110.0,
-      "y" : 420.5
-    }, {
-      "x" : 919.0,
-      "y" : 420.5
-    }, {
-      "x" : 919.0,
-      "y" : 488.2142857142858
-    }, {
-      "x" : 791.0,
-      "y" : 488.2142857142858
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 2110.0,
+        "y" : 420.5
+      }, {
+        "x" : 919.0,
+        "y" : 420.5
+      }, {
+        "x" : 919.0,
+        "y" : 488.2142857142858
+      }, {
+        "x" : 791.0,
+        "y" : 488.2142857142858
+      } ]
+    },
     "label" : "ships",
     "source_pointer" : "/relationships/9"
   }, {
@@ -331,19 +361,22 @@
     "source_id" : "shipment-destination",
     "projection_id" : "shipment-destination",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 2267.1666666666665,
-      "y" : 486.5
-    }, {
-      "x" : 2267.1666666666665,
-      "y" : 534.5
-    }, {
-      "x" : 2605.0,
-      "y" : 534.5
-    }, {
-      "x" : 2605.0,
-      "y" : 582.5
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 2267.1666666666665,
+        "y" : 486.5
+      }, {
+        "x" : 2267.1666666666665,
+        "y" : 534.5
+      }, {
+        "x" : 2605.0,
+        "y" : 534.5
+      }, {
+        "x" : 2605.0,
+        "y" : 582.5
+      } ]
+    },
     "label" : "ships to",
     "source_pointer" : "/relationships/10"
   }, {
@@ -353,19 +386,22 @@
     "source_id" : "shipment-state",
     "projection_id" : "shipment-state",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 2194.8333333333335,
-      "y" : 486.5
-    }, {
-      "x" : 2194.8333333333335,
-      "y" : 751.5
-    }, {
-      "x" : 2605.0,
-      "y" : 751.5
-    }, {
-      "x" : 2605.0,
-      "y" : 799.5
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 2194.8333333333335,
+        "y" : 486.5
+      }, {
+        "x" : 2194.8333333333335,
+        "y" : 751.5
+      }, {
+        "x" : 2605.0,
+        "y" : 751.5
+      }, {
+        "x" : 2605.0,
+        "y" : 799.5
+      } ]
+    },
     "label" : "state",
     "source_pointer" : "/relationships/11"
   } ],

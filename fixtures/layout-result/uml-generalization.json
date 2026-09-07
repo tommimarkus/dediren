@@ -1,5 +1,5 @@
 {
-  "layout_result_schema_version": "layout-result.schema.v2",
+  "layout_result_schema_version": "layout-result.schema.v3",
   "view_id": "class-view",
   "nodes": [
     {
@@ -33,16 +33,19 @@
       "source_id": "customer-is-account",
       "projection_id": "customer-is-account",
       "routing_hints": [],
-      "points": [
-        {
-          "x": 180.0,
-          "y": 220.0
-        },
-        {
-          "x": 180.0,
-          "y": 120.0
-        }
-      ],
+      "route": {
+        "kind": "polyline",
+        "points": [
+          {
+            "x": 180.0,
+            "y": 220.0
+          },
+          {
+            "x": 180.0,
+            "y": 120.0
+          }
+        ]
+      },
       "label": "",
       "source_pointer": "/relationships/0"
     }

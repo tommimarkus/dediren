@@ -117,7 +117,7 @@ class GradientTest {
   private static ObjectNode groupLayoutInput() throws Exception {
     ObjectNode input = JsonSupport.objectMapper().createObjectNode();
     ObjectNode layout = input.putObject("layout_result");
-    layout.put("layout_result_schema_version", "layout-result.schema.v2");
+    layout.put("layout_result_schema_version", "layout-result.schema.v3");
     layout.put("view_id", "g");
     ObjectNode n1 = layout.putArray("nodes").addObject();
     n1.put("id", "n1").put("source_id", "n1").put("projection_id", "n1");

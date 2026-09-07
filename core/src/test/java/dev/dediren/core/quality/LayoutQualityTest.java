@@ -9,6 +9,7 @@ import dev.dediren.contracts.layout.LaidOutGroup;
 import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.layout.Point;
+import dev.dediren.contracts.layout.PolylineRoute;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -109,7 +110,7 @@ class LayoutQualityTest {
     assertThat(diagnostics)
         .extracting(diagnostic -> diagnostic.code())
         .containsExactly("DEDIREN_LAYOUT_ROUTE_POINTS_INSUFFICIENT");
-    assertThat(diagnostics.get(0).path()).isEqualTo("$.edges[0].points");
+    assertThat(diagnostics.get(0).path()).isEqualTo("$.edges[0].route.points");
   }
 
   @Test
@@ -137,8 +138,8 @@ class LayoutQualityTest {
     assertThat(diagnostics)
         .extracting(diagnostic -> diagnostic.severity())
         .containsOnly(DiagnosticSeverity.ERROR);
-    assertThat(diagnostics.get(0).path()).isEqualTo("$.edges[0].points");
-    assertThat(diagnostics.get(1).path()).isEqualTo("$.edges[1].points[-1]");
+    assertThat(diagnostics.get(0).path()).isEqualTo("$.edges[0].route.points");
+    assertThat(diagnostics.get(1).path()).isEqualTo("$.edges[1].route");
   }
 
   @Test
@@ -183,7 +184,7 @@ class LayoutQualityTest {
     assertThat(diagnostics)
         .extracting(diagnostic -> diagnostic.code())
         .containsExactly("DEDIREN_LAYOUT_ROUTE_ENDPOINT_OFF_NODE_PERIMETER");
-    assertThat(diagnostics.get(0).path()).isEqualTo("$.edges[0].points[-1]");
+    assertThat(diagnostics.get(0).path()).isEqualTo("$.edges[0].route");
   }
 
   @Test
@@ -201,7 +202,7 @@ class LayoutQualityTest {
     assertThat(diagnostics)
         .extracting(diagnostic -> diagnostic.code())
         .containsExactly("DEDIREN_LAYOUT_ROUTE_ENDPOINT_OFF_NODE_PERIMETER");
-    assertThat(diagnostics.get(0).path()).isEqualTo("$.edges[0].points[-1]");
+    assertThat(diagnostics.get(0).path()).isEqualTo("$.edges[0].route");
   }
 
   @Test
@@ -239,7 +240,7 @@ class LayoutQualityTest {
         .filteredOn(diagnostic -> diagnostic.code().equals("DEDIREN_LAYOUT_NON_FINITE_GEOMETRY"))
         .singleElement()
         .extracting(diagnostic -> diagnostic.path())
-        .isEqualTo("$.edges[0].points[0]");
+        .isEqualTo("$.edges[0].route.points[0]");
   }
 
   @Test
@@ -817,7 +818,7 @@ class LayoutQualityTest {
         id,
         id,
         List.of(),
-        List.of(new Point(100.0, y), new Point(500.0, y)),
+        new PolylineRoute(List.of(new Point(100.0, y), new Point(500.0, y))),
         id);
   }
 
@@ -829,7 +830,7 @@ class LayoutQualityTest {
         id,
         id,
         List.of(),
-        List.of(new Point(100.0, y), new Point(500.0, y)),
+        new PolylineRoute(List.of(new Point(100.0, y), new Point(500.0, y))),
         "");
   }
 
@@ -841,7 +842,7 @@ class LayoutQualityTest {
         id,
         id,
         List.of(),
-        List.of(new Point(x, 100.0), new Point(x, 500.0)),
+        new PolylineRoute(List.of(new Point(x, 100.0), new Point(x, 500.0))),
         id);
   }
 
@@ -1704,6 +1705,6 @@ class LayoutQualityTest {
   }
 
   private static LaidOutEdge edge(String id, String source, String target, List<Point> points) {
-    return new LaidOutEdge(id, source, target, id, id, List.of(), points, id);
+    return new LaidOutEdge(id, source, target, id, id, List.of(), new PolylineRoute(points), id);
   }
 }

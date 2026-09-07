@@ -66,7 +66,7 @@ class OutsideNodeLabelObstacleTest {
   private static ObjectNode input(String junctionLabel) throws Exception {
     ObjectNode input = JsonSupport.objectMapper().createObjectNode();
     ObjectNode layout = input.putObject("layout_result");
-    layout.put("layout_result_schema_version", "layout-result.schema.v2");
+    layout.put("layout_result_schema_version", "layout-result.schema.v3");
     layout.put("view_id", "outside-node-label-obstacle");
 
     ObjectNode node = layout.putArray("nodes").addObject();
@@ -78,7 +78,7 @@ class OutsideNodeLabelObstacleTest {
     edge.put("id", "e").put("source", "a").put("target", "b");
     edge.put("source_id", "e").put("projection_id", "e");
     edge.putArray("routing_hints");
-    ArrayNode points = edge.putArray("points");
+    ArrayNode points = edge.putObject("route").put("kind", "polyline").putArray("points");
     points.addObject().put("x", 100).put("y", 100);
     points.addObject().put("x", 300).put("y", 100);
     edge.put("label", EDGE_LABEL);

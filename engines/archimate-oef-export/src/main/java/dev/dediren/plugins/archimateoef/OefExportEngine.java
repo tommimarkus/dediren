@@ -1,5 +1,7 @@
 package dev.dediren.plugins.archimateoef;
 
+import static dev.dediren.ir.RouteGeometry.flatten;
+
 import dev.dediren.archimate.Archimate;
 import dev.dediren.archimate.ArchimateJunctionValidationException;
 import dev.dediren.archimate.ArchimateTypeValidationException;
@@ -17,6 +19,7 @@ import dev.dediren.contracts.layout.LaidOutGroup;
 import dev.dediren.contracts.layout.LaidOutGroups;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.layout.Point;
+import dev.dediren.contracts.layout.PolylineRoute;
 import dev.dediren.contracts.source.GenericGraphPluginData;
 import dev.dediren.contracts.source.GenericGraphView;
 import dev.dediren.contracts.source.SourceDocument;
@@ -792,8 +795,10 @@ public final class OefExportEngine implements ExportEngine {
           .append("\" target=\"")
           .append(attr(viewNodeIds.get(edge.target())))
           .append("\">");
-      writeConnectionGeometry(
-          xml, geometry, edge.points(), "$.layout_result.edges[" + index + "].points");
+      boolean indexedPoints = edge.route() instanceof PolylineRoute;
+      String routePath =
+          "$.layout_result.edges[" + index + "].route" + (indexedPoints ? ".points" : "");
+      writeConnectionGeometry(xml, geometry, flatten(edge.route()), routePath, indexedPoints);
       xml.append("</connection>");
     }
     xml.append("</view>");
@@ -968,20 +973,46 @@ public final class OefExportEngine implements ExportEngine {
   }
 
   private static void writeConnectionGeometry(
-      StringBuilder xml, OefGeometry geometry, List<Point> points, String path) {
+      StringBuilder xml,
+      OefGeometry geometry,
+      List<Point> points,
+      String path,
+      boolean indexedPoints) {
     if (points == null || points.isEmpty()) {
       return;
     }
-    writeLocation(xml, geometry, "sourceAttachment", points.get(0), path + "[0]");
+    writeConnectionLocation(
+        xml, geometry, "sourceAttachment", points.get(0), path, 0, indexedPoints);
     for (int index = 1; index < points.size() - 1; index++) {
-      writeLocation(xml, geometry, "bendpoint", points.get(index), path + "[" + index + "]");
+      writeConnectionLocation(
+          xml, geometry, "bendpoint", points.get(index), path, index, indexedPoints);
     }
-    writeLocation(
+    writeConnectionLocation(
         xml,
         geometry,
         "targetAttachment",
         points.get(points.size() - 1),
-        path + "[" + (points.size() - 1) + "]");
+        path,
+        points.size() - 1,
+        indexedPoints);
+  }
+
+  private static void writeConnectionLocation(
+      StringBuilder xml,
+      OefGeometry geometry,
+      String elementName,
+      Point point,
+      String path,
+      int pointIndex,
+      boolean indexedPoints) {
+    String pointPath = indexedPoints ? path + "[" + pointIndex + "]" : path;
+    xml.append("<")
+        .append(elementName)
+        .append(" x=\"")
+        .append(geometry.nonNegative(point.x(), indexedPoints ? pointPath + ".x" : pointPath))
+        .append("\" y=\"")
+        .append(geometry.nonNegative(point.y(), indexedPoints ? pointPath + ".y" : pointPath))
+        .append("\"/>");
   }
 
   private static void writeLocation(

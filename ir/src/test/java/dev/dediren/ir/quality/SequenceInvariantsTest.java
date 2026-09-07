@@ -3,6 +3,7 @@ package dev.dediren.ir.quality;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.dediren.contracts.layout.Point;
+import dev.dediren.contracts.layout.PolylineRoute;
 import dev.dediren.ir.LaidOutScene;
 import dev.dediren.ir.PlacedNode;
 import dev.dediren.ir.RoutedEdge;
@@ -23,7 +24,8 @@ class SequenceInvariantsTest {
 
   private static RoutedEdge message(
       String id, String source, String target, List<Point> points, SourcePointer origin) {
-    return new RoutedEdge(id, source, target, id, id, List.of(), points, id, origin);
+    return new RoutedEdge(
+        id, source, target, id, id, List.of(), new PolylineRoute(points), id, origin);
   }
 
   // --- messageEndpointsOnLifelineAxis ---

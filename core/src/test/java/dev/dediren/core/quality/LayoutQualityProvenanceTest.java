@@ -7,6 +7,7 @@ import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.layout.Point;
+import dev.dediren.contracts.layout.PolylineRoute;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -53,7 +54,7 @@ class LayoutQualityProvenanceTest {
             "e",
             "e",
             List.of(),
-            List.of(new Point(Double.NaN, 0.0), new Point(100.0, 0.0)),
+            new PolylineRoute(List.of(new Point(Double.NaN, 0.0), new Point(100.0, 0.0))),
             "e",
             "/edges/5");
 
@@ -79,7 +80,7 @@ class LayoutQualityProvenanceTest {
             "misses-target",
             "misses-target",
             List.of(),
-            List.of(new Point(100.0, 40.0), new Point(250.0, 40.0)),
+            new PolylineRoute(List.of(new Point(100.0, 40.0), new Point(250.0, 40.0))),
             "misses-target",
             "/edges/9");
 
@@ -109,7 +110,7 @@ class LayoutQualityProvenanceTest {
             "misses-source",
             "misses-source",
             List.of(),
-            List.of(new Point(55.0, 45.0), new Point(300.0, 40.0)),
+            new PolylineRoute(List.of(new Point(55.0, 45.0), new Point(300.0, 40.0))),
             "misses-source",
             "/edges/11");
 
@@ -133,7 +134,7 @@ class LayoutQualityProvenanceTest {
             "empty-route",
             "empty-route",
             List.of(),
-            List.of(),
+            new PolylineRoute(List.of()),
             "empty-route",
             "/edges/12");
 
@@ -157,7 +158,7 @@ class LayoutQualityProvenanceTest {
             "one-point-route",
             "one-point-route",
             List.of(),
-            List.of(new Point(50.0, 40.0)),
+            new PolylineRoute(List.of(new Point(50.0, 40.0))),
             "one-point-route",
             "/edges/13");
 
@@ -195,9 +196,11 @@ class LayoutQualityProvenanceTest {
             "into-junction",
             "into-junction",
             List.of(),
-            // Endpoint (200, 28) is on the junction perimeter but past the center reach,
             // matching LayoutQualityTest#junctionCornerAttachedEdgeIsReported.
-            List.of(new Point(100.0, 40.0), new Point(200.0, 28.0)),
+            new PolylineRoute(
+                // Endpoint (200, 28) is on the junction perimeter but past the center reach,
+                // matching LayoutQualityTest#junctionCornerAttachedEdgeIsReported.
+                List.of(new Point(100.0, 40.0), new Point(200.0, 28.0))),
             "into-junction");
 
     var diagnostics =
@@ -224,7 +227,8 @@ class LayoutQualityProvenanceTest {
             "loop",
             "loop",
             List.of(),
-            List.of(new Point(50.0, 0.0), new Point(60.0, 10.0), new Point(50.0, 0.0)),
+            new PolylineRoute(
+                List.of(new Point(50.0, 0.0), new Point(60.0, 10.0), new Point(50.0, 0.0))),
             "loop",
             "/edges/3");
 

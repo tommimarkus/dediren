@@ -1,5 +1,5 @@
 {
-  "layout_result_schema_version" : "layout-result.schema.v2",
+  "layout_result_schema_version" : "layout-result.schema.v3",
   "view_id" : "main",
   "nodes" : [ {
     "id" : "client",
@@ -69,13 +69,16 @@
     "source_id" : "client-submits-order",
     "projection_id" : "client-submits-order",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 173.0,
-      "y" : 76.0
-    }, {
-      "x" : 289.0,
-      "y" : 76.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 173.0,
+        "y" : 76.0
+      }, {
+        "x" : 289.0,
+        "y" : 76.0
+      } ]
+    },
     "label" : "submits order",
     "source_pointer" : "/relationships/0"
   }, {
@@ -85,19 +88,22 @@
     "source_id" : "web-app-calls-api",
     "projection_id" : "web-app-calls-api",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 370.0,
-      "y" : 117.0
-    }, {
-      "x" : 370.0,
-      "y" : 141.0
-    }, {
-      "x" : 610.0,
-      "y" : 141.0
-    }, {
-      "x" : 610.0,
-      "y" : 165.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 370.0,
+        "y" : 117.0
+      }, {
+        "x" : 370.0,
+        "y" : 141.0
+      }, {
+        "x" : 610.0,
+        "y" : 141.0
+      }, {
+        "x" : 610.0,
+        "y" : 165.0
+      } ]
+    },
     "label" : "calls API",
     "source_pointer" : "/relationships/1"
   }, {
@@ -107,19 +113,22 @@
     "source_id" : "api-writes-database",
     "projection_id" : "api-writes-database",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 691.0,
-      "y" : 215.83333333333334
-    }, {
-      "x" : 715.0,
-      "y" : 215.83333333333334
-    }, {
-      "x" : 715.0,
-      "y" : 224.16666666666666
-    }, {
-      "x" : 1156.0,
-      "y" : 224.16666666666666
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 691.0,
+        "y" : 215.83333333333334
+      }, {
+        "x" : 715.0,
+        "y" : 215.83333333333334
+      }, {
+        "x" : 715.0,
+        "y" : 224.16666666666666
+      }, {
+        "x" : 1156.0,
+        "y" : 224.16666666666666
+      } ]
+    },
     "label" : "writes orders",
     "source_pointer" : "/relationships/2"
   }, {
@@ -129,19 +138,22 @@
     "source_id" : "api-authorizes-payment",
     "projection_id" : "api-authorizes-payment",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 691.0,
-      "y" : 196.16666666666666
-    }, {
-      "x" : 1048.0,
-      "y" : 196.16666666666666
-    }, {
-      "x" : 1048.0,
-      "y" : 114.0
-    }, {
-      "x" : 1156.0,
-      "y" : 114.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 691.0,
+        "y" : 196.16666666666666
+      }, {
+        "x" : 1048.0,
+        "y" : 196.16666666666666
+      }, {
+        "x" : 1048.0,
+        "y" : 114.0
+      }, {
+        "x" : 1156.0,
+        "y" : 114.0
+      } ]
+    },
     "label" : "requests payment authorization",
     "source_pointer" : "/relationships/3"
   }, {
@@ -151,19 +163,22 @@
     "source_id" : "api-publishes-job",
     "projection_id" : "api-publishes-job",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 610.0,
-      "y" : 247.0
-    }, {
-      "x" : 610.0,
-      "y" : 271.0
-    }, {
-      "x" : 859.0,
-      "y" : 271.0
-    }, {
-      "x" : 859.0,
-      "y" : 295.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 610.0,
+        "y" : 247.0
+      }, {
+        "x" : 610.0,
+        "y" : 271.0
+      }, {
+        "x" : 859.0,
+        "y" : 271.0
+      }, {
+        "x" : 859.0,
+        "y" : 295.0
+      } ]
+    },
     "label" : "publishes fulfillment",
     "source_pointer" : "/relationships/4"
   }, {
@@ -173,19 +188,22 @@
     "source_id" : "worker-reads-database",
     "projection_id" : "worker-reads-database",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 940.0,
-      "y" : 336.0
-    }, {
-      "x" : 1048.0,
-      "y" : 336.0
-    }, {
-      "x" : 1048.0,
-      "y" : 243.83333333333334
-    }, {
-      "x" : 1156.0,
-      "y" : 243.83333333333334
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 940.0,
+        "y" : 336.0
+      }, {
+        "x" : 1048.0,
+        "y" : 336.0
+      }, {
+        "x" : 1048.0,
+        "y" : 243.83333333333334
+      }, {
+        "x" : 1156.0,
+        "y" : 243.83333333333334
+      } ]
+    },
     "label" : "loads order",
     "source_pointer" : "/relationships/5"
   } ],

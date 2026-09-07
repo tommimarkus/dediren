@@ -1,5 +1,5 @@
 {
-  "layout_result_schema_version" : "layout-result.schema.v2",
+  "layout_result_schema_version" : "layout-result.schema.v3",
   "view_id" : "sequence-view",
   "nodes" : [ {
     "id" : "interaction-self-message",
@@ -42,13 +42,16 @@
     "source_id" : "m1",
     "projection_id" : "m1",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 171.0,
-      "y" : 380.0
-    }, {
-      "x" : 455.0,
-      "y" : 380.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 171.0,
+        "y" : 380.0
+      }, {
+        "x" : 455.0,
+        "y" : 380.0
+      } ]
+    },
     "label" : "placeOrder",
     "source_pointer" : "/relationships/0"
   }, {
@@ -58,19 +61,22 @@
     "source_id" : "m2",
     "projection_id" : "m2",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 455.0,
-      "y" : 412.0
-    }, {
-      "x" : 495.0,
-      "y" : 412.0
-    }, {
-      "x" : 495.0,
-      "y" : 436.0
-    }, {
-      "x" : 455.0,
-      "y" : 436.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 455.0,
+        "y" : 412.0
+      }, {
+        "x" : 495.0,
+        "y" : 412.0
+      }, {
+        "x" : 495.0,
+        "y" : 436.0
+      }, {
+        "x" : 455.0,
+        "y" : 436.0
+      } ]
+    },
     "label" : "validateOrder",
     "source_pointer" : "/relationships/1"
   }, {
@@ -80,13 +86,16 @@
     "source_id" : "m3",
     "projection_id" : "m3",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 455.0,
-      "y" : 468.0
-    }, {
-      "x" : 171.0,
-      "y" : 468.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 455.0,
+        "y" : 468.0
+      }, {
+        "x" : 171.0,
+        "y" : 468.0
+      } ]
+    },
     "label" : "orderConfirmed",
     "source_pointer" : "/relationships/2"
   } ],

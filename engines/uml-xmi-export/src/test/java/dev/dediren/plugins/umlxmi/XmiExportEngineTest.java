@@ -316,7 +316,7 @@ class XmiExportEngineTest {
     edge.put("id", id).put("source", source).put("target", target);
     edge.put("source_id", id).put("projection_id", id);
     edge.putArray("routing_hints");
-    ArrayNode points = edge.putArray("points");
+    ArrayNode points = edge.putObject("route").put("kind", "polyline").putArray("points");
     points.addObject().put("x", 45.0).put("y", 216.0);
     points.addObject().put("x", 141.0).put("y", 216.0);
     edge.put("label", "").put("source_pointer", "/relationships/6");
