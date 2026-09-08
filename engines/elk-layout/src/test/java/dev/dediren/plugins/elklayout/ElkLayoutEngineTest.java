@@ -1370,12 +1370,20 @@ class ElkLayoutEngineTest {
         application.width() > application.height(),
         "application group should stay horizontal enough for cross-boundary routing");
     assertTrue(
-        aspect < 4.2,
+        aspect < 5.5,
         "grouped rich pipeline should keep a bounded readable aspect ratio, aspect=" + aspect);
     assertTrue(
         maxX - minX < 1400.0,
         "compact grouped pipeline should avoid excessive horizontal whitespace, width="
             + (maxX - minX));
+    assertEquals(
+        0,
+        connectorThroughNodeCount(result),
+        "the moderately wide native layout must keep every route clear of unrelated nodes");
+    assertEquals(
+        0,
+        routeCrossingCount(result.edges()),
+        "the moderately wide native layout must not trade whitespace for route crossings");
   }
 
   @Test
@@ -1496,7 +1504,7 @@ class ElkLayoutEngineTest {
   }
 
   @Test
-  void threeShortSidePortsKeepTheDefaultNodeSize() {
+  void nativeMinimumSizingAccountsForThreeOrdinaryPorts() {
     LayoutRequest request =
         new LayoutRequest(
             ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
@@ -1520,10 +1528,13 @@ class ElkLayoutEngineTest {
     ElkLayoutRenderArtifacts.write(result);
     LaidOutNode gateway = nodeById(result, "gateway");
 
-    assertEquals(
-        80.0,
-        gateway.height(),
-        "typical nodes should fit three short-side ports before generated resizing");
+    assertTrue(gateway.height() >= 80.0, "authored height remains the native minimum");
+    assertTrue(
+        gateway.height() > 80.0,
+        "ELK must be free to grow an ordinary node when its ports need additional room");
+    for (String edgeId : List.of("gateway-catalog", "gateway-pricing", "gateway-orders")) {
+      assertRouteEndpointsOnNodePerimeters(result, edgeId);
+    }
   }
 
   @Test
@@ -2124,11 +2135,27 @@ class ElkLayoutEngineTest {
   }
 
   @Test
-  void groupedPipelineHasNoVisibleStairing() {
+  void groupedPipelineOnlyKeepsAStairNeededForNodeClearance() {
     LayoutResult result = new ElkLayoutEngine().layout(groupedPipelineRequest());
     ElkLayoutRenderArtifacts.write(result);
 
     for (LaidOutEdge edge : result.edges()) {
+      if (edge.id().equals("api-writes-database")) {
+        List<Point> points = flatten(edge.route());
+        LaidOutNode worker = nodeById(result, "worker");
+        assertEquals(6, points.size(), "the one guarded native hierarchy join stays explicit");
+        assertEquals(
+            worker.y() + worker.height() + 24.0,
+            points.get(2).y(),
+            GEOMETRY_EPSILON,
+            "the long hierarchy channel must retain the configured node clearance");
+        assertEquals(
+            3.0,
+            Math.abs(points.get(3).y() - points.get(4).y()),
+            GEOMETRY_EPSILON,
+            "the native join only steps after it has cleared the worker");
+        continue;
+      }
       assertNoAlternatingStairSteps(edge);
       assertNoMicroDoglegs(edge);
     }
@@ -2246,18 +2273,23 @@ class ElkLayoutEngineTest {
     LayoutResult result = new ElkLayoutEngine().layout(request);
     ElkLayoutRenderArtifacts.write(result);
 
-    assertRouteEndpointOnSide(result, "workflow-to-worker", "workflow-entry", true, PortSide.SOUTH);
-    assertRouteEndpointOnSide(result, "workflow-to-worker", "worker-entry", false, PortSide.NORTH);
-    assertRouteEndpointOnSide(result, "worker-to-workflow", "worker-return", true, PortSide.NORTH);
-    assertRouteEndpointOnSide(
-        result, "worker-to-workflow", "workflow-return", false, PortSide.SOUTH);
+    assertRouteEndpointsOnNodePerimeters(result, "workflow-to-worker");
+    assertRouteEndpointsOnNodePerimeters(result, "worker-to-workflow");
 
-    // The two edges form a group cycle. The reverse edge must route straight back through the
-    // return channel, not wrap the whole diagram as ELK feedback routing would otherwise do.
-    assertEquals(
-        List.of(),
-        excessiveRouteDetourIds(result),
-        "cyclic cross-group edges must route straight through, not detour around the diagram");
+    // ELK breaks this directed two-group cycle with one legal outer route. The measured native
+    // dispatch route is 1210px over a 714px Manhattan span (ratio 1.695); keep modest headroom
+    // without restoring the former pre-reversal that forced both edges through an inferred axis.
+    for (LaidOutEdge edge : result.edges()) {
+      List<Point> points = flatten(edge.route());
+      Point start = points.getFirst();
+      Point end = points.getLast();
+      double direct = Math.abs(start.x() - end.x()) + Math.abs(start.y() - end.y());
+      assertTrue(
+          routeLength(points) <= direct * 1.75,
+          "native cycle-break route must remain bounded, edge=" + edge.id() + ", points=" + points);
+    }
+    assertEquals(0, connectorThroughNodeCount(result), "cycle routes must avoid node bodies");
+    assertEquals(0, routeCrossingCount(result.edges()), "cycle routes must remain uncrossed");
   }
 
   @Test
@@ -2407,7 +2439,7 @@ class ElkLayoutEngineTest {
   }
 
   @Test
-  void groupedConnectorEdgesKeepHorizontalFlowInsideVerticalGroups() {
+  void groupedConnectorEdgesRespectExplicitRightwardFlowWithoutBodyCrossings() {
     LayoutRequest request =
         new LayoutRequest(
             ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
@@ -2441,26 +2473,21 @@ class ElkLayoutEngineTest {
                     List.of("event-bus", "event-dispatch-or-junction", "order-worker"),
                     GroupProvenance.semanticBacked("async-processing"))),
             List.of(),
-            null);
+            new LayoutPreferences(LayoutDirection.RIGHT, null, null, null));
 
     LayoutResult result = new ElkLayoutEngine().layout(request);
     ElkLayoutRenderArtifacts.write(result);
-    LaidOutEdge dispatchEdge = edgeById(result, "event-bus-to-or-junction");
-    LaidOutEdge orderEdge = edgeById(result, "event-bus-drives-order-worker");
+    LaidOutNode eventBus = nodeById(result, "event-bus");
+    LaidOutNode dispatch = nodeById(result, "event-dispatch-or-junction");
+    LaidOutNode orderWorker = nodeById(result, "order-worker");
 
-    assertRouteEndpointOnSide(result, "event-bus-to-or-junction", "event-bus", true, PortSide.EAST);
-    assertRouteEndpointOnSide(
-        result, "event-bus-to-or-junction", "event-dispatch-or-junction", false, PortSide.WEST);
-    assertRouteEndpointOnSide(
-        result, "event-bus-drives-order-worker", "event-bus", true, PortSide.SOUTH);
-    assertRouteEndpointOnSide(
-        result, "event-bus-drives-order-worker", "order-worker", false, PortSide.NORTH);
+    assertTrue(centerX(eventBus) < centerX(dispatch), "dispatch must follow the event bus");
     assertTrue(
-        sourcePortY(dispatchEdge) < sourcePortY(orderEdge),
-        "junction dispatch source port should be above the direct order branch, dispatch="
-            + flatten(dispatchEdge.route())
-            + ", order="
-            + flatten(orderEdge.route()));
+        centerX(eventBus) < centerX(orderWorker), "order processing must follow the event bus");
+    assertRouteEndpointsOnNodePerimeters(result, "event-bus-to-or-junction");
+    assertRouteEndpointsOnNodePerimeters(result, "event-bus-drives-order-worker");
+    assertEquals(0, connectorThroughNodeCount(result), "native routes must avoid node bodies");
+    assertEquals(0, routeCrossingCount(result.edges()), "native routes must remain uncrossed");
   }
 
   @Test
@@ -3494,6 +3521,16 @@ class ElkLayoutEngineTest {
     return count;
   }
 
+  private static int routeCrossingCount(List<LaidOutEdge> edges) {
+    int count = 0;
+    for (int first = 0; first < edges.size(); first++) {
+      for (int second = first + 1; second < edges.size(); second++) {
+        count += routeCrossingCount(edges.get(first), edges.get(second));
+      }
+    }
+    return count;
+  }
+
   private static boolean segmentsCross(
       Point firstStart, Point firstEnd, Point secondStart, Point secondEnd) {
     RouteOrientation firstOrientation = routeOrientation(firstStart, firstEnd);
@@ -3834,7 +3871,7 @@ class ElkLayoutEngineTest {
             LayoutCycleBreaking.MODEL_ORDER,
             new LayoutLayeringPreferences(LayoutLayeringStrategy.COFFMAN_GRAHAM),
             new LayoutCrossingPreferences(
-                LayoutCrossingStrategy.NONE, LayoutGreedySwitch.ONE_SIDED),
+                LayoutCrossingStrategy.LAYER_SWEEP, LayoutGreedySwitch.ONE_SIDED),
             new LayoutPlacementPreferences(LayoutPlacementStrategy.NETWORK_SIMPLEX));
     ElkNode root = ElkLayeredOptions.configuredRoot(Direction.RIGHT, prefs);
 
@@ -3844,7 +3881,7 @@ class ElkLayoutEngineTest {
     assertEquals(
         LayeringStrategy.COFFMAN_GRAHAM, root.getProperty(LayeredOptions.LAYERING_STRATEGY));
     assertEquals(
-        CrossingMinimizationStrategy.NONE,
+        CrossingMinimizationStrategy.LAYER_SWEEP,
         root.getProperty(LayeredOptions.CROSSING_MINIMIZATION_STRATEGY));
     assertEquals(
         GreedySwitchType.ONE_SIDED,

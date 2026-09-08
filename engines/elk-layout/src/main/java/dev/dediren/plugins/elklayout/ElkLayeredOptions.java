@@ -34,6 +34,7 @@ import org.eclipse.elk.core.options.CoreOptions;
 import org.eclipse.elk.core.options.Direction;
 import org.eclipse.elk.core.options.EdgeRouting;
 import org.eclipse.elk.core.options.HierarchyHandling;
+import org.eclipse.elk.core.options.PortAlignment;
 import org.eclipse.elk.graph.ElkEdge;
 import org.eclipse.elk.graph.ElkNode;
 import org.eclipse.elk.graph.util.ElkGraphUtil;
@@ -96,8 +97,10 @@ final class ElkLayeredOptions {
     root.setProperty(CoreOptions.SPACING_EDGE_NODE, edgeNodeSpacing);
     root.setProperty(CoreOptions.SPACING_EDGE_EDGE, edgeEdgeSpacing);
     root.setProperty(CoreOptions.SPACING_PORT_PORT, portPortSpacing);
+    root.setProperty(CoreOptions.SPACING_NODE_SELF_LOOP, selfLoopSpacing(preferences));
     root.setProperty(
         CoreOptions.SPACING_PORTS_SURROUNDING, new ElkMargin(PORT_SURROUNDING_SPACING));
+    root.setProperty(CoreOptions.PORT_ALIGNMENT_DEFAULT, PortAlignment.JUSTIFIED);
     // LayeredOptions.SPACING_{EDGE_EDGE,EDGE_NODE,PORT_PORT,PORTS_SURROUNDING} are literal aliases
     // of the CoreOptions fields set just above — the same IProperty key, written twice with the
     // same
@@ -139,9 +142,17 @@ final class ElkLayeredOptions {
     if (crossing != null) {
       root.setProperty(LayeredOptions.CROSSING_MINIMIZATION_STRATEGY, crossing);
     }
-    GreedySwitchType greedySwitch = greedySwitchType(preferences);
-    if (greedySwitch != null) {
-      root.setProperty(LayeredOptions.CROSSING_MINIMIZATION_GREEDY_SWITCH_TYPE, greedySwitch);
+    if (crossing != CrossingMinimizationStrategy.NONE) {
+      GreedySwitchType greedySwitch = greedySwitchType(preferences);
+      if (greedySwitch != null) {
+        root.setProperty(LayeredOptions.CROSSING_MINIMIZATION_GREEDY_SWITCH_TYPE, greedySwitch);
+        root.setProperty(
+            LayeredOptions.CROSSING_MINIMIZATION_GREEDY_SWITCH_HIERARCHICAL_TYPE, greedySwitch);
+      } else {
+        root.setProperty(
+            LayeredOptions.CROSSING_MINIMIZATION_GREEDY_SWITCH_HIERARCHICAL_TYPE,
+            GreedySwitchType.TWO_SIDED);
+      }
     }
     GraphCompactionStrategy compaction = compactionStrategy(preferences);
     if (compaction != null) {
@@ -173,7 +184,18 @@ final class ElkLayeredOptions {
     if (groupedWrappingEnabled(preferences)) {
       root.setProperty(LayeredOptions.WRAPPING_STRATEGY, WrappingStrategy.MULTI_EDGE);
     }
-    root.setProperty(LayeredOptions.FEEDBACK_EDGES, true);
+    root.setProperty(LayeredOptions.FEEDBACK_EDGES, false);
+  }
+
+  /** Reserves the padding and edge channel that are drawn around flat visual bands after layout. */
+  static void configureBandedRoot(
+      ElkNode root, Direction direction, LayoutPreferences preferences) {
+    configureRoot(root, direction, preferences);
+    double padding = groupBandPadding(preferences);
+    double gap = Math.max(nodeSpacing(preferences), 2 * padding + edgeNodeSpacing(preferences));
+    root.setProperty(CoreOptions.PADDING, new ElkPadding(padding));
+    root.setProperty(CoreOptions.SPACING_NODE_NODE, gap);
+    root.setProperty(LayeredOptions.SPACING_NODE_NODE_BETWEEN_LAYERS, gap);
   }
 
   static void configureGroup(ElkNode group, Direction direction, LayoutPreferences preferences) {
@@ -242,6 +264,30 @@ final class ElkLayeredOptions {
     };
   }
 
+  private static double nodeSpacing(LayoutPreferences preferences) {
+    return switch (density(preferences)) {
+      case READABLE -> READABLE_NODE_SPACING;
+      case SPACIOUS -> SPACIOUS_NODE_SPACING;
+      default -> NODE_SPACING;
+    };
+  }
+
+  private static double edgeNodeSpacing(LayoutPreferences preferences) {
+    return switch (density(preferences)) {
+      case READABLE -> READABLE_EDGE_NODE_SPACING;
+      case SPACIOUS -> SPACIOUS_EDGE_NODE_SPACING;
+      default -> EDGE_NODE_SPACING;
+    };
+  }
+
+  private static double selfLoopSpacing(LayoutPreferences preferences) {
+    return switch (density(preferences)) {
+      case READABLE -> 48.0;
+      case SPACIOUS -> 64.0;
+      default -> 24.0;
+    };
+  }
+
   static boolean endpointMergingEnabled(LayoutPreferences preferences) {
     return endpointMerging(preferences) != LayoutEndpointMerging.OFF;
   }
@@ -296,6 +342,10 @@ final class ElkLayeredOptions {
       case POLYLINE -> EdgeRouting.POLYLINE;
       case SPLINE -> EdgeRouting.SPLINES;
     };
+  }
+
+  static boolean orthogonalRouting(LayoutPreferences preferences) {
+    return routingStyle(preferences) == EdgeRouting.ORTHOGONAL;
   }
 
   private static LayoutEndpointMerging endpointMerging(LayoutPreferences preferences) {

@@ -1,415 +1,143 @@
 package dev.dediren.plugins.elklayout;
 
-import static dev.dediren.ir.RouteGeometry.flatten;
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import dev.dediren.contracts.ContractVersions;
-import dev.dediren.contracts.layout.GroupProvenance;
-import dev.dediren.contracts.layout.LaidOutEdge;
-import dev.dediren.contracts.layout.LaidOutNode;
-import dev.dediren.contracts.layout.LayoutDensity;
-import dev.dediren.contracts.layout.LayoutDirection;
 import dev.dediren.contracts.layout.LayoutEdge;
 import dev.dediren.contracts.layout.LayoutEndpointMerging;
-import dev.dediren.contracts.layout.LayoutGroup;
 import dev.dediren.contracts.layout.LayoutNode;
 import dev.dediren.contracts.layout.LayoutPreferences;
-import dev.dediren.contracts.layout.LayoutRequest;
-import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.layout.LayoutRoutingPreferences;
 import dev.dediren.contracts.layout.LayoutRoutingStyle;
-import dev.dediren.contracts.layout.Point;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 import org.eclipse.elk.core.options.Direction;
+import org.eclipse.elk.core.options.PortSide;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
-/**
- * The back-edge decisions {@link PortPlan} makes for {@code layoutGrouped}, and the property the
- * whole fix rests on.
- *
- * <p>{@code ElkLayoutLaneAgreementTest} covers the shape the lanes used to disagree about, and
- * {@code ElkLayoutInvariantFuzzTest} sweeps geometry. Neither reaches these three: the fuzz
- * generator puts every node in a group, so a cycle that closes through an <em>ungrouped</em> node
- * never appears in it; the anti-parallel group axis needs a specific direction pairing; and no test
- * anywhere asserts the acyclicity the reversal set exists to produce.
- */
 class PortPlanTest {
-
-  /** How far into a node's bounds a route may reach before it counts as crossing the body. */
-  private static final double NODE_BODY_INSET = 1.5;
-
-  /**
-   * A cycle between a grouped node and an ungrouped one. The predicate this replaced required both
-   * endpoints to have an owner, so it could not see this cycle at all and neither edge was ever
-   * reversed; ELK broke the cycle its own way, against the pinned port sides, and the route came
-   * back through both node bodies.
-   */
   @Test
-  void aCycleThroughAnUngroupedNodeIsStillDecided() {
-    LayoutRequest request =
-        request(
-            List.of(node("inside"), node("outside")),
-            List.of(
-                new LayoutEdge("out", "inside", "outside", "flow", "out"),
-                new LayoutEdge("back", "outside", "inside", "flow", "back")),
-            List.of(
-                new LayoutGroup(
-                    "boundary",
-                    "Boundary",
-                    List.of("inside"),
-                    GroupProvenance.semanticBacked("boundary"))),
-            LayoutDirection.RIGHT);
+  void ordinaryFlatAndGroupedEndpointsStayFree() {
+    List<LayoutEdge> edges = List.of(edge("a-b", "a", "b", "flow"));
+    Map<String, LayoutNode> nodes = nodes("a", "b");
 
-    assertThat(nodeBodyCrossings(new ElkLayoutEngine().layout(request)))
-        .as("a cycle closing through an ungrouped node must not route through the node bodies")
-        .isEmpty();
+    PortPlan flat =
+        PortPlan.flat(PortPlan.Ordering.UNCONSTRAINED, edges, nodes, null, Direction.RIGHT);
+    PortPlan grouped =
+        PortPlan.grouped(edges, nodes, Map.of("a", "g", "b", "g"), Direction.RIGHT, null);
+
+    assertFalse(flat.fixesSourceSide("a-b"));
+    assertFalse(flat.fixesTargetSide("a-b"));
+    assertFalse(grouped.fixesSourceSide("a-b"));
+    assertFalse(grouped.fixesTargetSide("a-b"));
+    assertEquals(PortPlan.Ordering.GROUPED, grouped.ordering());
   }
 
-  /**
-   * A group whose own {@code internalDirection} comes out as the exact opposite of the root
-   * direction. That is not a cross-flow, it is the layer axis pointing backwards: the member edge's
-   * two ports go on the leading and trailing faces in the wrong order, ELK still layers along the
-   * root, and the route has to come back across its own target to reconnect.
-   *
-   * <p>Reduced from a generated counter-example rather than invented, because the crossing only
-   * appears once the drawing is tight enough that the route has no way round: the {@code gate}
-   * endpoint pulls {@code gate -> store} onto the connector rule's {@code RIGHT} axis while the
-   * root runs {@code LEFT}, and the return edges hold the two groups against each other. Removing
-   * the correction from {@code alongLayerAxis} puts the route back through {@code store}'s body.
-   */
-  @Test
-  void aGroupAxisPointingBackAlongTheRootAxisIsCorrected() {
-    LayoutRequest request =
-        request(
-            List.of(connectorNode("entry"), node("sink"), connectorNode("gate"), node("store")),
-            List.of(
-                new LayoutEdge("entry-to-gate", "entry", "gate", "flow", "r1"),
-                new LayoutEdge("gate-to-store", "gate", "store", "flow", "r2"),
-                new LayoutEdge("store-to-entry", "store", "entry", "flow", "r3"),
-                new LayoutEdge("store-to-sink", "store", "sink", "flow", "r4")),
-            List.of(
-                new LayoutGroup(
-                    "edge-tier",
-                    "Edge",
-                    List.of("entry", "sink"),
-                    GroupProvenance.semanticBacked("edge-tier")),
-                new LayoutGroup(
-                    "core-tier",
-                    "Core",
-                    List.of("gate", "store"),
-                    GroupProvenance.semanticBacked("core-tier"))),
-            LayoutDirection.LEFT);
-
-    assertThat(nodeBodyCrossings(new ElkLayoutEngine().layout(request)))
-        .as("a member edge must not be pinned against the root's own layer axis")
-        .isEmpty();
-  }
-
-  /**
-   * The property everything else rests on: once the plan's reversal set is applied, the digraph
-   * handed to ELK has no cycle left, so ELK's cycle breaker finds nothing to break and cannot pick
-   * a feedback arc that disagrees with the port sides pinned from the same ranking.
-   *
-   * <p>Asserted on the arcs directly rather than through geometry, because geometry can only ever
-   * show that some particular drawing came out well.
-   */
-  @Test
-  void theGraphHandedToElkIsAcyclic() {
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("compactDirections")
+  void compactSplitReturnKeepsOnlyItsControlEndpointsFixed(
+      Direction direction, PortSide primarySource, PortSide primaryTarget, PortSide alternate) {
+    Map<String, LayoutNode> nodes = new LinkedHashMap<>();
+    nodes.put("split", new LayoutNode("split", "Split", "split", 36.0, 36.0));
+    nodes.put("left", new LayoutNode("left", "Left", "left", 80.0, 40.0));
+    nodes.put("right", new LayoutNode("right", "Right", "right", 80.0, 40.0));
+    nodes.put("join", new LayoutNode("join", "Join", "join", 36.0, 36.0));
     List<LayoutEdge> edges =
         List.of(
-            // a three-node cycle inside one group
-            new LayoutEdge("a-b", "a", "b", "flow", "e1"),
-            new LayoutEdge("b-c", "b", "c", "flow", "e2"),
-            new LayoutEdge("c-a", "c", "a", "flow", "e3"),
-            // a cycle across the two groups
-            new LayoutEdge("c-d", "c", "d", "flow", "e4"),
-            new LayoutEdge("d-a", "d", "a", "flow", "e5"),
-            // and one through a node no group claims
-            new LayoutEdge("d-loose", "d", "loose", "flow", "e6"),
-            new LayoutEdge("loose-b", "loose", "b", "flow", "e7"));
-    List<LayoutNode> nodes = List.of(node("a"), node("b"), node("c"), node("d"), node("loose"));
-    List<LayoutGroup> groups =
-        List.of(
-            new LayoutGroup(
-                "first", "First", List.of("a", "b", "c"), GroupProvenance.semanticBacked("first")),
-            new LayoutGroup(
-                "second", "Second", List.of("d"), GroupProvenance.semanticBacked("second")));
+            edge("split-left", "split", "left", "flow"),
+            edge("split-right", "split", "right", "flow"),
+            edge("left-join", "left", "join", "flow"),
+            edge("right-join", "right", "join", "flow"));
 
-    assertThat(hasCycle(presentedArcs(nodes, edges, groups, false)))
-        .as("guard: the declared graph really is cyclic, so the check below is not vacuous")
-        .isTrue();
-    assertThat(hasCycle(presentedArcs(nodes, edges, groups, true)))
-        .as("the reversal set must leave ELK an acyclic graph")
-        .isFalse();
+    PortPlan plan =
+        PortPlan.flat(PortPlan.Ordering.UNCONSTRAINED, edges, nodes, noMerge(), direction);
+
+    assertTrue(plan.fixesSourceSide("split-left"));
+    assertTrue(plan.fixesSourceSide("split-right"));
+    assertTrue(plan.fixesTargetSide("left-join"));
+    assertTrue(plan.fixesTargetSide("right-join"));
+    assertFalse(plan.fixesTargetSide("split-left"));
+    assertFalse(plan.fixesSourceSide("left-join"));
+    assertEquals(primarySource, plan.sourceSide("split-left"));
+    assertEquals(alternate, plan.sourceSide("split-right"));
+    assertEquals(primaryTarget, plan.targetSide("left-join"));
+    assertEquals(alternate, plan.targetSide("right-join"));
   }
 
-  /**
-   * The old cross-group rule, kept as a case of the general one rather than beside it: an edge
-   * whose source sits in a later-declared group than its target is reversed, and one running the
-   * declared way round is not.
-   */
   @Test
-  void groupDeclarationOrderStillDecidesCrossGroupEdges() {
-    List<LayoutNode> nodes = List.of(node("early"), node("late"));
+  void selfLoopNeverSharesAnEndpointPort() {
+    Map<String, LayoutNode> nodes = nodes("a", "b", "c", "d");
     List<LayoutEdge> edges =
         List.of(
-            new LayoutEdge("forward", "early", "late", "flow", "f"),
-            new LayoutEdge("backward", "late", "early", "flow", "b"));
-    List<LayoutGroup> groups =
-        List.of(
-            new LayoutGroup(
-                "first", "First", List.of("early"), GroupProvenance.semanticBacked("first")),
-            new LayoutGroup(
-                "second", "Second", List.of("late"), GroupProvenance.semanticBacked("second")));
+            edge("loop", "a", "a", "flow"),
+            edge("a-b", "a", "b", "flow"),
+            edge("a-c", "a", "c", "flow"),
+            edge("a-d", "a", "d", "flow"));
 
-    PortPlan plan = groupedPlan(nodes, edges, groups);
+    PortPlan plan =
+        PortPlan.flat(PortPlan.Ordering.UNCONSTRAINED, edges, nodes, autoMerge(), Direction.RIGHT);
 
-    assertThat(plan.ordering()).isEqualTo(PortPlan.Ordering.GROUPED);
-    assertThat(plan.reversed("backward"))
-        .as("an edge out of the later-declared group runs against the lane's order")
-        .isTrue();
-    assertThat(plan.reversed("forward")).isFalse();
+    assertTrue(plan.routingHints("loop").isEmpty());
+    assertTrue(plan.routingHints("a-b").contains("shared_source_junction"));
   }
 
-  /**
-   * A group's members reaching out to nodes no group claims. The old predicate required both owners
-   * non-null, so it never reversed one of these, and neither may this: reversing it makes ELK layer
-   * the external target ahead of the group, which mirrors the drawing — the group and its targets
-   * swap sides and the dependency arrows read backwards. The arrowheads stay on the right elements,
-   * so no geometric metric in the suite objects; only this does.
-   *
-   * <p>The shape is the published self-model's {@code distribution} view verbatim (see {@code
-   * docs/architecture/dediren.dediren/model-deployment.json}), because that is the drawing that
-   * regressed: it is the README hero and the Pages site, and nothing else pins it.
-   */
   @Test
-  void anEdgeReachingOutOfAGroupToAnUnclaimedNodeIsNotReversed() {
-    List<LayoutNode> nodes =
-        List.of(
-            node("ee-jvm"),
-            node("art-launcher"),
-            node("art-lib"),
-            node("comp-cli"),
-            node("comp-engines"));
+  void relationshipTypesKeepIndependentMergePorts() {
+    Map<String, LayoutNode> nodes = nodes("a", "b", "c", "d", "e", "f", "g");
     List<LayoutEdge> edges =
         List.of(
-            new LayoutEdge("dep-launcher", "art-launcher", "ee-jvm", "runs on", "d1"),
-            new LayoutEdge("dep-lib", "art-lib", "ee-jvm", "hosted by", "d2"),
-            new LayoutEdge("man-cli", "art-lib", "comp-cli", "manifests", "m1"),
-            new LayoutEdge("man-engines", "art-lib", "comp-engines", "manifests", "m2"));
-    List<LayoutGroup> groups =
-        List.of(
-            new LayoutGroup(
-                "grp-host",
-                "Host",
-                List.of("ee-jvm", "art-launcher", "art-lib"),
-                GroupProvenance.semanticBacked("host")));
+            edge("f1", "a", "b", "flow"),
+            edge("f2", "a", "c", "flow"),
+            edge("f3", "a", "d", "flow"),
+            edge("d1", "a", "e", "data"),
+            edge("d2", "a", "f", "data"),
+            edge("d3", "a", "g", "data"));
 
-    PortPlan plan = groupedPlan(nodes, edges, groups);
+    PortPlan plan =
+        PortPlan.flat(PortPlan.Ordering.UNCONSTRAINED, edges, nodes, autoMerge(), Direction.RIGHT);
 
-    assertThat(List.of("man-cli", "man-engines").stream().filter(plan::reversed).toList())
-        .as("an edge from a grouped node out to an unclaimed one must keep its declared direction")
-        .isEmpty();
-    assertThat(edges.stream().map(LayoutEdge::id).filter(plan::reversed).toList())
-        .as("this view is acyclic, so nothing in it should be reversed at all")
-        .isEmpty();
+    assertTrue(plan.routingHints("f1").contains("shared_source_junction"));
+    assertTrue(plan.routingHints("d1").contains("shared_source_junction"));
+    assertEquals(plan.routingHints("f1"), plan.routingHints("f2"));
+    assertEquals(plan.routingHints("d1"), plan.routingHints("d2"));
   }
 
-  /**
-   * The other half of the same rule: an unclaimed node is not pinned ahead of the groups, so a
-   * cycle that runs out of a group and back into it is still broken — by the depth-first order
-   * inside the shared bucket, on the edge that actually closes the cycle rather than on the one
-   * carrying the declared flow.
-   */
-  @Test
-  void aCycleOutOfAGroupAndBackIsBrokenOnTheClosingEdge() {
-    List<LayoutNode> nodes = List.of(node("inside"), node("outside"));
-    List<LayoutEdge> edges =
-        List.of(
-            new LayoutEdge("out", "inside", "outside", "flow", "out"),
-            new LayoutEdge("back", "outside", "inside", "flow", "back"));
-    List<LayoutGroup> groups =
-        List.of(
-            new LayoutGroup(
-                "boundary",
-                "Boundary",
-                List.of("inside"),
-                GroupProvenance.semanticBacked("boundary")));
-
-    PortPlan plan = groupedPlan(nodes, edges, groups);
-
-    assertThat(plan.reversed("out"))
-        .as("the edge carrying the declared flow out of the group keeps its direction")
-        .isFalse();
-    assertThat(plan.reversed("back"))
-        .as("the edge closing the cycle back into the group is the one that gets reversed")
-        .isTrue();
+  private static Stream<Arguments> compactDirections() {
+    return Stream.of(
+        Arguments.of(Direction.RIGHT, PortSide.EAST, PortSide.WEST, PortSide.NORTH),
+        Arguments.of(Direction.LEFT, PortSide.WEST, PortSide.EAST, PortSide.NORTH),
+        Arguments.of(Direction.DOWN, PortSide.SOUTH, PortSide.NORTH, PortSide.EAST),
+        Arguments.of(Direction.UP, PortSide.NORTH, PortSide.SOUTH, PortSide.EAST));
   }
 
-  /** The flat family declares its ordering and contributes no reversals under either of them. */
-  @Test
-  void theFlatFamilyDecidesNoBackEdges() {
-    List<LayoutNode> nodes = List.of(node("a"), node("b"));
-    Map<String, LayoutNode> nodesById = nodesById(nodes);
-    List<LayoutEdge> edges =
-        List.of(
-            new LayoutEdge("a-b", "a", "b", "flow", "e1"),
-            new LayoutEdge("b-a", "b", "a", "flow", "e2"));
-
-    for (PortPlan.Ordering ordering :
-        List.of(PortPlan.Ordering.UNCONSTRAINED, PortPlan.Ordering.PARTITIONED)) {
-      PortPlan plan = PortPlan.flat(ordering, edges, nodesById, null, Direction.RIGHT);
-      assertThat(plan.ordering()).isEqualTo(ordering);
-      assertThat(plan.reversed("a-b")).isFalse();
-      assertThat(plan.reversed("b-a"))
-          .as("%s leaves the feedback arc to ELK's own cycle breaker", ordering)
-          .isFalse();
+  private static Map<String, LayoutNode> nodes(String... ids) {
+    Map<String, LayoutNode> nodes = new LinkedHashMap<>();
+    for (String id : ids) {
+      nodes.put(id, new LayoutNode(id, id, id, 80.0, 40.0));
     }
+    return nodes;
   }
 
-  // --- helpers ----------------------------------------------------------------------------------
-
-  private static PortPlan groupedPlan(
-      List<LayoutNode> nodes, List<LayoutEdge> edges, List<LayoutGroup> groups) {
-    Map<String, LayoutNode> nodesById = nodesById(nodes);
-    Map<String, String> ownerByNode = new HashMap<>();
-    Map<String, Integer> groupOrderById = new HashMap<>();
-    Map<String, Direction> groupDirectionById = new HashMap<>();
-    for (int index = 0; index < groups.size(); index++) {
-      LayoutGroup group = groups.get(index);
-      groupOrderById.put(group.id(), index);
-      groupDirectionById.put(group.id(), Direction.RIGHT);
-      for (String member : group.members()) {
-        if (nodesById.containsKey(member)) {
-          ownerByNode.putIfAbsent(member, group.id());
-        }
-      }
-    }
-    return PortPlan.grouped(
-        edges,
-        nodes,
-        nodesById,
-        ownerByNode,
-        groupDirectionById,
-        groupOrderById,
-        Direction.RIGHT,
-        null);
+  private static LayoutEdge edge(String id, String source, String target, String type) {
+    return new LayoutEdge(id, source, target, type, id, type);
   }
 
-  /** The arcs {@code layoutGrouped} hands ELK, with and without the plan's reversal applied. */
-  private static List<String[]> presentedArcs(
-      List<LayoutNode> nodes, List<LayoutEdge> edges, List<LayoutGroup> groups, boolean applyPlan) {
-    PortPlan plan = groupedPlan(nodes, edges, groups);
-    List<String[]> arcs = new ArrayList<>();
-    for (LayoutEdge edge : edges) {
-      boolean reversed = applyPlan && plan.reversed(edge.id());
-      arcs.add(
-          reversed
-              ? new String[] {edge.target(), edge.source()}
-              : new String[] {edge.source(), edge.target()});
-    }
-    return arcs;
+  private static LayoutPreferences noMerge() {
+    return preferences(LayoutEndpointMerging.OFF);
   }
 
-  /** Kahn's algorithm: a node that never reaches in-degree zero is on a cycle. */
-  private static boolean hasCycle(List<String[]> arcs) {
-    Map<String, List<String>> outgoing = new LinkedHashMap<>();
-    Map<String, Integer> indegree = new LinkedHashMap<>();
-    for (String[] arc : arcs) {
-      outgoing.computeIfAbsent(arc[0], id -> new ArrayList<>()).add(arc[1]);
-      indegree.putIfAbsent(arc[0], 0);
-      indegree.merge(arc[1], 1, Integer::sum);
-    }
-    List<String> ready = new ArrayList<>();
-    indegree.forEach(
-        (id, degree) -> {
-          if (degree == 0) {
-            ready.add(id);
-          }
-        });
-    int settled = 0;
-    while (!ready.isEmpty()) {
-      String current = ready.remove(ready.size() - 1);
-      settled++;
-      for (String next : outgoing.getOrDefault(current, List.of())) {
-        if (indegree.merge(next, -1, Integer::sum) == 0) {
-          ready.add(next);
-        }
-      }
-    }
-    return settled != indegree.size();
+  private static LayoutPreferences autoMerge() {
+    return preferences(LayoutEndpointMerging.AUTO);
   }
 
-  /**
-   * Every routed segment that reaches further than {@link #NODE_BODY_INSET} into a node's bounds,
-   * including the segment's own source and target. Same check as {@code
-   * ElkLayoutLaneAgreementTest}, kept to a bounding-box test here because these fixtures route
-   * orthogonally.
-   */
-  private static List<String> nodeBodyCrossings(LayoutResult result) {
-    List<String> crossings = new ArrayList<>();
-    for (LaidOutEdge edge : result.edges()) {
-      List<Point> points = flatten(edge.route());
-      for (int index = 0; index < points.size() - 1; index++) {
-        Point start = points.get(index);
-        Point end = points.get(index + 1);
-        for (LaidOutNode node : result.nodes()) {
-          double left = node.x() + NODE_BODY_INSET;
-          double right = node.x() + node.width() - NODE_BODY_INSET;
-          double top = node.y() + NODE_BODY_INSET;
-          double bottom = node.y() + node.height() - NODE_BODY_INSET;
-          if (right <= left || bottom <= top) {
-            continue;
-          }
-          if (Math.max(start.x(), end.x()) > left
-              && Math.min(start.x(), end.x()) < right
-              && Math.max(start.y(), end.y()) > top
-              && Math.min(start.y(), end.y()) < bottom) {
-            crossings.add("edge " + edge.id() + " segment " + index + " crosses node " + node.id());
-          }
-        }
-      }
-    }
-    return crossings;
-  }
-
-  private static Map<String, LayoutNode> nodesById(List<LayoutNode> nodes) {
-    Map<String, LayoutNode> byId = new LinkedHashMap<>();
-    for (LayoutNode node : nodes) {
-      byId.put(node.id(), node);
-    }
-    return byId;
-  }
-
-  private static LayoutNode node(String id) {
-    return new LayoutNode(id, id, id, 160.0, 80.0);
-  }
-
-  private static LayoutNode connectorNode(String id) {
-    return new LayoutNode(id, id, id, 36.0, 36.0);
-  }
-
-  private static LayoutRequest request(
-      List<LayoutNode> nodes,
-      List<LayoutEdge> edges,
-      List<LayoutGroup> groups,
-      LayoutDirection direction) {
-    return new LayoutRequest(
-        ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
-        "port-plan",
-        nodes,
-        edges,
-        groups,
-        List.of(),
-        new LayoutPreferences(
-            direction,
-            LayoutDensity.READABLE,
-            null,
-            new LayoutRoutingPreferences(
-                LayoutRoutingStyle.ORTHOGONAL, LayoutEndpointMerging.OFF)));
+  private static LayoutPreferences preferences(LayoutEndpointMerging merging) {
+    return new LayoutPreferences(
+        null, null, null, new LayoutRoutingPreferences(LayoutRoutingStyle.ORTHOGONAL, merging));
   }
 }

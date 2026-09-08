@@ -32,11 +32,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.eclipse.elk.core.RecursiveGraphLayoutEngine;
+import org.eclipse.elk.core.math.KVector;
 import org.eclipse.elk.core.options.CoreOptions;
 import org.eclipse.elk.core.options.Direction;
 import org.eclipse.elk.core.options.EdgeRouting;
 import org.eclipse.elk.core.options.PortConstraints;
 import org.eclipse.elk.core.options.PortSide;
+import org.eclipse.elk.core.options.SizeConstraint;
 import org.eclipse.elk.core.util.BasicProgressMonitor;
 import org.eclipse.elk.graph.ElkConnectableShape;
 import org.eclipse.elk.graph.ElkEdge;
@@ -48,12 +50,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 final class ElkLayoutEngine {
+  private static final String JUNCTION_ROLE = "junction";
+
   // debug/trace only, by architecture rule: a layout diagnostic an agent must act on belongs in the
   // envelope's diagnostics[], never on stderr. See ArchitectureRulesTest.
   private static final Logger LOG = LoggerFactory.getLogger(ElkLayoutEngine.class);
-
-  private static final int DEFAULT_SHORT_SIDE_PORT_CAPACITY = 3;
-  private static final int MERGEABLE_ENDPOINT_EDGE_COUNT = 3;
 
   LayoutResult layout(LayoutRequest request) {
     LayoutRequestValidator.validate(request);
@@ -114,7 +115,11 @@ final class ElkLayoutEngine {
     Direction layoutDirection =
         sequenceMode ? Direction.RIGHT : ElkLayeredOptions.preferredDirection(preferences);
     ElkNode root = ElkGraphUtil.createGraph();
-    ElkLayeredOptions.configureRoot(root, layoutDirection, preferences);
+    if (ordering == PortPlan.Ordering.PARTITIONED) {
+      ElkLayeredOptions.configureBandedRoot(root, layoutDirection, preferences);
+    } else {
+      ElkLayeredOptions.configureRoot(root, layoutDirection, preferences);
+    }
 
     Map<String, LayoutNode> requestNodes = requestNodesById(request);
     List<LayoutEdge> originalRequestEdges = list(request.edges());
@@ -128,7 +133,7 @@ final class ElkLayoutEngine {
     for (LayoutNode node : sequenceConstraints.orderedNodes(requestNodeList)) {
       ElkNode elkNode = ElkGraphUtil.createNode(root);
       elkNode.setIdentifier(node.id());
-      setGeneratedDimensions(elkNode, node, portPlan.portCounts(node.id()), preferences);
+      setGeneratedDimensions(elkNode, node);
       ElkGraphUtil.createLabel(elkNode).setText(node.label());
       ElkLayeredOptions.applyNodeHints(elkNode, node);
       elkNodes.put(node.id(), elkNode);
@@ -168,6 +173,8 @@ final class ElkLayoutEngine {
               edge,
               portPlan.sourceSide(edge.id()),
               portPlan.targetSide(edge.id()),
+              portPlan.fixesSourceSide(edge.id()),
+              portPlan.fixesTargetSide(edge.id()),
               portPlan.mergesSourceEndpoint(edge.id()),
               portPlan.mergesTargetEndpoint(edge.id()));
       elkEdges.put(edge.id(), elkEdge);
@@ -400,7 +407,6 @@ final class ElkLayoutEngine {
     Map<String, LayoutGroup> requestGroupsById = requestGroupsById(request);
     Map<String, String> ownerByGroup = ownerByGroup(request);
     Map<String, ElkNode> elkGroups = new HashMap<>();
-    Map<String, Direction> groupDirectionById = new HashMap<>();
     for (LayoutGroup group : list(request.groups())) {
       createElkGroup(
           group.id(),
@@ -411,8 +417,6 @@ final class ElkLayoutEngine {
           ownerByNode,
           ownerByGroup,
           elkGroups,
-          groupDirectionById,
-          List.of(),
           (elkGroup, ignored) -> ElkPackedOptions.configureRoot(elkGroup, preferences),
           new HashSet<>());
     }
@@ -426,7 +430,7 @@ final class ElkLayoutEngine {
       }
       ElkNode elkNode = ElkGraphUtil.createNode(parent);
       elkNode.setIdentifier(node.id());
-      setGeneratedDimensions(elkNode, node, null, preferences);
+      setGeneratedDimensions(elkNode, node);
       ElkGraphUtil.createLabel(elkNode).setText(node.label());
       elkNodes.put(node.id(), elkNode);
     }
@@ -518,12 +522,9 @@ final class ElkLayoutEngine {
     ElkLayeredOptions.configureGroupedRoot(root, rootDirection, preferences);
 
     Map<String, ElkNode> elkGroups = new HashMap<>();
-    Map<String, Direction> groupDirectionById = new HashMap<>();
-    Map<String, Integer> groupOrderById = new HashMap<>();
     List<LayoutGroup> requestGroups = list(request.groups());
     for (int groupIndex = 0; groupIndex < requestGroups.size(); groupIndex++) {
       LayoutGroup group = requestGroups.get(groupIndex);
-      groupOrderById.put(group.id(), groupIndex);
       createElkGroup(
           group.id(),
           root,
@@ -533,23 +534,13 @@ final class ElkLayoutEngine {
           ownerByNode,
           ownerByGroup,
           elkGroups,
-          groupDirectionById,
-          requestEdges,
           (elkGroup, groupDirection) ->
               ElkLayeredOptions.configureGroup(elkGroup, groupDirection, preferences),
           new HashSet<>());
     }
 
     PortPlan portPlan =
-        PortPlan.grouped(
-            requestEdges,
-            list(request.nodes()),
-            requestNodes,
-            ownerByNode,
-            groupDirectionById,
-            groupOrderById,
-            rootDirection,
-            preferences);
+        PortPlan.grouped(requestEdges, requestNodes, ownerByNode, rootDirection, preferences);
     Map<String, ElkNode> elkNodes = new HashMap<>();
     for (LayoutNode node : list(request.nodes())) {
       ElkNode parent =
@@ -559,7 +550,7 @@ final class ElkLayoutEngine {
       }
       ElkNode elkNode = ElkGraphUtil.createNode(parent);
       elkNode.setIdentifier(node.id());
-      setGeneratedDimensions(elkNode, node, portPlan.portCounts(node.id()), preferences);
+      setGeneratedDimensions(elkNode, node);
       ElkGraphUtil.createLabel(elkNode).setText(node.label());
       ElkLayeredOptions.applyNodeHints(elkNode, node);
       elkNodes.put(node.id(), elkNode);
@@ -580,34 +571,17 @@ final class ElkLayoutEngine {
                 "$.edges[" + index + "]"));
         continue;
       }
-      ElkEdge elkEdge;
-      if (portPlan.reversed(edge.id())) {
-        // A back-edge points against the order this lane has already fixed. Presented to ELK as-is
-        // it is a feedback edge, and inside a compound node there is no room to route one: the
-        // group's own bounds are the only space available, so the route doubles back across the
-        // endpoint bodies. Handing ELK the reversed edge instead makes it an ordinary forward edge
-        // through the return channel; we reverse its route points below so the rendered edge keeps
-        // its declared source-to-target orientation and port sides.
-        elkEdge =
-            createRoutedEdge(
-                target,
-                source,
-                edge,
-                portPlan.sourceSide(edge.id()),
-                portPlan.targetSide(edge.id()),
-                portPlan.mergesTargetEndpoint(edge.id()),
-                portPlan.mergesSourceEndpoint(edge.id()));
-      } else {
-        elkEdge =
-            createRoutedEdge(
-                source,
-                target,
-                edge,
-                portPlan.sourceSide(edge.id()),
-                portPlan.targetSide(edge.id()),
-                portPlan.mergesSourceEndpoint(edge.id()),
-                portPlan.mergesTargetEndpoint(edge.id()));
-      }
+      ElkEdge elkEdge =
+          createRoutedEdge(
+              source,
+              target,
+              edge,
+              portPlan.sourceSide(edge.id()),
+              portPlan.targetSide(edge.id()),
+              false,
+              false,
+              portPlan.mergesSourceEndpoint(edge.id()),
+              portPlan.mergesTargetEndpoint(edge.id()));
       ElkGraphUtil.updateContainment(elkEdge);
       elkEdges.put(edge.id(), elkEdge);
       ElkLayeredOptions.applyEdgeHints(elkEdge, edge);
@@ -634,28 +608,12 @@ final class ElkLayoutEngine {
       }
     }
 
-    List<LaidOutEdge> edges = new ArrayList<>();
+    List<LaidOutEdge> nativeEdges = new ArrayList<>();
     List<LaidOutGroup> groups = groupedBounds(request, elkGroups, elkNodes, warnings);
     for (LayoutEdge edge : list(request.edges())) {
       ElkEdge elkEdge = elkEdges.get(edge.id());
       if (elkEdge != null) {
-        EdgeRoute route = route(elkEdge);
-        if (portPlan.reversed(edge.id())) {
-          // The edge was handed to ELK reversed to avoid feedback routing; flip the geometry back
-          // so the route runs from the declared source to the declared target.
-          route = RouteGeometry.reverse(route);
-        }
-        if (route instanceof PolylineRoute polyline) {
-          route =
-              new PolylineRoute(
-                  OrthogonalRouteNormalizer.collapseStairSteps(
-                      polyline.points(),
-                      nodes,
-                      edge.source(),
-                      edge.target(),
-                      !portPlan.mergesSourceEndpoint(edge.id())));
-        }
-        edges.add(
+        nativeEdges.add(
             new LaidOutEdge(
                 edge.id(),
                 edge.source(),
@@ -663,11 +621,13 @@ final class ElkLayoutEngine {
                 edge.sourceId(),
                 edge.id(),
                 portPlan.routingHints(edge.id()),
-                route,
+                route(elkEdge),
                 edge.label(),
                 edgePointers.get(edge.id())));
       }
     }
+    List<LaidOutEdge> edges =
+        normalizeGroupedRoutes(nativeEdges, nodes, groups, portPlan, preferences);
     // ELK Layered owns placement and routing. Compound edges arrive as joined hierarchy sections;
     // the normalizer only collapses redundant alternating joins when the shorter route remains
     // orthogonal and clear of every unrelated node.
@@ -681,6 +641,53 @@ final class ElkLayoutEngine {
         warnings);
   }
 
+  private static List<LaidOutEdge> normalizeGroupedRoutes(
+      List<LaidOutEdge> nativeEdges,
+      List<LaidOutNode> nodes,
+      List<LaidOutGroup> groups,
+      PortPlan portPlan,
+      LayoutPreferences preferences) {
+    if (!ElkLayeredOptions.orthogonalRouting(preferences)) {
+      return nativeEdges;
+    }
+    List<LaidOutEdge> normalized = new ArrayList<>(nativeEdges.size());
+    for (LaidOutEdge edge : nativeEdges) {
+      EdgeRoute route = edge.route();
+      if (!edge.source().equals(edge.target()) && route instanceof PolylineRoute polyline) {
+        List<List<Point>> siblingRoutes = new ArrayList<>(nativeEdges.size() - 1);
+        for (LaidOutEdge sibling : nativeEdges) {
+          if (!sibling.id().equals(edge.id())) {
+            siblingRoutes.add(RouteGeometry.flatten(sibling.route()));
+          }
+        }
+        boolean sharedJunction =
+            portPlan.mergesSourceEndpoint(edge.id()) || portPlan.mergesTargetEndpoint(edge.id());
+        route =
+            new PolylineRoute(
+                OrthogonalRouteNormalizer.collapseStairSteps(
+                    polyline.points(),
+                    nodes,
+                    groups,
+                    edge.source(),
+                    edge.target(),
+                    sharedJunction,
+                    siblingRoutes));
+      }
+      normalized.add(
+          new LaidOutEdge(
+              edge.id(),
+              edge.source(),
+              edge.target(),
+              edge.sourceId(),
+              edge.projectionId(),
+              edge.routingHints(),
+              route,
+              edge.label(),
+              edge.sourcePointer()));
+    }
+    return List.copyOf(normalized);
+  }
+
   private static Map<LayoutEdge, Integer> originalEdgeIndexes(List<LayoutEdge> edges) {
     Map<LayoutEdge, Integer> indexes = new IdentityHashMap<>();
     for (int index = 0; index < edges.size(); index++) {
@@ -689,67 +696,50 @@ final class ElkLayoutEngine {
     return indexes;
   }
 
-  private static Direction internalDirection(List<LayoutNode> nodes, List<LayoutEdge> edges) {
-    if (nodes.size() < 3) {
-      return Direction.RIGHT;
-    }
-    if (nodes.stream().anyMatch(PortPlan::isConnectorSized)) {
-      return Direction.DOWN;
-    }
-    // A same-source service fan-out reads as a left-to-right call flow.
-    // Express that as ELK direction intent instead of correcting routes
-    // after ELK has produced them.
-    if (hasInternalFanOut(edges)) {
-      return Direction.RIGHT;
-    }
-    return Direction.DOWN;
-  }
-
-  private static boolean hasInternalFanOut(List<LayoutEdge> edges) {
-    Map<String, Integer> outgoingCounts = new HashMap<>();
-    for (LayoutEdge edge : edges) {
-      int count = outgoingCounts.merge(edge.source(), 1, Integer::sum);
-      if (count >= MERGEABLE_ENDPOINT_EDGE_COUNT) {
-        return true;
-      }
-    }
-    return false;
-  }
-
   private static ElkEdge createRoutedEdge(
       ElkNode source,
       ElkNode target,
       LayoutEdge edge,
       PortSide sourceSide,
       PortSide targetSide,
+      boolean fixSourceSide,
+      boolean fixTargetSide,
       boolean mergeSourceEndpoint,
       boolean mergeTargetEndpoint) {
     String relationshipType = PortPlan.relationshipType(edge);
     ElkConnectableShape sourceShape =
         mergeSourceEndpoint
-            ? sharedMergePort(source, sourceSide, true, relationshipType)
-            : createEdgePort(source, edge.id() + "-source", sourceSide);
+            ? sharedMergePort(source, sourceSide, fixSourceSide, true, relationshipType)
+            : createEdgePort(source, edge.id() + "-source", sourceSide, fixSourceSide);
     ElkConnectableShape targetShape =
         mergeTargetEndpoint
-            ? sharedMergePort(target, targetSide, false, relationshipType)
-            : createEdgePort(target, edge.id() + "-target", targetSide);
+            ? sharedMergePort(target, targetSide, fixTargetSide, false, relationshipType)
+            : createEdgePort(target, edge.id() + "-target", targetSide, fixTargetSide);
     ElkEdge elkEdge = ElkGraphUtil.createSimpleEdge(sourceShape, targetShape);
     elkEdge.setIdentifier(edge.id());
     ElkGraphUtil.createLabel(elkEdge).setText(edge.label());
     return elkEdge;
   }
 
-  private static ElkPort createEdgePort(ElkNode node, String id, PortSide side) {
-    node.setProperty(CoreOptions.PORT_CONSTRAINTS, PortConstraints.FIXED_SIDE);
+  private static ElkPort createEdgePort(ElkNode node, String id, PortSide side, boolean fixedSide) {
+    node.setProperty(
+        CoreOptions.PORT_CONSTRAINTS,
+        fixedSide ? PortConstraints.FIXED_SIDE : PortConstraints.FREE);
     ElkPort port = ElkGraphUtil.createPort(node);
     port.setIdentifier(id);
     port.setDimensions(1.0, 1.0);
-    port.setProperty(CoreOptions.PORT_SIDE, side);
+    if (fixedSide) {
+      port.setProperty(CoreOptions.PORT_SIDE, side);
+    }
     return port;
   }
 
   private static ElkPort sharedMergePort(
-      ElkNode node, PortSide side, boolean sourceEndpoint, String relationshipType) {
+      ElkNode node,
+      PortSide side,
+      boolean fixedSide,
+      boolean sourceEndpoint,
+      String relationshipType) {
     String id =
         "__dediren_merge_"
             + (sourceEndpoint ? "source_" : "target_")
@@ -761,7 +751,7 @@ final class ElkLayoutEngine {
         return port;
       }
     }
-    return createEdgePort(node, id, side);
+    return createEdgePort(node, id, side, fixedSide);
   }
 
   private static String relationshipTypePortSuffix(String relationshipType) {
@@ -777,40 +767,16 @@ final class ElkLayoutEngine {
     return List.of(new Point(stemX, headBottom), new Point(stemX, headBottom + 1.0));
   }
 
-  private static void setGeneratedDimensions(
-      ElkNode elkNode,
-      LayoutNode node,
-      Map<PortSide, Integer> portCounts,
-      LayoutPreferences preferences) {
+  private static void setGeneratedDimensions(ElkNode elkNode, LayoutNode node) {
     double width = positiveOrDefault(node.widthHint(), PortPlan.DEFAULT_WIDTH);
     double height = positiveOrDefault(node.heightHint(), PortPlan.DEFAULT_HEIGHT);
-    if (portCounts != null) {
-      double portSpacing = ElkLayeredOptions.portPortSpacing(preferences);
-      width =
-          Math.max(
-              width,
-              requiredPortSideLength(
-                  width, maxPortCount(portCounts, PortSide.NORTH, PortSide.SOUTH), portSpacing));
-      height =
-          Math.max(
-              height,
-              requiredPortSideLength(
-                  height, maxPortCount(portCounts, PortSide.WEST, PortSide.EAST), portSpacing));
-    }
     elkNode.setDimensions(width, height);
-  }
-
-  private static double requiredPortSideLength(
-      double currentLength, int portCount, double portSpacing) {
-    if (portCount <= DEFAULT_SHORT_SIDE_PORT_CAPACITY) {
-      return currentLength;
+    if (JUNCTION_ROLE.equals(node.role())) {
+      return;
     }
-    return currentLength + ((portCount - DEFAULT_SHORT_SIDE_PORT_CAPACITY) * portSpacing);
-  }
-
-  private static int maxPortCount(
-      Map<PortSide, Integer> portCounts, PortSide first, PortSide second) {
-    return Math.max(portCounts.getOrDefault(first, 0), portCounts.getOrDefault(second, 0));
+    elkNode.setProperty(CoreOptions.NODE_SIZE_MINIMUM, new KVector(width, height));
+    elkNode.setProperty(CoreOptions.NODE_SIZE_CONSTRAINTS, SizeConstraint.minimumSizeWithPorts());
+    elkNode.setProperty(CoreOptions.PORT_CONSTRAINTS, PortConstraints.FREE);
   }
 
   private interface ElkGroupConfigurator {
@@ -892,8 +858,6 @@ final class ElkLayoutEngine {
       Map<String, String> ownerByNode,
       Map<String, String> ownerByGroup,
       Map<String, ElkNode> elkGroups,
-      Map<String, Direction> groupDirectionById,
-      List<LayoutEdge> requestEdges,
       ElkGroupConfigurator groupConfigurator,
       Set<String> visiting) {
     ElkNode existing = elkGroups.get(groupId);
@@ -930,32 +894,17 @@ final class ElkLayoutEngine {
                 ownerByNode,
                 ownerByGroup,
                 elkGroups,
-                groupDirectionById,
-                requestEdges,
                 groupConfigurator,
                 visiting);
     if (parent == null) {
       parent = root;
     }
 
-    List<LayoutEdge> internalEdges =
-        requestEdges.stream()
-            .filter(
-                edge ->
-                    group.id().equals(ownerByNode.get(edge.source()))
-                        && group.id().equals(ownerByNode.get(edge.target())))
-            .toList();
-
     ElkNode elkGroup = ElkGraphUtil.createNode(parent);
     elkGroup.setIdentifier(group.id());
     ElkGraphUtil.createLabel(elkGroup).setText(group.label());
-    Direction groupDirection =
-        directNodeMembers.isEmpty()
-            ? rootDirection
-            : internalDirection(directNodeMembers, internalEdges);
-    groupConfigurator.configure(elkGroup, groupDirection);
+    groupConfigurator.configure(elkGroup, rootDirection);
     elkGroups.put(group.id(), elkGroup);
-    groupDirectionById.put(group.id(), groupDirection);
     visiting.remove(groupId);
     return elkGroup;
   }
