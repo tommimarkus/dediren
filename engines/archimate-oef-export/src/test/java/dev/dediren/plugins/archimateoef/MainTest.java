@@ -156,7 +156,7 @@ class MainTest {
                 + "<node identifier=\"id-vn-main-orders-component\" xsi:type=\"Element\""
                 + " elementRef=\"id-el-orders-component\" x=\"12\" y=\"12\" w=\"160\" h=\"80\"/>"
                 + "<node identifier=\"id-vn-main-orders-service\" xsi:type=\"Element\""
-                + " elementRef=\"id-el-orders-service\" x=\"254\" y=\"12\" w=\"160\" h=\"80\"/>"
+                + " elementRef=\"id-el-orders-service\" x=\"317\" y=\"12\" w=\"160\" h=\"80\"/>"
                 + "</node>");
     // Nested, not duplicated: each member view node appears exactly once in the document.
     assertThat(xml.split("id-vn-main-orders-component", -1)).hasSize(3); // node id + edge source

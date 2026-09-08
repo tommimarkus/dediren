@@ -981,13 +981,13 @@ public final class DistTool {
   }
 
   /**
-   * Ceiling between the shipped size (~3.17 MB: shrunk + attribute-stripped + STORED repack + xz
-   * -9e) and the regression shapes above it — the attribute strip silently going inert (~3.49 MB;
-   * it depends on ProGuard's obfuscation phase running, see bundle-shrink.pro), the archive
-   * degrading back to gzip (~4.94 MB), and STORED-to-deflated or shrink-to-pass-through regressions
-   * far above that. Trips on any of those, not ordinary growth.
+   * Ceiling between the routing-v3 shipped size (~3.411 MB: shrunk + attribute-stripped + STORED
+   * repack + xz -9e) and the regression shapes above it — the attribute strip silently going inert
+   * (~3.49 MB; it depends on ProGuard's obfuscation phase running, see bundle-shrink.pro), the
+   * archive degrading back to gzip (~4.94 MB), and STORED-to-deflated or shrink-to-pass-through
+   * regressions far above that. Trips on any of those, not ordinary growth.
    */
-  private static final long MAX_ARCHIVE_BYTES = 3_400_000L;
+  private static final long MAX_ARCHIVE_BYTES = 3_450_000L;
 
   /**
    * The packaged lib/ must hold exactly the shrunk bundle jar — anything else means the CLASSPATH
