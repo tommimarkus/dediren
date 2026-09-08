@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.DiagnosticSeverity;
+import dev.dediren.contracts.layout.CubicBezierRoute;
+import dev.dediren.contracts.layout.CubicBezierSegment;
 import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LaidOutGroup;
 import dev.dediren.contracts.layout.LaidOutNode;
@@ -1168,6 +1170,564 @@ class LayoutQualityTest {
   }
 
   @Test
+  void routeThreeUnitsFromAnUnrelatedNodeFaceIsAClearanceIssue() {
+    var obstacle = node("obstacle", 100.0, 0.0);
+    var edge =
+        edge(
+            "near-face", "source", "target", List.of(new Point(0.0, 83.0), new Point(300.0, 83.0)));
+
+    assertThat(
+            LayoutQuality.validateLayout(layoutResult(List.of(obstacle), List.of(edge), List.of()))
+                .routeNodeClearanceIssueCount())
+        .isEqualTo(1);
+  }
+
+  @Test
+  void cubicDepartureFromItsOwnSourceDoesNotBecomeAClearanceIssueAfterFlattening() {
+    var source = node("source", 0.0, 0.0);
+    var route =
+        edge(
+            "curve",
+            "source",
+            "target",
+            new CubicBezierRoute(
+                new Point(100.0, 40.0),
+                List.of(
+                    new CubicBezierSegment(
+                        new Point(110.0, 40.0),
+                        new Point(160.0, 100.0),
+                        new Point(300.0, 100.0)))));
+
+    assertThat(
+            LayoutQuality.validateLayout(layoutResult(List.of(source), List.of(route), List.of()))
+                .routeNodeClearanceIssueCount())
+        .isZero();
+  }
+
+  @Test
+  void longRouteHuggingItsSourceAfterTerminalContactIsAClearanceIssue() {
+    var source = node("source", 0.0, 0.0);
+    var route =
+        edge(
+            "hug",
+            "source",
+            "target",
+            List.of(
+                new Point(100.0, 40.0),
+                new Point(101.0, 40.0),
+                new Point(101.0, 1000.0),
+                new Point(300.0, 1000.0)));
+
+    assertThat(
+            LayoutQuality.validateLayout(layoutResult(List.of(source), List.of(route), List.of()))
+                .routeNodeClearanceIssueCount())
+        .isEqualTo(1);
+  }
+
+  @Test
+  void diagonalAabbOverlapWithoutRectangleContactIsNotAClearanceIssue() {
+    var corner = new LaidOutNode("corner", "corner", "corner", 0.0, 90.0, 10.0, 10.0, "corner");
+    var diagonal =
+        edge("diagonal", "source", "target", List.of(new Point(0.0, 0.0), new Point(100.0, 100.0)));
+
+    assertThat(
+            LayoutQuality.validateLayout(
+                    layoutResult(List.of(corner), List.of(diagonal), List.of()))
+                .routeNodeClearanceIssueCount())
+        .isZero();
+  }
+
+  @Test
+  void curveJustInsideTheClearanceFloorIsNotLostToFlattening() {
+    var obstacle =
+        new LaidOutNode("obstacle", "obstacle", "obstacle", 0.0, 0.0, 100.0, 80.0, "obstacle");
+    // The cubic's closest point is at t=1/3, not at a binary subdivision vertex, and sits 23.99
+    // units above the node. A fixed chord approximation may round that closest approach above 24.
+    var curve =
+        edge(
+            "curve",
+            "source",
+            "target",
+            new CubicBezierRoute(
+                new Point(0.0, -30.0),
+                List.of(
+                    new CubicBezierSegment(
+                        new Point(0.0, -16.4775),
+                        new Point(100.0, -30.0),
+                        new Point(100.0, -30.0)))));
+
+    assertThat(
+            LayoutQuality.validateLayout(layoutResult(List.of(obstacle), List.of(curve), List.of()))
+                .routeNodeClearanceIssueCount())
+        .isEqualTo(1);
+  }
+
+  @Test
+  void curveJustOutsideTheClearanceFloorIsNotAConservativeFalsePositive() {
+    var obstacle =
+        new LaidOutNode("obstacle", "obstacle", "obstacle", 0.0, 0.0, 100.0, 80.0, "obstacle");
+    var curve =
+        edge(
+            "curve",
+            "source",
+            "target",
+            new CubicBezierRoute(
+                new Point(0.0, -30.0),
+                List.of(
+                    new CubicBezierSegment(
+                        new Point(0.0, -16.5225),
+                        new Point(100.0, -30.0),
+                        new Point(100.0, -30.0)))));
+
+    assertThat(
+            LayoutQuality.validateLayout(layoutResult(List.of(obstacle), List.of(curve), List.of()))
+                .routeNodeClearanceIssueCount())
+        .isZero();
+  }
+
+  @Test
+  void clearanceRefinementSeparatesTwoThousandthsOnEitherSideOfTheFloor() {
+    var obstacle =
+        new LaidOutNode("obstacle", "obstacle", "obstacle", 0.0, 0.0, 100.0, 80.0, "obstacle");
+    var inside =
+        edge(
+            "inside",
+            "source",
+            "target",
+            new CubicBezierRoute(
+                new Point(0.0, -30.0),
+                List.of(
+                    new CubicBezierSegment(
+                        new Point(0.0, -16.4955),
+                        new Point(100.0, -30.0),
+                        new Point(100.0, -30.0)))));
+    var outside =
+        edge(
+            "outside",
+            "source",
+            "target",
+            new CubicBezierRoute(
+                new Point(0.0, -30.0),
+                List.of(
+                    new CubicBezierSegment(
+                        new Point(0.0, -16.5045),
+                        new Point(100.0, -30.0),
+                        new Point(100.0, -30.0)))));
+
+    assertThat(
+            LayoutQuality.validateLayout(
+                    layoutResult(List.of(obstacle), List.of(inside), List.of()))
+                .routeNodeClearanceIssueCount())
+        .isEqualTo(1);
+    assertThat(
+            LayoutQuality.validateLayout(
+                    layoutResult(List.of(obstacle), List.of(outside), List.of()))
+                .routeNodeClearanceIssueCount())
+        .isZero();
+  }
+
+  @Test
+  void onePairCrossingTwiceCountsEachDistinctInteriorEvent() {
+    var weaving =
+        edge(
+            "weaving",
+            "left",
+            "right",
+            List.of(
+                new Point(0.0, 0.0),
+                new Point(50.0, 100.0),
+                new Point(100.0, 100.0),
+                new Point(150.0, 0.0)));
+    var baseline =
+        edge("baseline", "top", "bottom", List.of(new Point(0.0, 50.0), new Point(150.0, 50.0)));
+
+    assertThat(
+            LayoutQuality.validateLayout(
+                    layoutResult(List.of(), List.of(weaving, baseline), List.of()))
+                .edgeCrossingCount())
+        .isEqualTo(2);
+  }
+
+  @Test
+  void splitCrossingsAtRouteVerticesAreDeduplicatedAcrossSubdivision() {
+    var subdivided =
+        edge(
+            "subdivided",
+            "left",
+            "right",
+            List.of(new Point(0.0, 0.0), new Point(50.0, 50.0), new Point(100.0, 100.0)));
+    var counter =
+        edge(
+            "counter",
+            "top",
+            "bottom",
+            List.of(new Point(0.0, 100.0), new Point(50.0, 50.0), new Point(100.0, 0.0)));
+
+    assertThat(
+            LayoutQuality.validateLayout(
+                    layoutResult(List.of(), List.of(subdivided, counter), List.of()))
+                .edgeCrossingCount())
+        .isEqualTo(1);
+  }
+
+  @Test
+  void diagonalBoundsOverlapWithoutAnIntersectionIsNotACrossing() {
+    var rising = edge("rising", "a", "b", List.of(new Point(0.0, 0.0), new Point(100.0, 100.0)));
+    var parallel =
+        edge("parallel", "c", "d", List.of(new Point(0.0, 20.0), new Point(80.0, 100.0)));
+
+    assertThat(
+            LayoutQuality.validateLayout(
+                    layoutResult(List.of(), List.of(rising, parallel), List.of()))
+                .edgeCrossingCount())
+        .isZero();
+  }
+
+  @Test
+  void curveTangencyNearMissIsNotAProperCrossing() {
+    var arc =
+        edge(
+            "arc",
+            "left",
+            "right",
+            new CubicBezierRoute(
+                new Point(0.0, 0.0),
+                List.of(
+                    new CubicBezierSegment(
+                        new Point(0.0, 100.0), new Point(100.0, 100.0), new Point(100.0, 0.0)))));
+    var tangent =
+        edge("tangent", "top", "bottom", List.of(new Point(-10.0, 75.0), new Point(110.0, 75.0)));
+
+    assertThat(
+            LayoutQuality.validateLayout(layoutResult(List.of(), List.of(arc, tangent), List.of()))
+                .edgeCrossingCount())
+        .isZero();
+  }
+
+  @Test
+  void nearThresholdCurveCrossingsAreRefinedToDistinctEvents() {
+    var curve =
+        edge(
+            "curve",
+            "left",
+            "right",
+            new CubicBezierRoute(
+                new Point(0.0, 0.0),
+                List.of(
+                    new CubicBezierSegment(
+                        new Point(0.0, 100.0), new Point(100.0, 0.0), new Point(100.0, 0.0)))));
+    var nearPeak =
+        edge(
+            "near-peak",
+            "top",
+            "bottom",
+            List.of(new Point(0.0, 44.443), new Point(100.0, 44.443)));
+
+    assertThat(
+            LayoutQuality.validateLayout(
+                    layoutResult(List.of(), List.of(curve, nearPeak), List.of()))
+                .edgeCrossingCount())
+        .isEqualTo(2);
+  }
+
+  @Test
+  void resolvedCurveEventsDoNotHideASeparateAmbiguousCrossingRegion() {
+    var curve =
+        edge(
+            "curve",
+            "left",
+            "right",
+            new CubicBezierRoute(
+                new Point(0.0, 0.0),
+                List.of(
+                    new CubicBezierSegment(
+                        new Point(0.0, 100.0), new Point(100.0, 0.0), new Point(100.0, 0.0)))));
+    var mixed =
+        edge(
+            "mixed",
+            "top",
+            "bottom",
+            List.of(
+                new Point(0.0, 44.443),
+                new Point(100.0, 44.443),
+                new Point(100.0, -10.0),
+                new Point(-10.0, -10.0),
+                new Point(-10.0, 20.0),
+                new Point(100.0, 20.0)));
+
+    assertThat(
+            LayoutQuality.validateLayout(layoutResult(List.of(), List.of(curve, mixed), List.of()))
+                .edgeCrossingCount())
+        .isEqualTo(4);
+  }
+
+  @Test
+  void intentionalSharedSourceStubDoesNotCountAsRouteOverlap() {
+    var first =
+        edge(
+            "first",
+            "source",
+            "target-a",
+            List.of("shared_source_junction"),
+            List.of(new Point(0.0, 0.0), new Point(40.0, 0.0), new Point(100.0, -60.0)));
+    var second =
+        edge(
+            "second",
+            "source",
+            "target-b",
+            List.of("shared_source_junction"),
+            List.of(new Point(0.0, 0.0), new Point(40.0, 0.0), new Point(100.0, 60.0)));
+
+    assertThat(
+            LayoutQuality.validateLayout(layoutResult(List.of(), List.of(first, second), List.of()))
+                .routeOverlapCount())
+        .isZero();
+  }
+
+  @Test
+  void coincidentHintsWithDifferentSourceNodesDoNotExemptAnOverlap() {
+    var first =
+        edge(
+            "first",
+            "source-a",
+            "target-a",
+            List.of("shared_source_junction"),
+            List.of(new Point(0.0, 0.0), new Point(40.0, 0.0), new Point(100.0, -60.0)));
+    var second =
+        edge(
+            "second",
+            "source-b",
+            "target-b",
+            List.of("shared_source_junction"),
+            List.of(new Point(0.0, 0.0), new Point(40.0, 0.0), new Point(100.0, 60.0)));
+
+    assertThat(
+            LayoutQuality.validateLayout(layoutResult(List.of(), List.of(first, second), List.of()))
+                .routeOverlapCount())
+        .isEqualTo(1);
+  }
+
+  @Test
+  void intentionalMultiSegmentSharedSourceStubDoesNotCountAsRouteOverlap() {
+    var first =
+        edge(
+            "first",
+            "source",
+            "target-a",
+            List.of("shared_source_junction"),
+            List.of(
+                new Point(0.0, 0.0),
+                new Point(40.0, 0.0),
+                new Point(80.0, 0.0),
+                new Point(100.0, -60.0)));
+    var second =
+        edge(
+            "second",
+            "source",
+            "target-b",
+            List.of("shared_source_junction"),
+            List.of(
+                new Point(0.0, 0.0),
+                new Point(40.0, 0.0),
+                new Point(80.0, 0.0),
+                new Point(100.0, 60.0)));
+
+    assertThat(
+            LayoutQuality.validateLayout(layoutResult(List.of(), List.of(first, second), List.of()))
+                .routeOverlapCount())
+        .isZero();
+  }
+
+  @Test
+  void intentionalSharedSourceStubAllowsDifferentPointSegmentation() {
+    var first =
+        edge(
+            "first",
+            "source",
+            "target-a",
+            List.of("shared_source_junction"),
+            List.of(
+                new Point(0.0, 0.0),
+                new Point(40.0, 0.0),
+                new Point(80.0, 0.0),
+                new Point(100.0, -60.0)));
+    var second =
+        edge(
+            "second",
+            "source",
+            "target-b",
+            List.of("shared_source_junction"),
+            List.of(new Point(0.0, 0.0), new Point(80.0, 0.0), new Point(100.0, 60.0)));
+
+    assertThat(
+            LayoutQuality.validateLayout(layoutResult(List.of(), List.of(first, second), List.of()))
+                .routeOverlapCount())
+        .isZero();
+  }
+
+  @Test
+  void intentionalSharedSourceStubAllowsAMatchedBentPrefix() {
+    var first =
+        edge(
+            "first",
+            "source",
+            "target-a",
+            List.of("shared_source_junction"),
+            List.of(
+                new Point(0.0, 0.0),
+                new Point(40.0, 0.0),
+                new Point(40.0, 40.0),
+                new Point(100.0, 40.0)));
+    var second =
+        edge(
+            "second",
+            "source",
+            "target-b",
+            List.of("shared_source_junction"),
+            List.of(
+                new Point(0.0, 0.0),
+                new Point(40.0, 0.0),
+                new Point(40.0, 40.0),
+                new Point(40.0, 100.0)));
+
+    assertThat(
+            LayoutQuality.validateLayout(layoutResult(List.of(), List.of(first, second), List.of()))
+                .routeOverlapCount())
+        .isZero();
+  }
+
+  @Test
+  void unhintedOverlapAfterSplitAndRejoinIsReported() {
+    var first =
+        edge(
+            "first",
+            "source",
+            "target",
+            List.of(
+                new Point(0.0, 0.0),
+                new Point(40.0, 0.0),
+                new Point(80.0, -40.0),
+                new Point(120.0, 0.0),
+                new Point(200.0, 0.0)));
+    var second =
+        edge(
+            "second",
+            "source",
+            "target",
+            List.of(
+                new Point(0.0, 0.0),
+                new Point(40.0, 0.0),
+                new Point(80.0, 40.0),
+                new Point(120.0, 0.0),
+                new Point(200.0, 0.0)));
+
+    assertThat(
+            LayoutQuality.validateLayout(layoutResult(List.of(), List.of(first, second), List.of()))
+                .routeOverlapCount())
+        .isEqualTo(2);
+  }
+
+  @Test
+  void obstacleAvoidingRouteIsNotAnAdvisoryDetour() {
+    var obstacle = node("obstacle", 100.0, 0.0);
+    var detour =
+        edge(
+            "detour",
+            "source",
+            "target",
+            List.of(
+                new Point(0.0, 40.0),
+                new Point(0.0, 220.0),
+                new Point(300.0, 220.0),
+                new Point(300.0, 40.0)));
+
+    assertThat(
+            LayoutQuality.validateLayout(
+                    layoutResult(List.of(obstacle), List.of(detour), List.of()))
+                .routeDetourCount())
+        .isZero();
+  }
+
+  @Test
+  void genuineEscapingSelfLoopHasNoOwnNodeClearanceIssue() {
+    var self = node("self", 0.0, 0.0);
+    var loop =
+        edge(
+            "loop",
+            "self",
+            "self",
+            List.of(
+                new Point(100.0, 20.0),
+                new Point(130.0, 20.0),
+                new Point(130.0, 100.0),
+                new Point(100.0, 60.0)));
+
+    assertThat(
+            LayoutQuality.validateLayout(layoutResult(List.of(self), List.of(loop), List.of()))
+                .routeNodeClearanceIssueCount())
+        .isZero();
+  }
+
+  @Test
+  void escapingSelfLoopReenteringItsOwnNodeIsReported() {
+    var self = node("self", 0.0, 0.0);
+    var loop =
+        edge(
+            "loop",
+            "self",
+            "self",
+            List.of(
+                new Point(100.0, 20.0),
+                new Point(140.0, 20.0),
+                new Point(140.0, 100.0),
+                new Point(50.0, 100.0),
+                new Point(50.0, 0.0)));
+
+    LayoutQualityReport report =
+        LayoutQuality.validateLayout(layoutResult(List.of(self), List.of(loop), List.of()));
+
+    assertThat(report.connectorThroughNodeCount()).isEqualTo(1);
+    assertThat(report.routeNodeClearanceIssueCount()).isEqualTo(1);
+  }
+
+  @Test
+  void routeLeavingAndReenteringAnEndpointGroupIsABoundaryIssue() {
+    var group =
+        new LaidOutGroup(
+            "group", "group", "group", null, 0.0, 0.0, 300.0, 200.0, List.of("a", "b"), "Group");
+    var nodes = List.of(node("a", 50.0, 60.0), node("b", 150.0, 60.0));
+    var route =
+        edge(
+            "a-b",
+            "a",
+            "b",
+            List.of(new Point(100.0, 100.0), new Point(350.0, 100.0), new Point(200.0, 100.0)));
+
+    assertThat(
+            LayoutQuality.validateLayout(layoutResult(nodes, List.of(route), List.of(group)))
+                .groupBoundaryIssueCount())
+        .isEqualTo(1);
+  }
+
+  @Test
+  void routeCrossingAGroupTitleBandIsALabelBandIssue() {
+    var group =
+        new LaidOutGroup(
+            "group", "group", "group", null, 0.0, 0.0, 300.0, 200.0, List.of(), "Group");
+    var route =
+        edge(
+            "through-title",
+            "source",
+            "target",
+            List.of(new Point(-40.0, 12.0), new Point(340.0, 12.0)));
+
+    assertThat(
+            LayoutQuality.validateLayout(layoutResult(List.of(), List.of(route), List.of(group)))
+                .groupLabelBandIssueCount())
+        .isEqualTo(1);
+  }
+
+  @Test
   void edgesSharingAnEndpointNodeAreNotCountedAsCrossings() {
     var nodes =
         List.of(node("hub", 0.0, 0.0), node("left", 300.0, 0.0), node("right", 300.0, 200.0));
@@ -1706,5 +2266,14 @@ class LayoutQualityTest {
 
   private static LaidOutEdge edge(String id, String source, String target, List<Point> points) {
     return new LaidOutEdge(id, source, target, id, id, List.of(), new PolylineRoute(points), id);
+  }
+
+  private static LaidOutEdge edge(
+      String id, String source, String target, List<String> routingHints, List<Point> points) {
+    return new LaidOutEdge(id, source, target, id, id, routingHints, new PolylineRoute(points), id);
+  }
+
+  private static LaidOutEdge edge(String id, String source, String target, CubicBezierRoute route) {
+    return new LaidOutEdge(id, source, target, id, id, List.of(), route, id);
   }
 }
