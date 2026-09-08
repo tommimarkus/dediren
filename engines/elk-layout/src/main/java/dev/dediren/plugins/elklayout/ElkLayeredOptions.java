@@ -170,10 +170,7 @@ final class ElkLayeredOptions {
     if (highDegree != null) {
       root.setProperty(LayeredOptions.HIGH_DEGREE_NODES_TREATMENT, highDegree);
     }
-    Integer thoroughness = thoroughness(preferences);
-    if (thoroughness != null) {
-      root.setProperty(LayeredOptions.THOROUGHNESS, thoroughness);
-    }
+    root.setProperty(LayeredOptions.THOROUGHNESS, thoroughness(preferences));
   }
 
   static void configureGroupedRoot(
@@ -461,9 +458,9 @@ final class ElkLayeredOptions {
         };
   }
 
-  private static Integer thoroughness(LayoutPreferences preferences) {
+  private static int thoroughness(LayoutPreferences preferences) {
     if (preferences == null || preferences.thoroughness() == null) {
-      return null;
+      return 21;
     }
     return switch (preferences.thoroughness()) {
       case LOW -> 3;

@@ -3898,6 +3898,23 @@ class ElkLayoutEngineTest {
   }
 
   @Test
+  void nativeReadabilityDefaultPreservesExplicitThoroughness() throws Exception {
+    assertEquals(
+        21,
+        ElkLayeredOptions.configuredRoot(Direction.RIGHT, null)
+            .getProperty(LayeredOptions.THOROUGHNESS));
+    for (var entry : java.util.Map.of("low", 3, "normal", 7, "high", 21).entrySet()) {
+      LayoutPreferences preferences =
+          dev.dediren.contracts.json.JsonSupport.objectMapper()
+              .readValue("{\"thoroughness\":\"" + entry.getKey() + "\"}", LayoutPreferences.class);
+      assertEquals(
+          entry.getValue(),
+          ElkLayeredOptions.configuredRoot(Direction.RIGHT, preferences)
+              .getProperty(LayeredOptions.THOROUGHNESS));
+    }
+  }
+
+  @Test
   void layeredRootMapsGraphTuningToElkOptions() {
     LayoutPreferences prefs =
         new LayoutPreferences(
