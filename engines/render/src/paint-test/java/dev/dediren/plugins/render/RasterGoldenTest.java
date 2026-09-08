@@ -143,7 +143,7 @@ class RasterGoldenTest {
 
     JsonNode scenarios = manifest.get("scenarios");
     assertThat(scenarios).isNotNull();
-    assertThat(scenarios.size()).isEqualTo(4);
+    assertThat(scenarios.size()).isEqualTo(8);
     ArrayList<String> scenarioNames = new ArrayList<>();
     for (JsonNode scenario : scenarios) {
       scenarioNames.add(scenario.get("name").asText());
@@ -159,7 +159,11 @@ class RasterGoldenTest {
             "pipeline-rich-light",
             "pipeline-rich-dark",
             "archimate-decorators",
-            "uml-sequence-fragments");
+            "uml-sequence-fragments",
+            "uml-compact-side-return",
+            "uml-compact-sibling-fan-out",
+            "uml-state-machine-two-node-cycle",
+            "uml-state-machine-multi-cycle");
   }
 
   @Test
@@ -311,7 +315,27 @@ class RasterGoldenTest {
             "uml-sequence-fragments",
             "uml-sequence-fragments",
             "uml-svg",
-            "uml-sequence-fragments"));
+            "uml-sequence-fragments"),
+        scenario(
+            "uml-compact-side-return",
+            "compact-side-return",
+            "uml-svg",
+            "uml-compact-side-return"),
+        scenario(
+            "uml-compact-sibling-fan-out",
+            "compact-sibling-fan-out",
+            "uml-svg",
+            "uml-compact-sibling-fan-out"),
+        scenario(
+            "uml-state-machine-two-node-cycle",
+            "uml-state-machine-two-node-cycle",
+            "uml-svg",
+            "uml-state-machine-two-node-cycle"),
+        scenario(
+            "uml-state-machine-multi-cycle",
+            "uml-state-machine-multi-cycle",
+            "uml-svg",
+            "uml-state-machine-multi-cycle"));
   }
 
   private static Arguments scenario(String name, String layout, String policy, String metadata) {

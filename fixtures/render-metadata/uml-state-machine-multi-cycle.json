@@ -1,0 +1,91 @@
+{
+  "render_metadata_schema_version": "render-metadata.schema.v1",
+  "semantic_profile": "uml",
+  "nodes": {
+    "preparing": {
+      "type": "State",
+      "source_id": "preparing",
+      "properties": {
+        "region": "session-region"
+      }
+    },
+    "running": {
+      "type": "State",
+      "source_id": "running",
+      "properties": {
+        "region": "session-region"
+      }
+    },
+    "paused": {
+      "type": "State",
+      "source_id": "paused",
+      "properties": {
+        "region": "session-region"
+      }
+    },
+    "reviewing": {
+      "type": "State",
+      "source_id": "reviewing",
+      "properties": {
+        "region": "session-region"
+      }
+    }
+  },
+  "edges": {
+    "t-start": {
+      "type": "Transition",
+      "source_id": "t-start",
+      "properties": {
+        "region": "session-region",
+        "kind": "external",
+        "trigger": "start"
+      }
+    },
+    "t-pause": {
+      "type": "Transition",
+      "source_id": "t-pause",
+      "properties": {
+        "region": "session-region",
+        "kind": "external",
+        "trigger": "pause"
+      }
+    },
+    "t-resume": {
+      "type": "Transition",
+      "source_id": "t-resume",
+      "properties": {
+        "region": "session-region",
+        "kind": "external",
+        "trigger": "resume"
+      }
+    },
+    "t-review": {
+      "type": "Transition",
+      "source_id": "t-review",
+      "properties": {
+        "region": "session-region",
+        "kind": "external",
+        "trigger": "review"
+      }
+    },
+    "t-rework": {
+      "type": "Transition",
+      "source_id": "t-rework",
+      "properties": {
+        "region": "session-region",
+        "kind": "external",
+        "trigger": "rework"
+      }
+    }
+  },
+  "groups": {
+    "multi-cycle-machine-frame": {
+      "type": "StateMachine",
+      "source_id": "session-machine"
+    },
+    "multi-cycle-region-frame": {
+      "type": "Region",
+      "source_id": "session-region"
+    }
+  }
+}

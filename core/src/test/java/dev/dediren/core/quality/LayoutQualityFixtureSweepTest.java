@@ -7,7 +7,6 @@ import dev.dediren.contracts.layout.LayoutResult;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Map;
 import java.util.stream.Stream;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -19,21 +18,10 @@ import org.junit.jupiter.params.provider.MethodSource;
 // carry a HARD-error diagnostic (malformed geometry, a route detached from its node, a junction
 // off its incident route, a degenerate self-loop) and every warning-eligible structural quality
 // metric must stay at its known-accepted value — zero everywhere the real engine currently
-// produces zero. edge_crossing_count is the one metric that is informational only (crossings can
-// be unavoidable in non-planar graphs, see LayoutQuality#validateLayout) and is pinned per fixture
-// below instead of forced to zero, so a fixture that legitimately has crossings stays honest
-// rather than silently passing or masking a regression elsewhere.
+// produces zero. edge_crossing_count is informational globally (crossings can be unavoidable in
+// non-planar graphs, see LayoutQuality#validateLayout), but this checked-in corpus consists of
+// feasible zero-crossing witnesses and therefore requires zero for every fixture.
 class LayoutQualityFixtureSweepTest {
-
-  // Every fixture defaults to zero crossings; only fixtures with a real, expected nonzero count
-  // are listed here. A fixture regeneration that shifts this count is a legitimate layout change
-  // to review and re-pin, not a silent pass.
-  //
-  // uml-state-machine-two-node-cycle.json has one baseline crossing from the corrected metric,
-  // present before the compact-sibling port change. Keep it explicit so new fixtures, including
-  // the compact fan-out and side-return fixtures, remain zero by default.
-  private static final Map<String, Integer> EXPECTED_EDGE_CROSSING_COUNTS =
-      Map.of("uml-state-machine-two-node-cycle.json", 1);
 
   @ParameterizedTest
   @MethodSource("layoutResultFixtures")
@@ -72,7 +60,7 @@ class LayoutQualityFixtureSweepTest {
     assertThat(report.warningCount()).as("warning count in %s", fixtureName).isZero();
     assertThat(report.edgeCrossingCount())
         .as("edge crossing count in %s", fixtureName)
-        .isEqualTo(EXPECTED_EDGE_CROSSING_COUNTS.getOrDefault(fixtureName, 0));
+        .isZero();
   }
 
   static Stream<Path> layoutResultFixtures() throws IOException {

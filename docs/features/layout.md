@@ -41,6 +41,14 @@ The default route style remains orthogonal with Brandes–Koepf placement and
 straightness improvement. Redundant collinear hierarchy-boundary points are
 disabled: a route point must describe an endpoint or a visible turn. Input and
 port order remain stable where the ordinary layered graph can preserve them.
+ELK natively owns free ports and cycle routing. The default requests high
+thoroughness (21); `thoroughness: normal` is an explicit, preserved lower-cost
+request (7). For every nonempty edge label, layout supplies ELK a centred
+canonical label reservation using shared text advances: 15.4px text width plus
+10px horizontal padding, and 15.4px × 1.25 plus 6px vertical padding. A render
+policy's larger font override is not available at the layout seam; it can still
+produce `DEDIREN_RENDER_EDGE_LABEL_CONSTRAINED` rather than silently moving the
+label to another route.
 
 Checked-in layout fixtures and SVG/raster goldens lock reviewed output after
 this behavior is exercised. They detect change; they do not by themselves
@@ -79,7 +87,18 @@ is zero**.
 | `label_space_issue_count` | Node labels that clearly cannot fit their box (icon-sized nodes are exempt). |
 | `edge_label_dissociation_count` | Labeled edges trapped in a dense band of parallel labeled edges, where a centered edge label cannot stay on its own route and drifts toward a neighbour (edges sharing an endpoint node are exempt). |
 | `edge_crossing_count` | Proper route-interior intersections, including between edges that share an endpoint node; endpoint touches and collinear overlaps are excluded. **Informational only**; crossings can be unavoidable, so this never degrades `status`. |
+| `route_node_clearance_issue_count` | Routes within 24 units of unrelated nodes, own-node re-entry, and group containment/title-band risks after bounded terminal-contact exemptions. |
+| `route_overlap_count` | Accidental coincident route lengths; only intentional contiguous shared prefixes/suffixes are exempt. |
 | `warning_count` | Aggregate warning count. |
+
+The v3 route contract has one route per edge: `polyline` or `cubic_bezier`.
+There is no v2 output fallback; authored input schemas remain unchanged. Shared
+quality checks flatten cubic curves to a maximum 0.25 layout-unit error and also
+detect body hits, accidental coincident runs, node-face rides, label-band
+overlap, and detached labels. The browser paint audit and render bounds check
+paint overflow. A focused fixture can require zero crossings when its graph
+permits it; that does not turn the aggregate crossing metric into a universal
+error.
 
 ### Node placement hints
 

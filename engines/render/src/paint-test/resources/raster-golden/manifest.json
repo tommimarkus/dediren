@@ -138,5 +138,53 @@
       "height" : 977
     },
     "sha256" : "d6f12d54db8bf9cb1b8ce158e7bd53d2259a187f31493d674d0ce0744e1a3e9b"
+  }, {
+    "name" : "uml-compact-side-return",
+    "description" : "Compact activity side-return routing witness",
+    "layoutFixture" : "fixtures/layout-result/uml-compact-side-return.json",
+    "policyFixture" : "fixtures/render-policy/uml-svg.json",
+    "metadataFixture" : "fixtures/render-metadata/uml-compact-side-return.json",
+    "baseline" : "engines/render/src/paint-test/resources/raster-golden/uml-compact-side-return.png",
+    "dimensions" : {
+      "width" : 0,
+      "height" : 0
+    },
+    "sha256" : "PARENT_REGENERATES"
+  }, {
+    "name" : "uml-compact-sibling-fan-out",
+    "description" : "Compact activity sibling fan-out routing witness",
+    "layoutFixture" : "fixtures/layout-result/uml-compact-sibling-fan-out.json",
+    "policyFixture" : "fixtures/render-policy/uml-svg.json",
+    "metadataFixture" : "fixtures/render-metadata/uml-compact-sibling-fan-out.json",
+    "baseline" : "engines/render/src/paint-test/resources/raster-golden/uml-compact-sibling-fan-out.png",
+    "dimensions" : {
+      "width" : 0,
+      "height" : 0
+    },
+    "sha256" : "PARENT_REGENERATES"
+  }, {
+    "name" : "uml-state-machine-two-node-cycle",
+    "description" : "Two-node state-machine cycle routing witness",
+    "layoutFixture" : "fixtures/layout-result/uml-state-machine-two-node-cycle.json",
+    "policyFixture" : "fixtures/render-policy/uml-svg.json",
+    "metadataFixture" : "fixtures/render-metadata/uml-state-machine-two-node-cycle.json",
+    "baseline" : "engines/render/src/paint-test/resources/raster-golden/uml-state-machine-two-node-cycle.png",
+    "dimensions" : {
+      "width" : 0,
+      "height" : 0
+    },
+    "sha256" : "PARENT_REGENERATES"
+  }, {
+    "name" : "uml-state-machine-multi-cycle",
+    "description" : "Multi-cycle state-machine routing witness",
+    "layoutFixture" : "fixtures/layout-result/uml-state-machine-multi-cycle.json",
+    "policyFixture" : "fixtures/render-policy/uml-svg.json",
+    "metadataFixture" : "fixtures/render-metadata/uml-state-machine-multi-cycle.json",
+    "baseline" : "engines/render/src/paint-test/resources/raster-golden/uml-state-machine-multi-cycle.png",
+    "dimensions" : {
+      "width" : 0,
+      "height" : 0
+    },
+    "sha256" : "PARENT_REGENERATES"
   } ]
 }

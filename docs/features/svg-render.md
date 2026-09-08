@@ -113,8 +113,13 @@ preferred.
 Edge label placement tries candidate positions that avoid node boxes, group
 title/border bands, other edge route segments, and labels already placed earlier
 in the SVG, then falls back to the preferred route position when no clear
-candidate is available. Line-jump masks use the local group fill when the jump
-occurs inside a group, falling back to the page background outside groups.
+candidate is available. It keeps the label attached to its own route with a
+2–6px normal offset. When constrained geometry cannot satisfy that attachment,
+the renderer preserves the label and reports
+`DEDIREN_RENDER_EDGE_LABEL_CONSTRAINED`; it does not silently associate the
+label with a neighbouring route. Line-jump masks use the local group fill when
+the jump occurs inside a group, falling back to the page background outside
+groups.
 
 ## Notation Rendering & Render Metadata
 

@@ -38,6 +38,12 @@ turns into a CI drift gate ("are these diagrams still current?") with
 [`docs/agent-usage.md`](docs/agent-usage.md) for every command, flag, and
 notation.
 
+Layout-result schema v3 has one authoritative typed route on every edge:
+`polyline` or `cubic_bezier`. It replaces the v2 `edge.points` field without
+changing authored source-model, layout-request, or render-policy schemas. ELK
+owns free ports and cycle routing; Dediren requests conservative curves and
+uses a 0.25 layout-unit maximum error when a consumer must flatten a curve for waypoint exports or quality analysis.
+
 `dediren import --plugin mermaid [--input <path>]` converts the documented
 Mermaid 11.16.1 flowchart subset into generic-graph source JSON, including
 bounded multiline statements, label-only `<br>` newlines, and solid directed
@@ -164,6 +170,10 @@ Failures write actual, changed-pixel mask, and overlay evidence under
 Goldens are regression snapshots of reviewed output, not a standalone quality
 standard. Layout changes must also satisfy `validate-layout` and be inspected
 as rendered diagrams before their fixture, SVG, or raster baselines are moved.
+Layout quality identifies body hits, accidental coincident runs, node-face
+rides, dense label-band overlap, and detached labels. The browser paint audit
+and render bounds check paint overflow. Crossings remain informational outside a
+fixture-specific acceptance witness.
 
 Browser DOM geometry, computed styles, marker/filter paint, and transparent
 screenshots are authoritative for this Chromium-only lane; ImageIO still owns
