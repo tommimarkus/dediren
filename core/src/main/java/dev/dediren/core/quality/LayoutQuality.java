@@ -1043,7 +1043,8 @@ public final class LayoutQuality {
             double delta = neighbor.fixed() - run.fixed();
             if (run.orientation() == neighbor.orientation()
                 && Math.abs(delta) <= LABEL_BAND_GAP
-                && overlapLength(run.min(), run.max(), neighbor.min(), neighbor.max()) >= LABEL_BAND_MIN_OVERLAP) {
+                && overlapLength(run.min(), run.max(), neighbor.min(), neighbor.max())
+                    >= LABEL_BAND_MIN_OVERLAP) {
               lower |= delta < -GEOMETRY_EPSILON;
               higher |= delta > GEOMETRY_EPSILON;
             }

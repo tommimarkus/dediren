@@ -717,7 +717,11 @@ class LayoutQualityTest {
 
   @Test
   void denseBandOuterLabelsHaveAnOpenSideEvenWithTwoNearbyNeighbours() {
-    var edges = List.of(horizontalEdge("top", 200.0), horizontalEdge("middle", 210.0), horizontalEdge("bottom", 220.0));
+    var edges =
+        List.of(
+            horizontalEdge("top", 200.0),
+            horizontalEdge("middle", 210.0),
+            horizontalEdge("bottom", 220.0));
     assertThat(dissociationCount(edges)).isEqualTo(1);
   }
 
