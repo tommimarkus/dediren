@@ -569,7 +569,10 @@ serializations, **and** the `SHA256SUMS` checksum file
 build rather than regenerated downstream; the `publish` job verifies every
 attested subject (`gh attestation verify`), checks the staged assets against the
 attested `SHA256SUMS` (`sha256sum -c`), and then creates the release as a
-draft with all assets attached before flipping it to published. The attested
+draft with all assets attached before flipping it to published. Release notes
+come from the tagged repository's `docs/releases/<version>.md` when present,
+otherwise from GitHub-generated notes; the quoted file argument is not evaluated
+as shell code. The attested
 `build` job restores no cross-run cache: every dependency cold-resolves from
 Maven Central under Maven's strict-checksums flag, so the provenance's input
 set is the tagged commit plus checksum-verified downloads. Repository

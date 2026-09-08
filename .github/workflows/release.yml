@@ -250,6 +250,10 @@ jobs:
           # to published in one transition. With repository release immutability
           # enabled, a release freezes at publish time, so all assets must be in
           # place first — GitHub's documented draft-first ordering (audit F6).
+          notes_args=(--generate-notes)
+          if [[ -f "docs/releases/${VERSION}.md" ]]; then
+            notes_args=(--notes-file "docs/releases/${VERSION}.md")
+          fi
           gh release create "$GITHUB_REF_NAME" \
             "release-assets/dediren-agent-bundle-${VERSION}.tar.xz" \
             "release-assets/dediren-${VERSION}.cdx.json" \
@@ -258,5 +262,5 @@ jobs:
             --draft \
             --verify-tag \
             --title "Dediren $GITHUB_REF_NAME" \
-            --generate-notes
+            "${notes_args[@]}"
           gh release edit "$GITHUB_REF_NAME" --draft=false
