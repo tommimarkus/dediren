@@ -433,17 +433,19 @@ class ArchitectureRulesTest {
   }
 
   @Test
-  void formatEnginesDoNotImportIr() {
+  void formatEnginesOnlyUseSharedRouteGeometryFromIr() {
     noClasses()
         .that()
         .resideInAnyPackage(ARCHIMATE_OEF, UML_XMI, DRAWIO)
         .should()
-        .dependOnClassesThat()
-        .resideInAPackage(IR)
+        .dependOnClassesThat(
+            JavaClass.Predicates.resideInAPackage(IR)
+                .and(
+                    com.tngtech.archunit.base.DescribedPredicate.not(
+                        name("dev.dediren.ir.RouteGeometry"))))
         .because(
-            "the OEF, XMI, and drawio format engines consume the record-based ExportRequest wire"
-                + " contract, not the in-memory IR; §2's edge table allows them no ir edge even"
-                + " though transitive compilation leaves it reachable (P4 forced deviation, §5)")
+            "format engines retain the ExportRequest wire boundary; only shared pure route"
+                + " geometry is allowed from ir for bounded waypoint approximation")
         .check(PRODUCTION_CLASSES);
   }
 
