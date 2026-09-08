@@ -37,6 +37,7 @@ final class PortPlan {
   private final Map<String, EndpointMerge> merges;
   private final Set<String> fixedSourceEndpoints;
   private final Set<String> fixedTargetEndpoints;
+  private final Set<String> compactControlNodes;
   private final EndpointSides defaultSides;
 
   private PortPlan(
@@ -45,12 +46,14 @@ final class PortPlan {
       Map<String, EndpointMerge> merges,
       Set<String> fixedSourceEndpoints,
       Set<String> fixedTargetEndpoints,
+      Set<String> compactControlNodes,
       EndpointSides defaultSides) {
     this.ordering = ordering;
     this.sides = sides;
     this.merges = merges;
     this.fixedSourceEndpoints = fixedSourceEndpoints;
     this.fixedTargetEndpoints = fixedTargetEndpoints;
+    this.compactControlNodes = compactControlNodes;
     this.defaultSides = defaultSides;
   }
 
@@ -72,6 +75,10 @@ final class PortPlan {
 
   boolean fixesTargetSide(String edgeId) {
     return fixedTargetEndpoints.contains(edgeId);
+  }
+
+  boolean fixesNode(String nodeId) {
+    return compactControlNodes.contains(nodeId);
   }
 
   boolean mergesSourceEndpoint(String edgeId) {
@@ -114,6 +121,7 @@ final class PortPlan {
         merges,
         endpointEdges(edges, nodes, fixedNodes, true),
         endpointEdges(edges, nodes, fixedNodes, false),
+        fixedNodes,
         defaultEndpointSides(direction));
   }
 
@@ -144,6 +152,7 @@ final class PortPlan {
         emptyEndpointMerges(edges),
         sourceEndpoints,
         targetEndpoints,
+        Set.of(),
         defaults);
   }
 
@@ -157,6 +166,7 @@ final class PortPlan {
         Ordering.GROUPED,
         Map.of(),
         groupedEndpointMerges(edges, nodes, ownerByNode, preferences),
+        Set.of(),
         Set.of(),
         Set.of(),
         defaultEndpointSides(direction));

@@ -263,6 +263,46 @@ class ElkNativeRoutingTest {
     assertTrue(onPerimeter(points.getLast(), node(result, "target")), "route must end at target");
   }
 
+  @Test
+  void downwardCompactForkAndJoinKeepLateralPortsOnTheirPaintedBars() {
+    LayoutRequest request =
+        request(
+            List.of(
+                new LayoutNode("before", "Before", "before", 160.0, 80.0),
+                new LayoutNode("fork", "", "fork", 32.0, 32.0),
+                new LayoutNode("primary", "Primary", "primary", 160.0, 80.0),
+                new LayoutNode("side", "Side", "side", 160.0, 80.0),
+                new LayoutNode("join", "", "join", 32.0, 32.0),
+                new LayoutNode("after", "After", "after", 160.0, 80.0)),
+            List.of(
+                new LayoutEdge("before-fork", "before", "fork", "", "before-fork"),
+                new LayoutEdge("fork-primary", "fork", "primary", "", "fork-primary"),
+                new LayoutEdge("fork-side", "fork", "side", "", "fork-side"),
+                new LayoutEdge("primary-join", "primary", "join", "", "primary-join"),
+                new LayoutEdge("side-join", "side", "join", "", "side-join"),
+                new LayoutEdge("join-after", "join", "after", "", "join-after")),
+            List.of(),
+            preferences(
+                LayoutDirection.DOWN, LayoutDensity.COMPACT, LayoutEndpointMerging.OFF, null));
+
+    LayoutResult result = new ElkLayoutEngine().layout(request);
+    LaidOutNode fork = node(result, "fork");
+    LaidOutNode join = node(result, "join");
+
+    assertEquals(32.0, fork.width(), EPSILON, "compact fork must keep its authored width");
+    assertEquals(32.0, fork.height(), EPSILON, "compact fork must keep its authored height");
+    assertEquals(32.0, join.width(), EPSILON, "compact join must keep its authored width");
+    assertEquals(32.0, join.height(), EPSILON, "compact join must keep its authored height");
+    assertTrue(fork.width() >= fork.height(), "downward fork bar must remain horizontal");
+    assertTrue(join.width() >= join.height(), "downward join bar must remain horizontal");
+    assertTrue(
+        touchesPaintedUmlBar(flatten(edge(result, "fork-side").route()).getFirst(), fork),
+        "fork's lateral branch must touch the painted fork bar");
+    assertTrue(
+        touchesPaintedUmlBar(flatten(edge(result, "side-join").route()).getLast(), join),
+        "join's lateral branch must touch the painted join bar");
+  }
+
   private static Stream<Arguments> greedySwitches() {
     return Stream.of(
         Arguments.of(LayoutGreedySwitch.OFF, GreedySwitchType.OFF),
@@ -405,6 +445,17 @@ class ElkNativeRoutingTest {
             || Math.abs(point.x() - right) <= 1.0
             || Math.abs(point.y() - top) <= 1.0
             || Math.abs(point.y() - bottom) <= 1.0);
+  }
+
+  private static boolean touchesPaintedUmlBar(Point point, LaidOutNode node) {
+    boolean horizontal = node.width() >= node.height();
+    double width = horizontal ? node.width() : Math.min(node.width(), 14.0);
+    double height = horizontal ? Math.min(node.height(), 14.0) : node.height();
+    double left = node.x() + (node.width() - width) / 2.0;
+    double top = node.y() + (node.height() - height) / 2.0;
+    double dx = Math.max(left - point.x(), Math.max(0.0, point.x() - (left + width)));
+    double dy = Math.max(top - point.y(), Math.max(0.0, point.y() - (top + height)));
+    return Math.hypot(dx, dy) <= 1.0 + EPSILON;
   }
 
   private static double separation(

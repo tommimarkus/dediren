@@ -133,7 +133,7 @@ final class ElkLayoutEngine {
     for (LayoutNode node : sequenceConstraints.orderedNodes(requestNodeList)) {
       ElkNode elkNode = ElkGraphUtil.createNode(root);
       elkNode.setIdentifier(node.id());
-      setGeneratedDimensions(elkNode, node);
+      setGeneratedDimensions(elkNode, node, portPlan.fixesNode(node.id()));
       ElkGraphUtil.createLabel(elkNode).setText(node.label());
       ElkLayeredOptions.applyNodeHints(elkNode, node);
       elkNodes.put(node.id(), elkNode);
@@ -430,7 +430,7 @@ final class ElkLayoutEngine {
       }
       ElkNode elkNode = ElkGraphUtil.createNode(parent);
       elkNode.setIdentifier(node.id());
-      setGeneratedDimensions(elkNode, node);
+      setGeneratedDimensions(elkNode, node, false);
       ElkGraphUtil.createLabel(elkNode).setText(node.label());
       elkNodes.put(node.id(), elkNode);
     }
@@ -550,7 +550,7 @@ final class ElkLayoutEngine {
       }
       ElkNode elkNode = ElkGraphUtil.createNode(parent);
       elkNode.setIdentifier(node.id());
-      setGeneratedDimensions(elkNode, node);
+      setGeneratedDimensions(elkNode, node, false);
       ElkGraphUtil.createLabel(elkNode).setText(node.label());
       ElkLayeredOptions.applyNodeHints(elkNode, node);
       elkNodes.put(node.id(), elkNode);
@@ -778,11 +778,12 @@ final class ElkLayoutEngine {
     return List.of(new Point(stemX, headBottom), new Point(stemX, headBottom + 1.0));
   }
 
-  private static void setGeneratedDimensions(ElkNode elkNode, LayoutNode node) {
+  private static void setGeneratedDimensions(
+      ElkNode elkNode, LayoutNode node, boolean compactControl) {
     double width = positiveOrDefault(node.widthHint(), PortPlan.DEFAULT_WIDTH);
     double height = positiveOrDefault(node.heightHint(), PortPlan.DEFAULT_HEIGHT);
     elkNode.setDimensions(width, height);
-    if (JUNCTION_ROLE.equals(node.role())) {
+    if (compactControl || JUNCTION_ROLE.equals(node.role())) {
       return;
     }
     elkNode.setProperty(CoreOptions.NODE_SIZE_MINIMUM, new KVector(width, height));
