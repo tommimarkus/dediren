@@ -717,7 +717,18 @@ final class ElkLayoutEngine {
             : createEdgePort(target, edge.id() + "-target", targetSide, fixTargetSide);
     ElkEdge elkEdge = ElkGraphUtil.createSimpleEdge(sourceShape, targetShape);
     elkEdge.setIdentifier(edge.id());
-    ElkGraphUtil.createLabel(elkEdge).setText(edge.label());
+    var label = ElkGraphUtil.createLabel(elkEdge);
+    label.setText(edge.label());
+    if (edge.label() != null && !edge.label().isBlank()) {
+      // Reserve the canonical 14px base / 15.4px edge text and background padding before
+      // native routing. Render policies may enlarge text later; those retain placement diagnostics.
+      label.setDimensions(
+          dev.dediren.ir.TextMetrics.estimateTextWidth(edge.label(), 15.4) + 10.0,
+          15.4 * 1.25 + 6.0);
+      label.setProperty(
+          CoreOptions.EDGE_LABELS_PLACEMENT,
+          org.eclipse.elk.core.options.EdgeLabelPlacement.CENTER);
+    }
     return elkEdge;
   }
 

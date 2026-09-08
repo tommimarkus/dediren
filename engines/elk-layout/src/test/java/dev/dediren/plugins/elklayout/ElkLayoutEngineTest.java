@@ -70,6 +70,27 @@ class ElkLayoutEngineTest {
   // drift and never lets a genuine diagonal through.
   private static final double ORTHOGONAL_TOLERANCE = 0.5;
 
+  @Test
+  void nativeLayoutReservesSpaceForLongEdgeLabels() {
+    LayoutRequest request =
+        new LayoutRequest(
+            ContractVersions.LAYOUT_REQUEST_SCHEMA_VERSION,
+            "long-label",
+            List.of(
+                new LayoutNode("a", "A", "a", 160.0, 80.0),
+                new LayoutNode("b", "B", "b", 160.0, 80.0)),
+            List.of(
+                new LayoutEdge(
+                    "e", "a", "b", "a long relationship label needs its own space", "e")),
+            List.of(),
+            List.of(),
+            null);
+    LayoutResult result = new ElkLayoutEngine().layout(request);
+    double gap =
+        nodeById(result, "b").x() - nodeById(result, "a").x() - nodeById(result, "a").width();
+    assertTrue(gap > 240, "native label reservation must exceed the ordinary node gap: " + gap);
+  }
+
   // Architectural fitness function for the ELK-first rule (CLAUDE.md): the helper must not grow a
   // general post-ELK router. The one narrow compound-section join simplification is documented in
   // architecture-guidelines.md §12 and covered by geometry-outcome tests. This source-text guard,
@@ -1369,11 +1390,13 @@ class ElkLayoutEngineTest {
     assertTrue(
         application.width() > application.height(),
         "application group should stay horizontal enough for cross-boundary routing");
+    // Native center-label dummies now reserve the actual text width. Firefox review confirms
+    // this seven-node pipeline stays legible within 1900 units without compressing its labels.
     assertTrue(
-        aspect < 5.5,
+        aspect < 8.0,
         "grouped rich pipeline should keep a bounded readable aspect ratio, aspect=" + aspect);
     assertTrue(
-        maxX - minX < 1400.0,
+        maxX - minX < 1900.0,
         "compact grouped pipeline should avoid excessive horizontal whitespace, width="
             + (maxX - minX));
     assertEquals(
@@ -2150,10 +2173,10 @@ class ElkLayoutEngineTest {
             GEOMETRY_EPSILON,
             "the long hierarchy channel must retain the configured node clearance");
         assertEquals(
-            3.0,
-            Math.abs(points.get(3).y() - points.get(4).y()),
+            points.getLast().y(),
+            points.get(4).y(),
             GEOMETRY_EPSILON,
-            "the native join only steps after it has cleared the worker");
+            "the native join finishes on the target approach after clearing the worker and label");
         continue;
       }
       assertNoAlternatingStairSteps(edge);
