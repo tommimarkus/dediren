@@ -1,0 +1,50 @@
+{
+  "render_metadata_schema_version": "render-metadata.schema.v1",
+  "semantic_profile": "uml",
+  "nodes": {
+    "idle": {
+      "type": "State",
+      "source_id": "idle",
+      "properties": {
+        "region": "session-region"
+      }
+    },
+    "engaged": {
+      "type": "State",
+      "source_id": "engaged",
+      "properties": {
+        "region": "session-region"
+      }
+    }
+  },
+  "edges": {
+    "t-engage": {
+      "type": "Transition",
+      "source_id": "t-engage",
+      "properties": {
+        "region": "session-region",
+        "kind": "external",
+        "trigger": "engage"
+      }
+    },
+    "t-disengage": {
+      "type": "Transition",
+      "source_id": "t-disengage",
+      "properties": {
+        "region": "session-region",
+        "kind": "external",
+        "trigger": "disengage"
+      }
+    }
+  },
+  "groups": {
+    "two-node-machine-frame": {
+      "type": "StateMachine",
+      "source_id": "session-machine"
+    },
+    "two-node-region-frame": {
+      "type": "Region",
+      "source_id": "session-region"
+    }
+  }
+}

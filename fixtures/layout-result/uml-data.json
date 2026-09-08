@@ -1,21 +1,21 @@
 {
-  "layout_result_schema_version" : "layout-result.schema.v2",
+  "layout_result_schema_version" : "layout-result.schema.v3",
   "view_id" : "data-view",
   "nodes" : [ {
     "id" : "class-order",
     "source_id" : "class-order",
     "projection_id" : "class-order",
     "x" : 12.0,
-    "y" : 28.5,
+    "y" : 20.5,
     "width" : 220.0,
-    "height" : 120.0,
+    "height" : 144.0,
     "label" : "Order",
     "source_pointer" : "/nodes/1"
   }, {
     "id" : "class-order-line",
     "source_id" : "class-order-line",
     "projection_id" : "class-order-line",
-    "x" : 402.0,
+    "x" : 444.5248107910156,
     "y" : 12.0,
     "width" : 220.0,
     "height" : 120.0,
@@ -25,7 +25,7 @@
     "id" : "enum-order-status",
     "source_id" : "enum-order-status",
     "projection_id" : "enum-order-status",
-    "x" : 402.0,
+    "x" : 444.5248107910156,
     "y" : 204.0,
     "width" : 220.0,
     "height" : 120.0,
@@ -39,13 +39,16 @@
     "source_id" : "order-has-lines",
     "projection_id" : "order-has-lines",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 233.0,
-      "y" : 72.0
-    }, {
-      "x" : 401.0,
-      "y" : 72.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 233.0,
+        "y" : 72.0
+      }, {
+        "x" : 443.5248107910156,
+        "y" : 72.0
+      } ]
+    },
     "label" : "lines",
     "source_pointer" : "/relationships/0"
   }, {
@@ -55,19 +58,22 @@
     "source_id" : "order-status-dependency",
     "projection_id" : "order-status-dependency",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 233.0,
-      "y" : 105.0
-    }, {
-      "x" : 281.0,
-      "y" : 105.0
-    }, {
-      "x" : 281.0,
-      "y" : 264.0
-    }, {
-      "x" : 401.0,
-      "y" : 264.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 233.0,
+        "y" : 113.0
+      }, {
+        "x" : 281.0,
+        "y" : 113.0
+      }, {
+        "x" : 281.0,
+        "y" : 264.0
+      }, {
+        "x" : 443.5248107910156,
+        "y" : 264.0
+      } ]
+    },
     "label" : "uses",
     "source_pointer" : "/relationships/1"
   } ],

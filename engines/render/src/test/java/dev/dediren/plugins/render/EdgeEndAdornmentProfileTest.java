@@ -42,7 +42,7 @@ class EdgeEndAdornmentProfileTest {
       throws Exception {
     ObjectNode input = JsonSupport.objectMapper().createObjectNode();
     ObjectNode layout = input.putObject("layout_result");
-    layout.put("layout_result_schema_version", "layout-result.schema.v2");
+    layout.put("layout_result_schema_version", "layout-result.schema.v3");
     layout.put("view_id", "end-adornment-profile");
 
     ArrayNode nodes = layout.putArray("nodes");
@@ -56,7 +56,7 @@ class EdgeEndAdornmentProfileTest {
         .put("target", "class-order")
         .put("source_id", "customer-places-order")
         .put("projection_id", "customer-places-order");
-    ArrayNode points = edge.putArray("points");
+    ArrayNode points = edge.putObject("route").put("kind", "polyline").putArray("points");
     points.addObject().put("x", 200).put("y", 70);
     points.addObject().put("x", 360).put("y", 70);
     edge.put("label", "places");

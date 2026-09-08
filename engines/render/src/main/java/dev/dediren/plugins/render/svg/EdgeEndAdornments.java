@@ -8,6 +8,7 @@ import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.Point;
 import dev.dediren.contracts.render.RenderMetadata;
 import dev.dediren.contracts.render.RenderMetadataSelector;
+import dev.dediren.ir.RouteGeometry;
 import dev.dediren.plugins.render.style.ResolvedEdgeStyle;
 import java.util.ArrayList;
 import java.util.List;
@@ -61,7 +62,7 @@ public final class EdgeEndAdornments {
       return List.of();
     }
     RenderMetadataSelector selector = metadata.edges().get(edge.id());
-    if (selector == null || selector.properties() == null || edge.points().size() < 2) {
+    if (selector == null || selector.properties() == null) {
       return List.of();
     }
     JsonNode properties = selector.properties();
@@ -76,8 +77,8 @@ public final class EdgeEndAdornments {
       return List.of();
     }
     List<Adornment> adornments = new ArrayList<>();
-    EndDirection source = endDirection(edge.points(), true);
-    EndDirection target = endDirection(edge.points(), false);
+    EndDirection source = endDirection(edge, true);
+    EndDirection target = endDirection(edge, false);
     if (source != null) {
       addAdornment(
           adornments, "source_multiplicity", "source", source, 1, sourceMultiplicity, fontSize);
@@ -143,30 +144,19 @@ public final class EdgeEndAdornments {
             kind, end, edgeLabelCandidate(anchorX, baseline, textAnchor, text, fontSize), text));
   }
 
-  private static EndDirection endDirection(List<Point> points, boolean fromSource) {
-    if (fromSource) {
-      Point endpoint = points.getFirst();
-      for (int index = 1; index < points.size(); index++) {
-        EndDirection direction = direction(endpoint, points.get(index));
-        if (direction != null) {
-          return direction;
-        }
-      }
+  private static EndDirection endDirection(LaidOutEdge edge, boolean fromSource) {
+    Point endpoint =
+        fromSource ? RouteGeometry.start(edge.route()) : RouteGeometry.end(edge.route());
+    Point tangent =
+        fromSource
+            ? RouteGeometry.startTangent(edge.route())
+            : RouteGeometry.endTangent(edge.route());
+    if (endpoint == null || tangent == null) {
       return null;
     }
-    Point endpoint = points.getLast();
-    for (int index = points.size() - 2; index >= 0; index--) {
-      EndDirection direction = direction(endpoint, points.get(index));
-      if (direction != null) {
-        return direction;
-      }
-    }
-    return null;
-  }
-
-  private static EndDirection direction(Point endpoint, Point toward) {
-    double dx = toward.x() - endpoint.x();
-    double dy = toward.y() - endpoint.y();
+    double sign = fromSource ? 1.0 : -1.0;
+    double dx = tangent.x() * sign;
+    double dy = tangent.y() * sign;
     double length = Math.hypot(dx, dy);
     if (length < 1.0e-6) {
       return null;

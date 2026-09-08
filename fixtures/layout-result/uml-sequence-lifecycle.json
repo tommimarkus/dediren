@@ -1,14 +1,14 @@
 {
-  "layout_result_schema_version" : "layout-result.schema.v2",
+  "layout_result_schema_version" : "layout-result.schema.v3",
   "view_id" : "sequence-view",
   "nodes" : [ {
     "id" : "interaction-lifecycle",
     "source_id" : "interaction-lifecycle",
     "projection_id" : "interaction-lifecycle",
-    "x" : 101.0,
-    "y" : 292.0,
+    "x" : 517.0,
+    "y" : 12.0,
     "width" : 612.0,
-    "height" : 184.0,
+    "height" : 203.5,
     "label" : "Worker Lifecycle",
     "role" : "interaction",
     "source_pointer" : "/nodes/0"
@@ -16,8 +16,8 @@
     "id" : "customer",
     "source_id" : "customer",
     "projection_id" : "customer",
-    "x" : 101.0,
-    "y" : 292.0,
+    "x" : 517.0,
+    "y" : 12.0,
     "width" : 140.0,
     "height" : 64.0,
     "label" : "Customer",
@@ -27,8 +27,8 @@
     "id" : "service",
     "source_id" : "service",
     "projection_id" : "service",
-    "x" : 337.0,
-    "y" : 292.0,
+    "x" : 753.0,
+    "y" : 12.0,
     "width" : 140.0,
     "height" : 64.0,
     "label" : "Order Service",
@@ -38,8 +38,8 @@
     "id" : "worker",
     "source_id" : "worker",
     "projection_id" : "worker",
-    "x" : 573.0,
-    "y" : 292.0,
+    "x" : 989.0,
+    "y" : 12.0,
     "width" : 140.0,
     "height" : 64.0,
     "label" : "Worker",
@@ -49,8 +49,8 @@
     "id" : "exec-service",
     "source_id" : "exec-service",
     "projection_id" : "exec-service",
-    "x" : 399.0,
-    "y" : 380.0,
+    "x" : 815.0,
+    "y" : 100.0,
     "width" : 16.0,
     "height" : 96.0,
     "label" : "Order Service Activation",
@@ -60,10 +60,10 @@
     "id" : "worker-destroyed",
     "source_id" : "worker-destroyed",
     "projection_id" : "worker-destroyed",
-    "x" : 631.0,
-    "y" : 432.0,
+    "x" : 1047.0,
+    "y" : 112.5,
     "width" : 24.0,
-    "height" : 24.0,
+    "height" : 103.0,
     "label" : "Worker Destroyed",
     "role" : "destruction",
     "source_pointer" : "/nodes/5"
@@ -75,13 +75,16 @@
     "source_id" : "m1",
     "projection_id" : "m1",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 171.0,
-      "y" : 380.0
-    }, {
-      "x" : 407.0,
-      "y" : 380.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 587.0,
+        "y" : 100.0
+      }, {
+        "x" : 823.0,
+        "y" : 100.0
+      } ]
+    },
     "label" : "placeOrder",
     "source_pointer" : "/relationships/0"
   }, {
@@ -91,13 +94,16 @@
     "source_id" : "m2",
     "projection_id" : "m2",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 407.0,
-      "y" : 412.0
-    }, {
-      "x" : 643.0,
-      "y" : 412.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 823.0,
+        "y" : 132.0
+      }, {
+        "x" : 1059.0,
+        "y" : 132.0
+      } ]
+    },
     "label" : "createWorker",
     "source_pointer" : "/relationships/1"
   }, {
@@ -107,13 +113,16 @@
     "source_id" : "m3",
     "projection_id" : "m3",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 407.0,
-      "y" : 444.0
-    }, {
-      "x" : 631.0,
-      "y" : 444.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 823.0,
+        "y" : 164.0
+      }, {
+        "x" : 1047.0,
+        "y" : 164.0
+      } ]
+    },
     "label" : "destroyWorker",
     "source_pointer" : "/relationships/2"
   }, {
@@ -123,13 +132,16 @@
     "source_id" : "m4",
     "projection_id" : "m4",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 407.0,
-      "y" : 476.0
-    }, {
-      "x" : 171.0,
-      "y" : 476.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 823.0,
+        "y" : 196.0
+      }, {
+        "x" : 587.0,
+        "y" : 196.0
+      } ]
+    },
     "label" : "orderComplete",
     "source_pointer" : "/relationships/3"
   } ],

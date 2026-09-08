@@ -1,12 +1,12 @@
 {
-  "layout_result_schema_version" : "layout-result.schema.v2",
+  "layout_result_schema_version" : "layout-result.schema.v3",
   "view_id" : "class-view",
   "nodes" : [ {
     "id" : "pkg-orders",
     "source_id" : "pkg-orders",
     "projection_id" : "pkg-orders",
-    "x" : 256.0,
-    "y" : 703.0,
+    "x" : 290.26239013671875,
+    "y" : 460.0,
     "width" : 160.0,
     "height" : 80.0,
     "label" : "Orders",
@@ -16,17 +16,17 @@
     "source_id" : "class-order",
     "projection_id" : "class-order",
     "x" : 44.0,
-    "y" : 44.0,
+    "y" : 52.5,
     "width" : 220.0,
-    "height" : 120.0,
+    "height" : 144.0,
     "label" : "Order",
     "source_pointer" : "/nodes/1"
   }, {
     "id" : "class-order-line",
     "source_id" : "class-order-line",
     "projection_id" : "class-order-line",
-    "x" : 408.0,
-    "y" : 262.0,
+    "x" : 476.5248107910156,
+    "y" : 44.0,
     "width" : 220.0,
     "height" : 120.0,
     "label" : "OrderLine",
@@ -35,8 +35,8 @@
     "id" : "enum-order-status",
     "source_id" : "enum-order-status",
     "projection_id" : "enum-order-status",
-    "x" : 408.0,
-    "y" : 479.0,
+    "x" : 476.5248107910156,
+    "y" : 236.0,
     "width" : 220.0,
     "height" : 120.0,
     "label" : "OrderStatus",
@@ -49,19 +49,16 @@
     "source_id" : "order-has-lines",
     "projection_id" : "order-has-lines",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 186.83333333333334,
-      "y" : 165.0
-    }, {
-      "x" : 186.83333333333334,
-      "y" : 213.0
-    }, {
-      "x" : 518.0,
-      "y" : 213.0
-    }, {
-      "x" : 518.0,
-      "y" : 261.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 265.0,
+        "y" : 104.0
+      }, {
+        "x" : 475.5248107910156,
+        "y" : 104.0
+      } ]
+    },
     "label" : "lines",
     "source_pointer" : "/relationships/0"
   }, {
@@ -71,19 +68,22 @@
     "source_id" : "order-status-dependency",
     "projection_id" : "order-status-dependency",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 121.16666666666667,
-      "y" : 165.0
-    }, {
-      "x" : 121.16666666666667,
-      "y" : 430.0
-    }, {
-      "x" : 518.0,
-      "y" : 430.0
-    }, {
-      "x" : 518.0,
-      "y" : 478.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 265.0,
+        "y" : 145.0
+      }, {
+        "x" : 313.0,
+        "y" : 145.0
+      }, {
+        "x" : 313.0,
+        "y" : 296.0
+      }, {
+        "x" : 475.5248107910156,
+        "y" : 296.0
+      } ]
+    },
     "label" : "uses",
     "source_pointer" : "/relationships/1"
   } ],
@@ -98,8 +98,8 @@
     },
     "x" : 12.0,
     "y" : 12.0,
-    "width" : 648.0,
-    "height" : 619.0,
+    "width" : 716.5247802734375,
+    "height" : 376.0,
     "members" : [ "class-order", "class-order-line", "enum-order-status" ],
     "label" : "Orders"
   } ],

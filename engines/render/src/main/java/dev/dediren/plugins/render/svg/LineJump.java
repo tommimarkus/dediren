@@ -57,4 +57,9 @@ public record LineJump(int segmentIndex, double x, double y, boolean vertical) {
     }
     return new LabelBox(x - REACH, y - apex, x + REACH, y);
   }
+
+  /** The backdrop stroke is paint too: its 6px width can outrun the route arc. */
+  public LabelBox maskInkBox() {
+    return routeInkBox().expanded(3.0, 3.0);
+  }
 }

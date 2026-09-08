@@ -44,6 +44,7 @@ or the token-efficient authoring guide in
 | [Source Model & Views](source-model.md) | The semantic source graph, namespaced properties, views/projection, semantic profiles, and fragments |
 | [Engine Runtime](engine-runtime.md) | The engine contract, the bundled first-party engines, and runtime diagnostics |
 | [Layout (ELK)](layout.md) | The official Java ELK plugin, layout modes (`flow`/`packed`/`auto`), and `validate-layout` quality metrics |
+| [Routing acceptance](routing-acceptance.md) | September 2026 geometry, Firefox, export and calibrated-paint evidence, including residual crossings |
 | [SVG Rendering](svg-render.md) | The render plugin, render policies, and the `artifacts[]` result shape |
 | [Text (ASCII) Rendering](text-render.md) | The `ascii` render plugin, `text.charset` policy, and its degrade behaviors |
 | [Exports (OEF, XMI & draw.io)](exports.md) | ArchiMate Open Exchange Format 3.1, UML 2.5.1 XMI, and draw.io mxfile export, plus the supported UML notation coverage |

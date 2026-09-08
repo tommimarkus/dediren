@@ -142,6 +142,32 @@ class OefExportEngineTest {
   }
 
   @Test
+  void cubicRouteExportsOrderedAttachmentsAndFlattenedIntermediateGeometry() throws Exception {
+    JsonNode inputJson = exportInputJson();
+    ObjectNode route = (ObjectNode) inputJson.at("/layout_result/edges/0/route");
+    route.removeAll();
+    route.put("kind", "cubic_bezier");
+    route.putObject("start").put("x", 173.0).put("y", 52.0);
+    ArrayNode segments = route.putArray("segments");
+    ObjectNode segment = segments.addObject();
+    segment.putObject("control1").put("x", 195.0).put("y", 0.0);
+    segment.putObject("control2").put("x", 230.0).put("y", 0.0);
+    segment.putObject("end").put("x", 253.0).put("y", 52.0);
+
+    String content = exportContent(inputJson);
+
+    int source = content.indexOf("<sourceAttachment x=\"173\" y=\"52\"/>");
+    int bend = content.indexOf("<bendpoint", source);
+    int target = content.indexOf("<targetAttachment x=\"253\" y=\"52\"/>");
+    assertThat(source).isGreaterThanOrEqualTo(0);
+    assertThat(bend).isGreaterThan(source);
+    assertThat(target).isGreaterThan(bend);
+    // The cubic's analytically known midpoint is (212.625, 13), so this distinguishes evaluated
+    // intermediate route geometry from serializing either control point at y=0.
+    assertThat(content.substring(source, target)).contains("y=\"13\"");
+  }
+
+  @Test
   void exportRejectsInvalidPolicyWithPolicyInvalidCode() throws Exception {
     JsonNode inputJson = exportInputJson();
     ((ObjectNode) inputJson.get("policy")).remove("model_identifier");
@@ -406,7 +432,7 @@ class OefExportEngineTest {
     // nonNegativeInteger constraint — an edge route leaving the positive quadrant breaks export
     // even when every node is in range.
     JsonNode inputJson = exportInputJson();
-    ((ObjectNode) inputJson.at("/layout_result/edges/0/points/0")).put("y", -3.0);
+    ((ObjectNode) inputJson.at("/layout_result/edges/0/route/points/0")).put("y", -3.0);
 
     EngineResult<ExportResult> result = exportResult(inputJson);
 
@@ -415,7 +441,75 @@ class OefExportEngineTest {
         .anySatisfy(
             diagnostic -> {
               assertThat(diagnostic.code()).isEqualTo("DEDIREN_OEF_GEOMETRY_CLAMPED");
-              assertThat(diagnostic.path()).isEqualTo("$.layout_result.edges[0].points[0].y");
+              assertThat(diagnostic.path()).isEqualTo("$.layout_result.edges[0].route.points[0].y");
+            });
+  }
+
+  @Test
+  void negativeFractionalRouteGeometryIsClampedAndDisclosedBeforeRounding() throws Exception {
+    // A negative fractional coordinate happens to round to zero, but it is still outside OEF's
+    // non-negative-integer domain and must not become an undisclosed position change.
+    JsonNode inputJson = exportInputJson();
+    ((ObjectNode) inputJson.at("/layout_result/edges/0/route/points/0")).put("y", -0.25);
+
+    EngineResult<ExportResult> result = exportResult(inputJson);
+
+    assertThat(result.value().content()).contains("<sourceAttachment x=\"173\" y=\"0\"/>");
+    assertThat(result.diagnostics())
+        .anySatisfy(
+            diagnostic -> {
+              assertThat(diagnostic.code()).isEqualTo("DEDIREN_OEF_GEOMETRY_CLAMPED");
+              assertThat(diagnostic.path()).isEqualTo("$.layout_result.edges[0].route.points[0].y");
+            });
+  }
+
+  @Test
+  void routeSamplesThatCollapseAfterExchangeRoundingAreDisclosed() throws Exception {
+    JsonNode inputJson = exportInputJson();
+    ArrayNode points = (ArrayNode) inputJson.at("/layout_result/edges/0/route/points");
+    points.insertObject(1).put("x", 173.2).put("y", 52.2);
+
+    EngineResult<ExportResult> result = exportResult(inputJson);
+
+    assertThat(result.value().content())
+        .contains("<sourceAttachment x=\"173\" y=\"52\"/><bendpoint x=\"173\" y=\"52\"/>");
+    assertThat(result.diagnostics())
+        .anySatisfy(
+            diagnostic -> {
+              assertThat(diagnostic.code()).isEqualTo("DEDIREN_OEF_GEOMETRY_CLAMPED");
+              assertThat(diagnostic.path()).isEqualTo("$.layout_result.edges[0].route.points[1]");
+              assertThat(diagnostic.message()).contains("collapsed");
+            });
+  }
+
+  @Test
+  void roundedCurveEnteringASemanticObstacleIsDisclosed() throws Exception {
+    JsonNode inputJson = exportInputJson();
+    ((ArrayNode) inputJson.at("/source/nodes"))
+        .addObject()
+        .put("id", "obstacle")
+        .put("type", "Grouping")
+        .put("label", "Obstacle")
+        .putObject("properties");
+    ArrayNode groups = (ArrayNode) inputJson.at("/layout_result/groups");
+    ObjectNode group = groups.addObject();
+    group.put("id", "obstacle").put("source_id", "obstacle").put("projection_id", "obstacle");
+    group.putObject("provenance").putObject("semantic_backed").put("source_id", "obstacle");
+    group.put("x", 173.4).put("y", 51.4).put("width", 1.0).put("height", 1.0);
+    group.putArray("members");
+    group.put("label", "Obstacle");
+    ArrayNode points = (ArrayNode) inputJson.at("/layout_result/edges/0/route/points");
+    // The source samples stay left/above the fractional group. Integer exchange coordinates move
+    // the sample onto the group's rounded bounds.
+    points.insertObject(1).put("x", 173.2).put("y", 51.2);
+
+    EngineResult<ExportResult> result = exportResult(inputJson);
+
+    assertThat(result.diagnostics())
+        .anySatisfy(
+            diagnostic -> {
+              assertThat(diagnostic.code()).isEqualTo("DEDIREN_OEF_GEOMETRY_CLAMPED");
+              assertThat(diagnostic.message()).contains("obstacle");
             });
   }
 

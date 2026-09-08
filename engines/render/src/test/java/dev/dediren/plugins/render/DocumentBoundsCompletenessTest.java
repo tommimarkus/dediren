@@ -314,7 +314,7 @@ class DocumentBoundsCompletenessTest {
     edge.put("id", id).put("source", id + "-s").put("target", id + "-t");
     edge.put("source_id", id).put("projection_id", id);
     edge.putArray("routing_hints");
-    ArrayNode routed = edge.putArray("points");
+    ArrayNode routed = edge.putObject("route").put("kind", "polyline").putArray("points");
     for (double[] point : points) {
       routed.addObject().put("x", point[0]).put("y", point[1]);
     }
@@ -326,7 +326,7 @@ class DocumentBoundsCompletenessTest {
   private static ObjectNode zeroMarginInput(String viewId) throws Exception {
     ObjectNode input = JsonSupport.objectMapper().createObjectNode();
     ObjectNode layout = input.putObject("layout_result");
-    layout.put("layout_result_schema_version", "layout-result.schema.v2");
+    layout.put("layout_result_schema_version", "layout-result.schema.v3");
     layout.put("view_id", viewId);
     layout.putArray("nodes");
     layout.putArray("edges");

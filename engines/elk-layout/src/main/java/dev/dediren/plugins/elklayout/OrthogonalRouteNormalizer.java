@@ -1,67 +1,33 @@
 package dev.dediren.plugins.elklayout;
 
+import dev.dediren.contracts.layout.LaidOutGroup;
 import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.layout.Point;
+import dev.dediren.contracts.layout.PolylineRoute;
+import dev.dediren.ir.RouteGeometry;
 import java.util.ArrayList;
 import java.util.List;
 
 /** Removes redundant staircase turns introduced when ELK joins compound-edge route sections. */
 final class OrthogonalRouteNormalizer {
   private static final double EPSILON = 0.001;
-
-  // A source-boundary pivot replacement is rejected as "riding its own source's face" once it has
-  // a segment within this proximity of, and overlapping by at least FACE_RIDE_MIN_OVERLAP, that
-  // node's outline. Measured across this module's own test suite (100-case seeded fuzz sweep plus
-  // the hand-written engine scenarios): of 60 total source-boundary-pivot firings (12 from the
-  // 4-point dogleg replacement, 48 from the 6-point stairReplacements startsAtSourceEndpoint
-  // pivot), 57 rode the source's own face and only 3 did not, so this is a guard, not a deletion --
-  // the "ANY clean firings" branch of the pre-approved decision. The dogleg replacement's own
-  // admission condition (adjustedCoordinate inside the source's span) rides by construction on
-  // every one of its 12 firings, so this guard also suppresses it in practice without deleting the
-  // rule outright.
-  private static final double FACE_RIDE_PROXIMITY = 8.0;
-  private static final double FACE_RIDE_MIN_OVERLAP = 2.0;
+  private static final double CLOSE_PARALLEL_DISTANCE = 20.0;
+  private static final double CLOSE_PARALLEL_MIN_OVERLAP = 40.0;
 
   private OrthogonalRouteNormalizer() {}
 
   static List<Point> collapseStairSteps(
       List<Point> input, List<LaidOutNode> nodes, String sourceId, String targetId) {
-    return collapseStairSteps(input, nodes, sourceId, targetId, true);
-  }
-
-  static List<Point> collapseStairSteps(
-      List<Point> input,
-      List<LaidOutNode> nodes,
-      String sourceId,
-      String targetId,
-      boolean allowSourceBoundaryPivot) {
     List<Point> route = new ArrayList<>(input);
-    boolean allowWholeRouteSourcePivot = allowSourceBoundaryPivot && input.size() == 6;
-    if (allowSourceBoundaryPivot && route.size() == 4) {
-      List<Point> replacement = sourceBoundaryDoglegReplacement(route, nodes, sourceId);
-      if (!replacement.isEmpty()
-          && routeLength(replacement) <= routeLength(route) + EPSILON
-          && clearOfUnrelatedNodes(replacement, nodes, sourceId, targetId)
-          && !ridesOwnFace(replacement, nodes, sourceId)) {
-        route = new ArrayList<>(replacement);
-      }
-    }
     boolean changed;
     do {
       changed = false;
       for (int index = 0; index <= route.size() - 6; index++) {
-        boolean sourcePivotEligible = index == 0 && allowWholeRouteSourcePivot;
-        List<List<Point>> candidates =
-            stairReplacements(route.subList(index, index + 6), sourcePivotEligible);
+        List<List<Point>> candidates = stairReplacements(route.subList(index, index + 6));
         for (int candidateIndex = 0; candidateIndex < candidates.size(); candidateIndex++) {
           List<Point> replacement = candidates.get(candidateIndex);
-          // The source-pivot candidate is always candidates.get(0) when sourcePivotEligible (see
-          // stairReplacements): only that one can ride the source's own face by construction, so
-          // the guard is scoped to it rather than every candidate.
-          boolean isSourcePivotCandidate = sourcePivotEligible && candidateIndex == 0;
           if (routeLength(replacement) > routeLength(route.subList(index, index + 6)) + EPSILON
-              || !clearOfUnrelatedNodes(replacement, nodes, sourceId, targetId)
-              || (isSourcePivotCandidate && ridesOwnFace(replacement, nodes, sourceId))) {
+              || !clearOfUnrelatedNodes(replacement, nodes, sourceId, targetId)) {
             continue;
           }
           List<Point> collapsed = new ArrayList<>(route.size() - 2);
@@ -80,40 +46,35 @@ final class OrthogonalRouteNormalizer {
     return List.copyOf(route);
   }
 
-  /**
-   * True when the replacement route has a segment that overlaps its own source node's outline by at
-   * least {@link #FACE_RIDE_MIN_OVERLAP} within {@link #FACE_RIDE_PROXIMITY} of that face -- the
-   * "doubled border" defect both source-boundary pivots can produce.
-   */
-  private static boolean ridesOwnFace(List<Point> route, List<LaidOutNode> nodes, String sourceId) {
-    LaidOutNode source = findNode(nodes, sourceId);
-    if (source == null) {
-      return false;
+  static List<Point> collapseStairSteps(
+      List<Point> input,
+      List<LaidOutNode> nodes,
+      List<LaidOutGroup> groups,
+      String sourceId,
+      String targetId,
+      boolean sharedJunction,
+      List<List<Point>> siblingRoutes) {
+    if (sharedJunction || !allSegmentsAxisAligned(input)) {
+      return List.copyOf(input);
     }
-    for (int index = 0; index < route.size() - 1; index++) {
-      if (ownFaceOverlap(route.get(index), route.get(index + 1), source) >= FACE_RIDE_MIN_OVERLAP) {
-        return true;
-      }
+    List<Point> candidate = collapseStairSteps(input, nodes, sourceId, targetId);
+    if (candidate.equals(input)
+        || !preservesEndpointApproaches(input, candidate)
+        || addsObstacleIntrusion(input, candidate, nodes, groups)
+        || reducesObstacleClearance(input, candidate, nodes, groups)
+        || createsRouteConflict(candidate, siblingRoutes)) {
+      return List.copyOf(input);
     }
-    return false;
+    return candidate;
   }
 
-  private static double ownFaceOverlap(Point start, Point end, LaidOutNode node) {
-    double left = node.x();
-    double right = node.x() + node.width();
-    double top = node.y();
-    double bottom = node.y() + node.height();
-    if (same(start.y(), end.y())
-        && (Math.abs(start.y() - top) <= FACE_RIDE_PROXIMITY
-            || Math.abs(start.y() - bottom) <= FACE_RIDE_PROXIMITY)) {
-      return overlapLength(start.x(), end.x(), left, right);
+  private static boolean allSegmentsAxisAligned(List<Point> route) {
+    for (int index = 0; index < route.size() - 1; index++) {
+      if (orientation(route.get(index), route.get(index + 1)) == null) {
+        return false;
+      }
     }
-    if (same(start.x(), end.x())
-        && (Math.abs(start.x() - left) <= FACE_RIDE_PROXIMITY
-            || Math.abs(start.x() - right) <= FACE_RIDE_PROXIMITY)) {
-      return overlapLength(start.y(), end.y(), top, bottom);
-    }
-    return 0.0;
+    return true;
   }
 
   private static double overlapLength(
@@ -123,49 +84,7 @@ final class OrthogonalRouteNormalizer {
     return Math.max(0.0, Math.min(firstMax, secondEnd) - Math.max(firstMin, secondStart));
   }
 
-  private static LaidOutNode findNode(List<LaidOutNode> nodes, String id) {
-    for (LaidOutNode node : nodes) {
-      if (node.id().equals(id)) {
-        return node;
-      }
-    }
-    return null;
-  }
-
-  private static List<Point> sourceBoundaryDoglegReplacement(
-      List<Point> points, List<LaidOutNode> nodes, String sourceId) {
-    Orientation first = orientation(points.get(0), points.get(1));
-    Orientation cross = orientation(points.get(1), points.get(2));
-    Orientation third = orientation(points.get(2), points.get(3));
-    if (first == null || cross == null || first == cross || first != third) {
-      return List.of();
-    }
-
-    LaidOutNode source = findNode(nodes, sourceId);
-    if (source == null) {
-      return List.of();
-    }
-
-    Point start = points.get(0);
-    Point end = points.get(3);
-    double adjustedCoordinate = first == Orientation.HORIZONTAL ? end.y() : end.x();
-    double sourceMinimum = first == Orientation.HORIZONTAL ? source.y() : source.x();
-    double sourceMaximum =
-        first == Orientation.HORIZONTAL
-            ? source.y() + source.height()
-            : source.x() + source.width();
-    if (adjustedCoordinate < sourceMinimum - EPSILON
-        || adjustedCoordinate > sourceMaximum + EPSILON) {
-      return List.of();
-    }
-
-    return first == Orientation.HORIZONTAL
-        ? compact(List.of(start, new Point(start.x(), end.y()), end))
-        : compact(List.of(start, new Point(end.x(), start.y()), end));
-  }
-
-  private static List<List<Point>> stairReplacements(
-      List<Point> points, boolean startsAtSourceEndpoint) {
+  private static List<List<Point>> stairReplacements(List<Point> points) {
     Orientation first = orientation(points.get(0), points.get(1));
     Orientation second = orientation(points.get(1), points.get(2));
     if (first == null
@@ -180,12 +99,6 @@ final class OrthogonalRouteNormalizer {
     Point start = points.get(0);
     Point end = points.get(5);
     List<Double> pivots = new ArrayList<>();
-    if (startsAtSourceEndpoint) {
-      // This is the only equivalent route with one visible corner rather than two: the small
-      // cross-axis adjustment stays at the source boundary, while ELK's exact endpoints and the
-      // target approach direction remain unchanged.
-      pivots.add(first == Orientation.HORIZONTAL ? start.x() : start.y());
-    }
     pivots.add(first == Orientation.HORIZONTAL ? points.get(1).x() : points.get(1).y());
     pivots.add(first == Orientation.HORIZONTAL ? points.get(4).x() : points.get(4).y());
     List<List<Point>> candidates = new ArrayList<>();
@@ -241,6 +154,173 @@ final class OrthogonalRouteNormalizer {
           && segmentTop < bottom - EPSILON;
     }
     return true;
+  }
+
+  private static boolean preservesEndpointApproaches(
+      List<Point> nativeRoute, List<Point> candidate) {
+    return nativeRoute.size() >= 2
+        && candidate.size() >= 2
+        && samePoint(nativeRoute.getFirst(), candidate.getFirst())
+        && samePoint(nativeRoute.getLast(), candidate.getLast())
+        && orientation(nativeRoute.get(0), nativeRoute.get(1))
+            == orientation(candidate.get(0), candidate.get(1))
+        && orientation(nativeRoute.get(nativeRoute.size() - 2), nativeRoute.getLast())
+            == orientation(candidate.get(candidate.size() - 2), candidate.getLast());
+  }
+
+  private static boolean addsObstacleIntrusion(
+      List<Point> nativeRoute,
+      List<Point> candidate,
+      List<LaidOutNode> nodes,
+      List<LaidOutGroup> groups) {
+    for (LaidOutNode node : nodes) {
+      if (intrusionLength(candidate, node.x(), node.y(), node.width(), node.height())
+          > intrusionLength(nativeRoute, node.x(), node.y(), node.width(), node.height())
+              + EPSILON) {
+        return true;
+      }
+    }
+    for (LaidOutGroup group : groups) {
+      if (intrusionLength(candidate, group.x(), group.y(), group.width(), group.height())
+          > intrusionLength(nativeRoute, group.x(), group.y(), group.width(), group.height())
+              + EPSILON) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static double intrusionLength(
+      List<Point> route, double x, double y, double width, double height) {
+    double total = 0.0;
+    for (int index = 0; index < route.size() - 1; index++) {
+      Point start = route.get(index);
+      Point end = route.get(index + 1);
+      if (same(start.y(), end.y()) && start.y() > y + EPSILON && start.y() < y + height - EPSILON) {
+        total += overlapLength(start.x(), end.x(), x, x + width);
+      } else if (same(start.x(), end.x())
+          && start.x() > x + EPSILON
+          && start.x() < x + width - EPSILON) {
+        total += overlapLength(start.y(), end.y(), y, y + height);
+      } else if (!same(start.x(), end.x()) && !same(start.y(), end.y())) {
+        return Double.POSITIVE_INFINITY;
+      }
+    }
+    return total;
+  }
+
+  private static boolean reducesObstacleClearance(
+      List<Point> nativeRoute,
+      List<Point> candidate,
+      List<LaidOutNode> nodes,
+      List<LaidOutGroup> groups) {
+    for (LaidOutNode node : nodes) {
+      if (clearance(candidate, node.x(), node.y(), node.width(), node.height()) + EPSILON
+          < clearance(nativeRoute, node.x(), node.y(), node.width(), node.height())) {
+        return true;
+      }
+    }
+    for (LaidOutGroup group : groups) {
+      if (clearance(candidate, group.x(), group.y(), group.width(), group.height()) + EPSILON
+          < clearance(nativeRoute, group.x(), group.y(), group.width(), group.height())) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static double clearance(
+      List<Point> route, double x, double y, double width, double height) {
+    double minimum = Double.POSITIVE_INFINITY;
+    for (int index = 0; index < route.size() - 1; index++) {
+      minimum =
+          Math.min(
+              minimum,
+              segmentRectangleDistance(
+                  route.get(index), route.get(index + 1), x, y, width, height));
+    }
+    return minimum;
+  }
+
+  private static double segmentRectangleDistance(
+      Point start, Point end, double x, double y, double width, double height) {
+    Orientation segmentOrientation = orientation(start, end);
+    if (segmentOrientation == Orientation.HORIZONTAL) {
+      return Math.hypot(
+          intervalDistance(start.x(), end.x(), x, x + width),
+          intervalDistance(start.y(), start.y(), y, y + height));
+    }
+    if (segmentOrientation == Orientation.VERTICAL) {
+      return Math.hypot(
+          intervalDistance(start.x(), start.x(), x, x + width),
+          intervalDistance(start.y(), end.y(), y, y + height));
+    }
+    if (samePoint(start, end)) {
+      return Math.hypot(
+          intervalDistance(start.x(), start.x(), x, x + width),
+          intervalDistance(start.y(), start.y(), y, y + height));
+    }
+    // This normalizer changes only orthogonal staircases. A diagonal elsewhere in the native
+    // route is outside its proof surface, so treat its clearance as unknown and keep the native
+    // route whenever that uncertainty could matter.
+    return 0.0;
+  }
+
+  private static double intervalDistance(
+      double firstStart, double firstEnd, double secondStart, double secondEnd) {
+    double firstMin = Math.min(firstStart, firstEnd);
+    double firstMax = Math.max(firstStart, firstEnd);
+    if (firstMax < secondStart) {
+      return secondStart - firstMax;
+    }
+    if (secondEnd < firstMin) {
+      return firstMin - secondEnd;
+    }
+    return 0.0;
+  }
+
+  private static boolean createsRouteConflict(List<Point> candidate, List<List<Point>> siblings) {
+    PolylineRoute candidateRoute = new PolylineRoute(candidate);
+    for (List<Point> sibling : siblings) {
+      if (RouteGeometry.properlyIntersects(candidateRoute, new PolylineRoute(sibling))
+          || closeParallelCount(candidate, sibling) > 0) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static int closeParallelCount(List<Point> left, List<Point> right) {
+    int count = 0;
+    for (int leftIndex = 0; leftIndex < left.size() - 1; leftIndex++) {
+      Orientation leftOrientation = orientation(left.get(leftIndex), left.get(leftIndex + 1));
+      if (leftOrientation == null) {
+        continue;
+      }
+      for (int rightIndex = 0; rightIndex < right.size() - 1; rightIndex++) {
+        Orientation rightOrientation =
+            orientation(right.get(rightIndex), right.get(rightIndex + 1));
+        if (leftOrientation != rightOrientation) {
+          continue;
+        }
+        Point leftStart = left.get(leftIndex);
+        Point leftEnd = left.get(leftIndex + 1);
+        Point rightStart = right.get(rightIndex);
+        Point rightEnd = right.get(rightIndex + 1);
+        double distance =
+            leftOrientation == Orientation.HORIZONTAL
+                ? Math.abs(leftStart.y() - rightStart.y())
+                : Math.abs(leftStart.x() - rightStart.x());
+        double overlap =
+            leftOrientation == Orientation.HORIZONTAL
+                ? overlapLength(leftStart.x(), leftEnd.x(), rightStart.x(), rightEnd.x())
+                : overlapLength(leftStart.y(), leftEnd.y(), rightStart.y(), rightEnd.y());
+        if (distance < CLOSE_PARALLEL_DISTANCE && overlap >= CLOSE_PARALLEL_MIN_OVERLAP) {
+          count++;
+        }
+      }
+    }
+    return count;
   }
 
   private static List<Point> compact(List<Point> points) {

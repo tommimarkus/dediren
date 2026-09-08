@@ -1,5 +1,5 @@
 {
-  "layout_result_schema_version": "layout-result.schema.v2",
+  "layout_result_schema_version": "layout-result.schema.v3",
   "view_id": "sequence-view",
   "nodes": [
     {
@@ -32,10 +32,13 @@
       "target": "service",
       "source_id": "m1",
       "projection_id": "m1",
-      "points": [
-        { "x": 170, "y": 180 },
-        { "x": 590, "y": 180 }
-      ],
+      "route": {
+        "kind": "polyline",
+        "points": [
+          { "x": 170, "y": 180 },
+          { "x": 590, "y": 180 }
+        ]
+      },
       "label": "placeOrder"
     },
     {
@@ -44,10 +47,13 @@
       "target": "customer",
       "source_id": "m2",
       "projection_id": "m2",
-      "points": [
-        { "x": 590, "y": 220 },
-        { "x": 170, "y": 220 }
-      ],
+      "route": {
+        "kind": "polyline",
+        "points": [
+          { "x": 590, "y": 220 },
+          { "x": 170, "y": 220 }
+        ]
+      },
       "label": "accepted"
     },
     {
@@ -56,10 +62,13 @@
       "target": "customer",
       "source_id": "m3",
       "projection_id": "m3",
-      "points": [
-        { "x": 590, "y": 260 },
-        { "x": 170, "y": 260 }
-      ],
+      "route": {
+        "kind": "polyline",
+        "points": [
+          { "x": 590, "y": 260 },
+          { "x": 170, "y": 260 }
+        ]
+      },
       "label": "receiptReady"
     }
   ],

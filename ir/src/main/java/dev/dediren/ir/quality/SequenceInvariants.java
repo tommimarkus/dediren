@@ -1,5 +1,7 @@
 package dev.dediren.ir.quality;
 
+import static dev.dediren.ir.RouteGeometry.flatten;
+
 import dev.dediren.contracts.layout.LayoutNodeRole;
 import dev.dediren.contracts.layout.Point;
 import dev.dediren.ir.LaidOutScene;
@@ -39,11 +41,11 @@ public final class SequenceInvariants {
     for (RoutedEdge edge : scene.edges()) {
       PlacedNode source = nodesById.get(edge.source());
       PlacedNode target = nodesById.get(edge.target());
-      if (!isLifeline(source) || !isLifeline(target) || edge.points().isEmpty()) {
+      if (!isLifeline(source) || !isLifeline(target) || flatten(edge.route()).isEmpty()) {
         continue;
       }
-      Point first = edge.points().getFirst();
-      Point last = edge.points().getLast();
+      Point first = flatten(edge.route()).getFirst();
+      Point last = flatten(edge.route()).getLast();
       double sourceCenterX = centerX(source);
       double targetCenterX = centerX(target);
       if (!withinTolerance(first.x(), sourceCenterX, LIFELINE_AXIS_TOLERANCE)) {
@@ -91,10 +93,10 @@ public final class SequenceInvariants {
     Double previousY = null;
     String previousId = null;
     for (RoutedEdge edge : scene.edges()) {
-      if (!isMessage(edge, nodesById) || edge.points().isEmpty()) {
+      if (!isMessage(edge, nodesById) || flatten(edge.route()).isEmpty()) {
         continue;
       }
-      double y = edge.points().getFirst().y();
+      double y = flatten(edge.route()).getFirst().y();
       if (previousY != null && y <= previousY) {
         violations.add(
             new InvariantViolation(
@@ -168,7 +170,7 @@ public final class SequenceInvariants {
       if (!isMessage(edge, nodesById)) {
         continue;
       }
-      for (Point point : edge.points()) {
+      for (Point point : flatten(edge.route())) {
         if (point.x() < frameLeft
             || point.x() > frameRight
             || point.y() < frameTop

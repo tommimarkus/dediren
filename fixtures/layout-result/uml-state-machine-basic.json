@@ -1,74 +1,74 @@
 {
-  "layout_result_schema_version" : "layout-result.schema.v2",
+  "layout_result_schema_version" : "layout-result.schema.v3",
   "view_id" : "state-machine-view",
   "nodes" : [ {
     "id" : "initial",
     "source_id" : "initial",
     "projection_id" : "initial",
     "x" : 76.0,
-    "y" : 94.0,
+    "y" : 96.5,
     "width" : 36.0,
-    "height" : 36.0,
+    "height" : 103.0,
     "label" : "",
     "source_pointer" : "/nodes/2"
   }, {
     "id" : "draft",
     "source_id" : "draft",
     "projection_id" : "draft",
-    "x" : 258.0,
-    "y" : 76.0,
+    "x" : 310.7966003417969,
+    "y" : 96.5,
     "width" : 150.0,
-    "height" : 72.0,
+    "height" : 103.0,
     "label" : "Draft",
     "source_pointer" : "/nodes/3"
   }, {
     "id" : "submitted",
     "source_id" : "submitted",
     "projection_id" : "submitted",
-    "x" : 552.0,
-    "y" : 246.0,
+    "x" : 662.1495971679688,
+    "y" : 96.5,
     "width" : 150.0,
-    "height" : 72.0,
+    "height" : 103.0,
     "label" : "Submitted",
     "source_pointer" : "/nodes/4"
   }, {
     "id" : "payment-choice",
     "source_id" : "payment-choice",
     "projection_id" : "payment-choice",
-    "x" : 848.0,
-    "y" : 264.0,
+    "x" : 1031.4898071289062,
+    "y" : 76.0,
     "width" : 36.0,
-    "height" : 36.0,
+    "height" : 144.0,
     "label" : "",
     "source_pointer" : "/nodes/5"
   }, {
     "id" : "fulfilled",
     "source_id" : "fulfilled",
     "projection_id" : "fulfilled",
-    "x" : 1054.0,
-    "y" : 248.5,
+    "x" : 1388.72314453125,
+    "y" : 251.0,
     "width" : 150.0,
-    "height" : 72.0,
+    "height" : 103.0,
     "label" : "Fulfilled",
     "source_pointer" : "/nodes/6"
   }, {
     "id" : "closed",
     "source_id" : "closed",
     "projection_id" : "closed",
-    "x" : 1350.0,
-    "y" : 266.5,
+    "x" : 1740.076171875,
+    "y" : 251.0,
     "width" : 36.0,
-    "height" : 36.0,
+    "height" : 103.0,
     "label" : "",
     "source_pointer" : "/nodes/7"
   }, {
     "id" : "rejected",
     "source_id" : "rejected",
     "projection_id" : "rejected",
-    "x" : 1054.0,
-    "y" : 140.5,
+    "x" : 1388.72314453125,
+    "y" : 76.0,
     "width" : 36.0,
-    "height" : 36.0,
+    "height" : 103.0,
     "label" : "",
     "source_pointer" : "/nodes/8"
   } ],
@@ -79,13 +79,16 @@
     "source_id" : "t-create",
     "projection_id" : "t-create",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 113.0,
-      "y" : 112.0
-    }, {
-      "x" : 257.0,
-      "y" : 112.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 113.0,
+        "y" : 148.0
+      }, {
+        "x" : 309.7966003417969,
+        "y" : 148.0
+      } ]
+    },
     "label" : "create",
     "source_pointer" : "/relationships/0"
   }, {
@@ -95,19 +98,16 @@
     "source_id" : "t-submit",
     "projection_id" : "t-submit",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 333.0,
-      "y" : 149.0
-    }, {
-      "x" : 333.0,
-      "y" : 197.0
-    }, {
-      "x" : 627.0,
-      "y" : 197.0
-    }, {
-      "x" : 627.0,
-      "y" : 245.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 461.7966003417969,
+        "y" : 148.0
+      }, {
+        "x" : 661.1495971679688,
+        "y" : 148.0
+      } ]
+    },
     "label" : "submit",
     "source_pointer" : "/relationships/1"
   }, {
@@ -117,13 +117,16 @@
     "source_id" : "t-check-payment",
     "projection_id" : "t-check-payment",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 703.0,
-      "y" : 282.0
-    }, {
-      "x" : 847.0,
-      "y" : 282.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 813.1495971679688,
+        "y" : 148.0
+      }, {
+        "x" : 1030.4898071289062,
+        "y" : 148.0
+      } ]
+    },
     "label" : "authorize",
     "source_pointer" : "/relationships/2"
   }, {
@@ -133,13 +136,22 @@
     "source_id" : "t-approve",
     "projection_id" : "t-approve",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 885.0,
-      "y" : 284.5
-    }, {
-      "x" : 1053.0,
-      "y" : 284.5
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 1068.4898071289062,
+        "y" : 168.5
+      }, {
+        "x" : 1116.4898071289062,
+        "y" : 168.5
+      }, {
+        "x" : 1116.4898071289062,
+        "y" : 302.5
+      }, {
+        "x" : 1387.72314453125,
+        "y" : 302.5
+      } ]
+    },
     "label" : "[paymentAuthorized]",
     "source_pointer" : "/relationships/3"
   }, {
@@ -149,19 +161,16 @@
     "source_id" : "t-reject",
     "projection_id" : "t-reject",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 885.0,
-      "y" : 279.5
-    }, {
-      "x" : 933.0,
-      "y" : 279.5
-    }, {
-      "x" : 933.0,
-      "y" : 158.5
-    }, {
-      "x" : 1053.0,
-      "y" : 158.5
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 1068.4898071289062,
+        "y" : 127.5
+      }, {
+        "x" : 1387.72314453125,
+        "y" : 127.5
+      } ]
+    },
     "label" : "[paymentRejected]",
     "source_pointer" : "/relationships/4"
   }, {
@@ -171,13 +180,16 @@
     "source_id" : "t-close",
     "projection_id" : "t-close",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 1205.0,
-      "y" : 284.5
-    }, {
-      "x" : 1349.0,
-      "y" : 284.5
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 1539.72314453125,
+        "y" : 302.5
+      }, {
+        "x" : 1739.076171875,
+        "y" : 302.5
+      } ]
+    },
     "label" : "deliver",
     "source_pointer" : "/relationships/5"
   } ],
@@ -192,8 +204,8 @@
     },
     "x" : 12.0,
     "y" : 12.0,
-    "width" : 1438.0,
-    "height" : 372.5,
+    "width" : 1828.076171875,
+    "height" : 406.0,
     "members" : [ "main-region-frame" ],
     "label" : "Order Lifecycle"
   }, {
@@ -207,8 +219,8 @@
     },
     "x" : 44.0,
     "y" : 44.0,
-    "width" : 1374.0,
-    "height" : 308.5,
+    "width" : 1764.076171875,
+    "height" : 342.0,
     "members" : [ "initial", "draft", "submitted", "payment-choice", "fulfilled", "closed", "rejected" ],
     "label" : "Main Region"
   } ],

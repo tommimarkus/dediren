@@ -1,5 +1,7 @@
 package dev.dediren.plugins.elklayout;
 
+import static dev.dediren.ir.RouteGeometry.flatten;
+
 import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.layout.LayoutEdge;
@@ -7,6 +9,7 @@ import dev.dediren.contracts.layout.LayoutNode;
 import dev.dediren.contracts.layout.LayoutNodeRole;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.layout.Point;
+import dev.dediren.contracts.layout.PolylineRoute;
 import dev.dediren.ir.BandMember;
 import dev.dediren.ir.LayoutIntent;
 import dev.dediren.ir.LayoutIntent.OrderedBand;
@@ -239,7 +242,7 @@ final class LayoutIntentNormalizer {
     double bottom =
         lifelines.stream().mapToDouble(node -> node.y() + node.height()).max().orElse(top);
     for (LaidOutEdge edge : edges) {
-      for (Point point : edge.points()) {
+      for (Point point : flatten(edge.route())) {
         bottom = Math.max(bottom, point.y());
       }
     }
@@ -484,7 +487,7 @@ final class LayoutIntentNormalizer {
     List<LaidOutEdge> orderedMessages = new ArrayList<>();
     for (String id : messageOrder) {
       LaidOutEdge edge = edgesById.get(id);
-      if (edge != null && edge.points().size() >= 2) {
+      if (edge != null && flatten(edge.route()).size() >= 2) {
         orderedMessages.add(edge);
       }
     }
@@ -514,7 +517,8 @@ final class LayoutIntentNormalizer {
               edge.sourceId(),
               edge.projectionId(),
               edge.routingHints(),
-              normalizedMessagePoints(edge, normalizedNodesById, y, pointAnchoredIds),
+              new PolylineRoute(
+                  normalizedMessagePoints(edge, normalizedNodesById, y, pointAnchoredIds)),
               edge.label(),
               edgePointers.get(edge.id())));
     }
@@ -531,12 +535,12 @@ final class LayoutIntentNormalizer {
     Integer sourceIndex = resolvedBandIndex(edge.source());
     Integer targetIndex = resolvedBandIndex(edge.target());
     if (source == null || target == null || sourceIndex == null || targetIndex == null) {
-      return pointsAtY(edge.points(), y);
+      return pointsAtY(flatten(edge.route()), y);
     }
     LaidOutNode sourceStem = normalizedNodesById.get(resolvedBandMemberId(edge.source()));
     LaidOutNode targetStem = normalizedNodesById.get(resolvedBandMemberId(edge.target()));
     if (sourceStem == null || targetStem == null) {
-      return pointsAtY(edge.points(), y);
+      return pointsAtY(flatten(edge.route()), y);
     }
     if (pointAnchoredIds.contains(edge.target())) {
       // The route ends ON the point-anchored node, so it must land on that node's perimeter: the
@@ -623,7 +627,7 @@ final class LayoutIntentNormalizer {
     }
 
     return strictlyIncreasingYSlots(
-        orderedMessages.stream().map(edge -> edge.points().get(0).y()).sorted().toList());
+        orderedMessages.stream().map(edge -> flatten(edge.route()).get(0).y()).sorted().toList());
   }
 
   private static List<Double> strictlyIncreasingYSlots(List<Double> ySlots) {

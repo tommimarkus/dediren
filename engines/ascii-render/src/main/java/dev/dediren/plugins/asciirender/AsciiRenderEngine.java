@@ -60,6 +60,14 @@ public final class AsciiRenderEngine implements RenderEngine {
       for (var node : scene.nodes()) {
         diagnostics.addAll(NodeBox.draw(canvas, grid, glyphs, node));
       }
+      for (String edgeId : canvas.consumeObscuredEdges()) {
+        diagnostics.add(
+            new Diagnostic(
+                DiagnosticCode.ASCII_EDGE_APPROXIMATED.code(),
+                DiagnosticSeverity.WARNING,
+                "edge " + edgeId + " is obscured by a node after character-grid projection",
+                "edges[" + edgeId + "]"));
+      }
       for (var edge : scene.edges()) {
         diagnostics.addAll(EdgeLabelPlacer.place(canvas, grid, edge));
       }

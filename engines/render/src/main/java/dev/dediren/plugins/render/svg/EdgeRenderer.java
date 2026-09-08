@@ -1,11 +1,15 @@
 package dev.dediren.plugins.render.svg;
 
+import static dev.dediren.ir.RouteGeometry.flatten;
 import static dev.dediren.plugins.render.svg.Geometry.labelBox;
 import static dev.dediren.plugins.render.svg.Svg.dashArrayValue;
 import static dev.dediren.plugins.render.svg.Svg.f1;
 import static dev.dediren.plugins.render.svg.Svg.opacity;
 import static dev.dediren.plugins.render.svg.Svg.styleNumber;
 
+import dev.dediren.contracts.layout.CubicBezierRoute;
+import dev.dediren.contracts.layout.CubicBezierSegment;
+import dev.dediren.contracts.layout.EdgeRoute;
 import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LaidOutGroup;
 import dev.dediren.contracts.layout.LayoutResult;
@@ -15,13 +19,15 @@ import dev.dediren.contracts.render.RenderPolicy;
 import dev.dediren.contracts.render.SvgEdgeLabelPresentation;
 import dev.dediren.contracts.render.SvgEdgeLabelVerticalSide;
 import dev.dediren.contracts.render.SvgEdgeMarkerEnd;
+import dev.dediren.ir.RouteGeometry;
 import dev.dediren.plugins.render.style.ResolvedEdgeStyle;
 import dev.dediren.plugins.render.style.ResolvedStyle;
 import dev.dediren.plugins.render.style.StyleResolver;
+import java.awt.geom.Line2D;
+import java.awt.geom.Rectangle2D;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.Optional;
 
 public final class EdgeRenderer {
 
@@ -33,13 +39,6 @@ public final class EdgeRenderer {
   private static final double EDGE_LABEL_FONT_SIZE_SCALE = 1.1;
   private static final int EDGE_LABEL_FONT_WEIGHT = 600;
   private static final double EDGE_LABEL_OUTLINE_WIDTH = 2.0;
-  private static final double EDGE_LABEL_ROUTE_PADDING = 2.0;
-
-  // Perpendicular reach (px from the segment) within which a horizontal-side label still counts as
-  // "hugging" its own route. Offsets up to this are tried before falling back to an on-route
-  // vertical-segment placement; larger offsets — which can walk the label clear off the diagram —
-  // only run when no on-route placement is clear.
-  private static final double MAX_HUG_OFFSET = 56.0;
 
   /** Emits the edge's marker for {@code side} and returns its minted id ({@code null} for NONE). */
   public static String edgeMarker(
@@ -61,13 +60,17 @@ public final class EdgeRenderer {
    * the drawn one.
    */
   public static List<LabelBox> markerInkBoxes(LaidOutEdge edge, ResolvedEdgeStyle style) {
-    List<Point> points = edge.points();
-    if (points.isEmpty()) {
+    if (!hasRenderableGeometry(edge)) {
+      return List.of();
+    }
+    Point first = RouteGeometry.start(edge.route());
+    Point last = RouteGeometry.end(edge.route());
+    if (first == null || last == null) {
       return List.of();
     }
     List<LabelBox> boxes = new ArrayList<>();
-    Point first = points.getFirst();
-    Point last = points.getLast();
+    Point startTangent = RouteGeometry.startTangent(edge.route());
+    Point endTangent = RouteGeometry.endTangent(edge.route());
     LabelBox start =
         EdgeMarkers.inkBox(
             "start",
@@ -75,7 +78,7 @@ public final class EdgeRenderer {
             style.strokeWidth(),
             first.x(),
             first.y(),
-            markerAngleRadians(points, true));
+            Math.atan2(startTangent.y(), startTangent.x()));
     if (start != null) {
       boxes.add(start);
     }
@@ -86,31 +89,11 @@ public final class EdgeRenderer {
             style.strokeWidth(),
             last.x(),
             last.y(),
-            markerAngleRadians(points, false));
+            Math.atan2(endTangent.y(), endTangent.x()));
     if (end != null) {
       boxes.add(end);
     }
     return boxes;
-  }
-
-  // Direction of travel at the route's first or last vertex, taken from the nearest vertex that is
-  // actually somewhere else. A route whose points all coincide has no direction to orient to, and 0
-  // is what a renderer draws for it.
-  private static double markerAngleRadians(List<Point> points, boolean start) {
-    Point vertex = start ? points.getFirst() : points.getLast();
-    int step = start ? 1 : -1;
-    for (int index = start ? 1 : points.size() - 2;
-        index >= 0 && index < points.size();
-        index += step) {
-      Point other = points.get(index);
-      if (nearlyEqual(other.x(), vertex.x()) && nearlyEqual(other.y(), vertex.y())) {
-        continue;
-      }
-      return start
-          ? Math.atan2(other.y() - vertex.y(), other.x() - vertex.x())
-          : Math.atan2(vertex.y() - other.y(), vertex.x() - other.x());
-    }
-    return 0.0;
   }
 
   /** Writes the backdrop strokes that clear each jump. The fills arrive already resolved. */
@@ -163,7 +146,7 @@ public final class EdgeRenderer {
       List<LineJump> lineJumps,
       String markerStartReference,
       String markerEndReference) {
-    if (edge.points().isEmpty()) {
+    if (!hasRenderableGeometry(edge)) {
       return;
     }
     String data = pathData(edge, lineJumps);
@@ -256,10 +239,46 @@ public final class EdgeRenderer {
   }
 
   public static String pathData(LaidOutEdge edge, List<LineJump> lineJumps) {
-    if (lineJumps.isEmpty()) {
-      return roundedPathData(edge.points());
+    if (edge.route() instanceof CubicBezierRoute cubic) {
+      return cubicPathData(cubic);
     }
-    return roundedPathDataWithLineJumps(edge.points(), lineJumps);
+    if (lineJumps.isEmpty()) {
+      return roundedPathData(RouteGeometry.flatten(edge.route()));
+    }
+    return roundedPathDataWithLineJumps(RouteGeometry.flatten(edge.route()), lineJumps);
+  }
+
+  public static String cubicPathData(CubicBezierRoute route) {
+    if (!hasRenderableGeometry(route)) {
+      return "";
+    }
+    StringBuilder data = new StringBuilder();
+    data.append(String.format(Locale.ROOT, "M %.1f %.1f", route.start().x(), route.start().y()));
+    for (CubicBezierSegment segment : route.segments()) {
+      data.append(
+          String.format(
+              Locale.ROOT,
+              " C %.1f %.1f %.1f %.1f %.1f %.1f",
+              segment.control1().x(),
+              segment.control1().y(),
+              segment.control2().x(),
+              segment.control2().y(),
+              segment.end().x(),
+              segment.end().y()));
+    }
+    return data.toString();
+  }
+
+  private static boolean hasRenderableGeometry(LaidOutEdge edge) {
+    return hasRenderableGeometry(edge.route());
+  }
+
+  private static boolean hasRenderableGeometry(dev.dediren.contracts.layout.EdgeRoute route) {
+    try {
+      return RouteGeometry.flatten(route).size() >= 2;
+    } catch (IllegalArgumentException exception) {
+      return false;
+    }
   }
 
   public static String roundedPathDataWithLineJumps(List<Point> points, List<LineJump> lineJumps) {
@@ -400,24 +419,35 @@ public final class EdgeRenderer {
   }
 
   public static List<LineJump> lineJumps(LaidOutEdge edge, List<LaidOutEdge> renderedEdges) {
+    return lineJumps(edge, renderedEdges, List.of());
+  }
+
+  /** Accepts complete arcs only after accounting for the endpoint decoration paint. */
+  public static List<LineJump> lineJumps(
+      LaidOutEdge edge, List<LaidOutEdge> renderedEdges, List<LabelBox> endpointDecorations) {
+    // Cubics emit their native C commands unchanged; inserting a polyline-style Q jump would
+    // either be ignored by pathData or require altering the curve. Curves may still be crossed by
+    // later orthogonal owners, but they never own a jump or its mask.
+    if (edge.route() instanceof CubicBezierRoute) {
+      return List.of();
+    }
     List<LineJump> jumps = new ArrayList<>();
-    for (int segmentIndex = 0; segmentIndex < edge.points().size() - 1; segmentIndex++) {
-      Point currentStart = edge.points().get(segmentIndex);
-      Point currentEnd = edge.points().get(segmentIndex + 1);
+    List<Point> currentPoints = flatten(edge.route());
+    List<List<Point>> previousRoutes =
+        renderedEdges.stream().map(previous -> flatten(previous.route())).toList();
+    for (int segmentIndex = 0; segmentIndex < currentPoints.size() - 1; segmentIndex++) {
+      Point currentStart = currentPoints.get(segmentIndex);
+      Point currentEnd = currentPoints.get(segmentIndex + 1);
       boolean currentVertical = nearlyEqual(currentStart.x(), currentEnd.x());
       boolean currentHorizontal = nearlyEqual(currentStart.y(), currentEnd.y());
       if (!currentVertical && !currentHorizontal) {
         continue;
       }
-      for (LaidOutEdge previousEdge : renderedEdges) {
-        if (isSharedJunctionPair(edge, previousEdge)) {
-          continue;
-        }
-        for (int previousIndex = 0;
-            previousIndex < previousEdge.points().size() - 1;
-            previousIndex++) {
-          Point previousStart = previousEdge.points().get(previousIndex);
-          Point previousEnd = previousEdge.points().get(previousIndex + 1);
+      for (int edgeIndex = 0; edgeIndex < renderedEdges.size(); edgeIndex++) {
+        List<Point> previousPoints = previousRoutes.get(edgeIndex);
+        for (int previousIndex = 0; previousIndex < previousPoints.size() - 1; previousIndex++) {
+          Point previousStart = previousPoints.get(previousIndex);
+          Point previousEnd = previousPoints.get(previousIndex + 1);
           boolean previousVertical = nearlyEqual(previousStart.x(), previousEnd.x());
           boolean previousHorizontal = nearlyEqual(previousStart.y(), previousEnd.y());
           if (currentVertical && previousHorizontal) {
@@ -438,14 +468,57 @@ public final class EdgeRenderer {
         }
       }
     }
-    return dedupeJumps(jumps);
+    List<LineJump> clearCandidates =
+        dedupeJumps(jumps).stream()
+            .filter(jump -> endpointDecorations.stream().noneMatch(jump.maskInkBox()::overlaps))
+            .toList();
+    return acceptedLineJumps(currentPoints, clearCandidates);
   }
 
-  public static boolean isSharedJunctionPair(LaidOutEdge edge, LaidOutEdge previousEdge) {
-    return (edge.routingHints().contains("shared_source_junction")
-            && edge.source().equals(previousEdge.source()))
-        || (edge.routingHints().contains("shared_target_junction")
-            && edge.target().equals(previousEdge.target()));
+  /**
+   * Keeps only jumps whose whole six-unit reach fits in the straight portion that survives corner
+   * rounding. The ordered accepted list is also the list used by the path, mask, and bounds lanes.
+   */
+  private static List<LineJump> acceptedLineJumps(List<Point> points, List<LineJump> candidates) {
+    List<LineJump> accepted = new ArrayList<>();
+    for (LineJump candidate : candidates) {
+      if (!jumpFitsStraightRun(points, candidate)) {
+        continue;
+      }
+      boolean overlapsAccepted =
+          accepted.stream()
+              .anyMatch(existing -> candidate.routeInkBox().overlaps(existing.routeInkBox()));
+      if (!overlapsAccepted) {
+        accepted.add(candidate);
+      }
+    }
+    return accepted;
+  }
+
+  private static boolean jumpFitsStraightRun(List<Point> points, LineJump jump) {
+    int index = jump.segmentIndex();
+    Point start = points.get(index);
+    Point end = points.get(index + 1);
+    Point penStart = start;
+    if (index > 0) {
+      RoundedCorner prior = roundedCorner(points.get(index - 1), start, end);
+      if (prior != null) {
+        penStart = prior.after();
+      }
+    }
+    Point penEnd = end;
+    if (index + 2 < points.size()) {
+      RoundedCorner next = roundedCorner(start, end, points.get(index + 2));
+      if (next != null) {
+        penEnd = next.before();
+      }
+    }
+    double progress = segmentProgress(start, end, jump.x(), jump.y());
+    double startProgress = segmentProgress(start, end, penStart.x(), penStart.y());
+    double endProgress = segmentProgress(start, end, penEnd.x(), penEnd.y());
+    double length = distance(start, end);
+    double reachProgress = length == 0.0 ? Double.POSITIVE_INFINITY : 6.0 / length;
+    return progress - startProgress >= reachProgress && endProgress - progress >= reachProgress;
   }
 
   public static List<LineJump> dedupeJumps(List<LineJump> jumps) {
@@ -476,294 +549,316 @@ public final class EdgeRenderer {
     return value > min && value < max;
   }
 
+  public record LabelPlacement(EdgeLabel label, boolean constrained) {}
+
   public static EdgeLabel edgeLabel(
       LaidOutEdge edge, ResolvedEdgeStyle style, List<LabelBox> occupiedBoxes, double fontSize) {
-    Optional<Segment> horizontal = firstHorizontalSegment(edge);
-    if (horizontal.isPresent()) {
-      Segment segment = horizontal.get();
-      double direction = Math.signum(segment.end().x() - segment.start().x());
-      if (direction == 0.0) {
-        direction = 1.0;
-      }
-      double preferredX =
-          switch (style.labelHorizontalPosition()) {
-            case CENTER -> (segment.start().x() + segment.end().x()) / 2.0;
-            case NEAR_END -> segment.end().x() - direction * 18.0;
-            case NEAR_START -> segment.start().x() + direction * 18.0;
-          };
-      double centerX = (segment.start().x() + segment.end().x()) / 2.0;
-      double nearStartX = segment.start().x() + direction * 18.0;
-      double nearEndX = segment.end().x() - direction * 18.0;
-      double baseOffset =
-          clearHorizontalLabelOffset(
-              switch (style.labelHorizontalSide()) {
-                case ABOVE -> -10.0;
-                case BELOW -> 18.0;
-                case AUTO -> autoHorizontalLabelOffset(edge, segment.index());
-              },
-              edge.label(),
-              style,
-              fontSize);
-      List<Double> xCandidates = orderedValues(preferredX, centerX, nearStartX, nearEndX);
-      List<Double> hugOffsets = new ArrayList<>();
-      List<Double> farOffsets = new ArrayList<>();
-      for (double offset : labelOffsetCandidates(baseOffset)) {
-        (Math.abs(offset) <= MAX_HUG_OFFSET ? hugOffsets : farOffsets).add(offset);
-      }
-      // 1. Hug the segment: try only the beside-the-route offsets first.
-      Optional<EdgeLabel> besideRoute =
-          firstClearHorizontalLabel(
-              edge, style, occupiedBoxes, fontSize, segment, xCandidates, hugOffsets);
-      if (besideRoute.isPresent()) {
-        return besideRoute.get();
-      }
-      // 2. Prefer an on-route vertical-segment placement over displacing the label far from its own
-      // segment. Escalating the horizontal offset outward can walk the label clear off the diagram
-      // (the grouped fan-out regression), dissociating it from the relationship it names.
-      Optional<EdgeLabel> vertical = firstClearVerticalLabel(edge, style, occupiedBoxes, fontSize);
-      if (vertical.isPresent()) {
-        return vertical.get();
-      }
-      // 3. Only with no clear on-route placement, escalate the horizontal offset outward.
-      Optional<EdgeLabel> displaced =
-          firstClearHorizontalLabel(
-              edge, style, occupiedBoxes, fontSize, segment, xCandidates, farOffsets);
-      if (displaced.isPresent()) {
-        return displaced.get();
-      }
-      // No candidate from any of the three strategies cleared the obstacle set. Rather than return
-      // an arbitrary point blind to the obstacles, pick the least-bad candidate already generated
-      // by
-      // the cascade above: the one with the smallest overlap area against what's actually there.
-      List<EdgeLabel> horizontalCandidates = new ArrayList<>();
-      for (double offset : labelOffsetCandidates(baseOffset)) {
-        for (double x : xCandidates) {
-          horizontalCandidates.add(
-              edgeLabelCandidate(
-                  x, segment.start().y() + offset, "middle", edge.label(), fontSize));
-        }
-      }
-      return leastOverlapLabel(horizontalCandidates, occupiedBoxes, style.labelPresentation());
-    }
-    List<EdgeLabel> candidates = verticalLabelCandidates(edge, style, fontSize);
-    if (!candidates.isEmpty()) {
-      for (EdgeLabel candidate : candidates) {
-        LabelBox candidateBox = edgeLabelVisibleBox(candidate, style.labelPresentation());
-        if (occupiedBoxes.stream().noneMatch(candidateBox::overlaps)) {
-          return candidate;
-        }
-      }
-      return leastOverlapLabel(candidates, occupiedBoxes, style.labelPresentation());
-    }
-    List<Point> routePoints =
-        edge.points().isEmpty() ? List.of(new Point(0.0, 0.0)) : edge.points();
-    List<EdgeLabel> routeCandidates = new ArrayList<>();
-    for (Point routePoint : routePoints) {
-      routeCandidates.add(
-          edgeLabelCandidate(
-              routePoint.x(), routePoint.y() - 6.0, "middle", edge.label(), fontSize));
-    }
-    return leastOverlapLabel(routeCandidates, occupiedBoxes, style.labelPresentation());
+    return placeLabel(edge, style, occupiedBoxes, List.of(), fontSize).label();
   }
 
-  /**
-   * Among already-generated candidates, the one with the smallest total overlap area against the
-   * obstacle set. Used only once every placement strategy above has exhausted its clear candidates;
-   * it never runs ahead of them and never widens the obstacle set they already check against.
-   */
-  private static EdgeLabel leastOverlapLabel(
-      List<EdgeLabel> candidates,
-      List<LabelBox> occupiedBoxes,
-      SvgEdgeLabelPresentation presentation) {
-    EdgeLabel best = candidates.get(0);
-    double bestOverlapArea = Double.POSITIVE_INFINITY;
-    for (EdgeLabel candidate : candidates) {
-      LabelBox candidateBox = edgeLabelVisibleBox(candidate, presentation);
-      double overlapArea = 0.0;
-      for (LabelBox obstacle : occupiedBoxes) {
-        if (candidateBox.overlaps(obstacle)) {
-          double overlapWidth =
-              Math.min(candidateBox.maxX(), obstacle.maxX())
-                  - Math.max(candidateBox.minX(), obstacle.minX());
-          double overlapHeight =
-              Math.min(candidateBox.maxY(), obstacle.maxY())
-                  - Math.max(candidateBox.minY(), obstacle.minY());
-          overlapArea += overlapWidth * overlapHeight;
-        }
-      }
-      if (overlapArea < bestOverlapArea) {
-        bestOverlapArea = overlapArea;
-        best = candidate;
-      }
-    }
-    return best;
-  }
-
-  private static Optional<EdgeLabel> firstClearHorizontalLabel(
+  public static EdgeLabel edgeLabel(
       LaidOutEdge edge,
       ResolvedEdgeStyle style,
       List<LabelBox> occupiedBoxes,
-      double fontSize,
-      Segment segment,
-      List<Double> xCandidates,
-      List<Double> offsets) {
-    for (double offset : offsets) {
-      for (double x : xCandidates) {
-        EdgeLabel candidate =
-            edgeLabelCandidate(x, segment.start().y() + offset, "middle", edge.label(), fontSize);
-        LabelBox candidateBox = edgeLabelVisibleBox(candidate, style.labelPresentation());
-        if (occupiedBoxes.stream().noneMatch(candidateBox::overlaps)) {
-          return Optional.of(candidate);
+      List<LaidOutEdge> competingRoutes,
+      double fontSize) {
+    return placeLabel(edge, style, occupiedBoxes, competingRoutes, fontSize).label();
+  }
+
+  /** One decision owns both the attached label and its unsatisfied-placement diagnostic. */
+  public static LabelPlacement placeLabel(
+      LaidOutEdge edge,
+      ResolvedEdgeStyle style,
+      List<LabelBox> occupiedBoxes,
+      List<LaidOutEdge> competingRoutes,
+      double fontSize) {
+    List<Point> candidatePoints = candidateRuns(flatten(edge.route()));
+    List<EdgeLabel> candidates = new ArrayList<>();
+    if (edge.route() instanceof CubicBezierRoute && candidatePoints.size() > 2) {
+      // A sampled curve vertex can carry an extremum whose tangent no individual chord retains.
+      for (int offset : middleOutSegmentIndexes(candidatePoints.size() - 2)) {
+        int index = offset + 1;
+        Point before = candidatePoints.get(index - 1);
+        Point after = candidatePoints.get(index + 1);
+        double dx = after.x() - before.x();
+        double dy = after.y() - before.y();
+        double length = Math.hypot(dx, dy);
+        if (length > 0.001) {
+          for (double side :
+              routeAttachmentSides(style, dx, dy, -dy / length, dx / length, false)) {
+            candidates.add(
+                routeAttachedCandidate(
+                    candidatePoints.get(index),
+                    -dy / length,
+                    dx / length,
+                    side,
+                    edge.label(),
+                    style,
+                    fontSize));
+          }
         }
       }
     }
-    return Optional.empty();
+    candidates.addAll(routeAttachedCandidates(candidatePoints, edge.label(), style, fontSize));
+    RouteSample owner = sample(edge.route(), 0.0625);
+    List<RouteSample> competitors =
+        competingRoutes.stream().map(other -> sample(other.route(), 0.0625)).toList();
+    EdgeLabel best = candidates.getFirst();
+    double bestScore = Double.POSITIVE_INFINITY;
+    for (EdgeLabel candidate : candidates) {
+      LabelBox box = edgeLabelVisibleBox(candidate, style.labelPresentation());
+      double ownerDistance = routeDistance(owner.points(), box);
+      double competitorDistance = Double.POSITIVE_INFINITY;
+      double uncertainty = owner.error();
+      for (RouteSample other : competitors) {
+        competitorDistance = Math.min(competitorDistance, routeDistance(other.points(), box));
+        uncertainty = Math.max(uncertainty, owner.error() + other.error());
+      }
+      // Refine curves when their bounded approximation could change an attachment decision.
+      if (uncertainty > 0.0
+          && (Math.abs(ownerDistance - 2.0) <= uncertainty
+              || Math.abs(ownerDistance - 6.0) <= uncertainty
+              || Math.abs(competitorDistance - ownerDistance) <= uncertainty)) {
+        ownerDistance = routeDistance(flatten(edge.route(), 0.00001), box);
+        competitorDistance = Double.POSITIVE_INFINITY;
+        for (LaidOutEdge other : competingRoutes) {
+          competitorDistance =
+              Math.min(competitorDistance, routeDistance(flatten(other.route(), 0.00001), box));
+        }
+        uncertainty = 0.00002;
+      }
+      double overlap = 0.0;
+      for (LabelBox obstacle : occupiedBoxes) {
+        overlap +=
+            Math.max(
+                    0.0,
+                    Math.min(box.maxX(), obstacle.maxX()) - Math.max(box.minX(), obstacle.minX()))
+                * Math.max(
+                    0.0,
+                    Math.min(box.maxY(), obstacle.maxY()) - Math.max(box.minY(), obstacle.minY()));
+      }
+      if (overlap == 0.0
+          && ownerDistance >= 2.0 + uncertainty
+          && ownerDistance <= 6.0 - uncertainty
+          && ownerDistance + uncertainty < competitorDistance) {
+        return new LabelPlacement(candidate, false);
+      }
+      double score =
+          overlap
+              + 1000.0
+                  * (Math.max(0.0, 2.0 - ownerDistance)
+                      + Math.max(0.0, ownerDistance - 6.0)
+                      + Math.max(0.0, ownerDistance + uncertainty - competitorDistance));
+      if (score < bestScore) {
+        bestScore = score;
+        best = candidate;
+      }
+    }
+    return new LabelPlacement(best, true);
+  }
+
+  private record RouteSample(List<Point> points, double error) {}
+
+  private static RouteSample sample(EdgeRoute route, double error) {
+    return new RouteSample(flatten(route, error), route instanceof CubicBezierRoute ? error : 0.0);
+  }
+
+  /** Distance to actual line segments, not the empty corners of their bounding rectangles. */
+  private static double routeDistance(List<Point> points, LabelBox box) {
+    Rectangle2D rectangle =
+        new Rectangle2D.Double(box.minX(), box.minY(), box.width(), box.height());
+    double nearest = Double.POSITIVE_INFINITY;
+    for (int index = 1; index < points.size(); index++) {
+      Point a = points.get(index - 1);
+      Point b = points.get(index);
+      if (rectangle.intersectsLine(a.x(), a.y(), b.x(), b.y())) {
+        return 0.0;
+      }
+      nearest = Math.min(nearest, pointBoxDistance(a, box));
+      nearest = Math.min(nearest, pointBoxDistance(b, box));
+      for (double x : new double[] {box.minX(), box.maxX()}) {
+        for (double y : new double[] {box.minY(), box.maxY()}) {
+          nearest = Math.min(nearest, Line2D.ptSegDist(a.x(), a.y(), b.x(), b.y(), x, y));
+        }
+      }
+    }
+    return nearest;
+  }
+
+  private static double pointBoxDistance(Point point, LabelBox box) {
+    return Math.hypot(
+        Math.max(0.0, Math.max(box.minX() - point.x(), point.x() - box.maxX())),
+        Math.max(0.0, Math.max(box.minY() - point.y(), point.y() - box.maxY())));
+  }
+
+  private static List<EdgeLabel> routeAttachedCandidates(
+      List<Point> points, String text, ResolvedEdgeStyle style, double fontSize) {
+    if (points.size() < 2) {
+      return List.of(edgeLabelCandidate(0.0, -6.0, "middle", text, fontSize));
+    }
+    List<EdgeLabel> fittingCandidates = new ArrayList<>();
+    List<EdgeLabel> horizontalFittingCandidates = new ArrayList<>();
+    List<EdgeLabel> fallbackCandidates = new ArrayList<>();
+    for (int index : middleOutSegmentIndexes(points.size() - 1)) {
+      Point start = points.get(index);
+      Point end = points.get(index + 1);
+      double dx = end.x() - start.x();
+      double dy = end.y() - start.y();
+      double length = Math.hypot(dx, dy);
+      if (length < 0.001) {
+        continue;
+      }
+      double normalX = -dy / length;
+      double normalY = dx / length;
+      for (double progress : routeAttachmentProgresses(style, length, Math.abs(dx) < 0.001)) {
+        Point anchor = new Point(start.x() + dx * progress, start.y() + dy * progress);
+        for (double side :
+            routeAttachmentSides(
+                style,
+                dx,
+                dy,
+                normalX,
+                normalY,
+                index + 2 < points.size() && points.get(index + 2).y() < start.y())) {
+          EdgeLabel candidate =
+              routeAttachedCandidate(anchor, normalX, normalY, side, text, style, fontSize);
+          LabelBox visible = edgeLabelVisibleBox(candidate, style.labelPresentation());
+          double tangentHalfExtent =
+              visible.width() / 2.0 * Math.abs(dx / length)
+                  + visible.height() / 2.0 * Math.abs(dy / length);
+          if (Math.min(progress, 1.0 - progress) * length >= tangentHalfExtent) {
+            fittingCandidates.add(candidate);
+            if (Math.abs(dy) < 0.001) {
+              horizontalFittingCandidates.add(candidate);
+            }
+          } else {
+            fallbackCandidates.add(candidate);
+          }
+        }
+      }
+    }
+    // The render policy's horizontal label controls are the tie-breaker when an actual route has
+    // both orientations. A long horizontal body therefore wins over a nearby vertical stub, while
+    // vertical and diagonal routes remain fully usable when no horizontal body can carry the text.
+    List<EdgeLabel> candidates = new ArrayList<>(horizontalFittingCandidates);
+    for (EdgeLabel candidate : fittingCandidates) {
+      if (!candidates.contains(candidate)) {
+        candidates.add(candidate);
+      }
+    }
+    candidates.addAll(fallbackCandidates);
+    return candidates.isEmpty()
+        ? List.of(
+            edgeLabelCandidate(
+                points.getFirst().x(), points.getFirst().y() - 6.0, "middle", text, fontSize))
+        : candidates;
+  }
+
+  private static List<Point> candidateRuns(List<Point> points) {
+    List<Point> runs = new ArrayList<>();
+    for (Point point : points) {
+      while (runs.size() >= 2) {
+        Point a = runs.get(runs.size() - 2);
+        Point b = runs.getLast();
+        double cross =
+            (b.x() - a.x()) * (point.y() - b.y()) - (b.y() - a.y()) * (point.x() - b.x());
+        double dot = (b.x() - a.x()) * (point.x() - b.x()) + (b.y() - a.y()) * (point.y() - b.y());
+        if (Math.abs(cross) > 0.000000001 || dot < 0.0) {
+          break;
+        }
+        runs.removeLast();
+      }
+      runs.add(point);
+    }
+    return runs;
+  }
+
+  private static List<Double> routeAttachmentProgresses(
+      ResolvedEdgeStyle style, double length, boolean vertical) {
+    double near = Math.min(0.5, 18.0 / length);
+    String position =
+        vertical ? style.labelVerticalPosition().name() : style.labelHorizontalPosition().name();
+    var positions =
+        new java.util.LinkedHashSet<Double>(
+            switch (position) {
+              case "NEAR_START" -> List.of(near, 0.5, 1.0 - near);
+              case "NEAR_END" -> List.of(1.0 - near, 0.5, near);
+              default -> List.of(0.5, near, 1.0 - near);
+            });
+    positions.add(0.25);
+    positions.add(0.75);
+    for (double along = 24.0; along < length; along += 24.0) {
+      positions.add(along / length);
+    }
+    return List.copyOf(positions);
+  }
+
+  private static List<Double> routeAttachmentSides(
+      ResolvedEdgeStyle style,
+      double dx,
+      double dy,
+      double normalX,
+      double normalY,
+      boolean autoAbove) {
+    if (Math.abs(dy) < 0.001) {
+      boolean above =
+          switch (style.labelHorizontalSide()) {
+            case ABOVE -> true;
+            case BELOW -> false;
+            case AUTO -> autoAbove;
+          };
+      double aboveSide = normalY < 0.0 ? 1.0 : -1.0;
+      return above ? List.of(aboveSide, -aboveSide) : List.of(-aboveSide, aboveSide);
+    }
+    if (Math.abs(dx) < 0.001) {
+      boolean left = style.labelVerticalSide() != SvgEdgeLabelVerticalSide.RIGHT;
+      double leftSide = normalX < 0.0 ? 1.0 : -1.0;
+      return left ? List.of(leftSide, -leftSide) : List.of(-leftSide, leftSide);
+    }
+    return List.of(1.0, -1.0);
+  }
+
+  private static EdgeLabel routeAttachedCandidate(
+      Point anchor,
+      double normalX,
+      double normalY,
+      double side,
+      String text,
+      ResolvedEdgeStyle style,
+      double fontSize) {
+    String textAnchor =
+        Math.abs(normalY) < 0.001 ? (side * normalX > 0.0 ? "start" : "end") : "middle";
+    EdgeLabel initial = edgeLabelCandidate(anchor.x(), anchor.y(), textAnchor, text, fontSize);
+    LabelBox visible = edgeLabelVisibleBox(initial, style.labelPresentation());
+    double centerX = (visible.minX() + visible.maxX()) / 2.0;
+    double centerY = (visible.minY() + visible.maxY()) / 2.0;
+    double halfProjection =
+        visible.width() / 2.0 * Math.abs(normalX) + visible.height() / 2.0 * Math.abs(normalY);
+    return edgeLabelCandidate(
+        initial.x() + anchor.x() - centerX + normalX * side * (halfProjection + 4.0),
+        initial.y() + anchor.y() - centerY + normalY * side * (halfProjection + 4.0),
+        textAnchor,
+        text,
+        fontSize);
+  }
+
+  private static List<Integer> middleOutSegmentIndexes(int size) {
+    List<Integer> indexes = new ArrayList<>(size);
+    int middle = (size - 1) / 2;
+    indexes.add(middle);
+    for (int distance = 1; indexes.size() < size; distance++) {
+      if (middle + distance < size) {
+        indexes.add(middle + distance);
+      }
+      if (middle - distance >= 0) {
+        indexes.add(middle - distance);
+      }
+    }
+    return indexes;
   }
 
   public static EdgeLabel edgeLabelCandidate(
       double x, double y, String anchor, String text, double fontSize) {
     return new EdgeLabel(x, y, anchor, labelBox(x, y, anchor, text, fontSize));
-  }
-
-  public static List<Double> orderedValues(double... values) {
-    List<Double> ordered = new ArrayList<>();
-    for (double value : values) {
-      boolean exists = ordered.stream().anyMatch(existing -> Math.abs(existing - value) < 0.1);
-      if (!exists) {
-        ordered.add(value);
-      }
-    }
-    return ordered;
-  }
-
-  public static List<Double> labelOffsetCandidates(double baseOffset) {
-    double oppositeOffset = baseOffset < 0.0 ? 18.0 : -10.0;
-    return orderedValues(
-        baseOffset,
-        oppositeOffset,
-        baseOffset + 28.0,
-        baseOffset - 28.0,
-        baseOffset + 56.0,
-        baseOffset - 56.0,
-        baseOffset + 84.0,
-        baseOffset - 84.0,
-        baseOffset + 112.0,
-        baseOffset - 112.0,
-        baseOffset + 140.0,
-        baseOffset - 140.0);
-  }
-
-  private static double clearHorizontalLabelOffset(
-      double offset, String text, ResolvedEdgeStyle style, double fontSize) {
-    if (style.labelPresentation() != SvgEdgeLabelPresentation.BACKGROUND) {
-      return offset;
-    }
-    EdgeLabel candidate = edgeLabelCandidate(0.0, offset, "middle", text, fontSize);
-    LabelBox visibleBox = edgeLabelVisibleBox(candidate, style.labelPresentation());
-    double clearance = style.strokeWidth() / 2.0 + EDGE_LABEL_ROUTE_PADDING;
-    if (offset < 0.0 && visibleBox.maxY() > -clearance) {
-      return offset - (visibleBox.maxY() + clearance);
-    }
-    if (offset >= 0.0 && visibleBox.minY() < clearance) {
-      return offset + clearance - visibleBox.minY();
-    }
-    return offset;
-  }
-
-  public static Optional<EdgeLabel> firstClearVerticalLabel(
-      LaidOutEdge edge, ResolvedEdgeStyle style, List<LabelBox> occupiedBoxes, double fontSize) {
-    for (EdgeLabel candidate : verticalLabelCandidates(edge, style, fontSize)) {
-      LabelBox candidateBox = edgeLabelVisibleBox(candidate, style.labelPresentation());
-      if (occupiedBoxes.stream().noneMatch(candidateBox::overlaps)) {
-        return Optional.of(candidate);
-      }
-    }
-    return Optional.empty();
-  }
-
-  public static List<EdgeLabel> verticalLabelCandidates(
-      LaidOutEdge edge, ResolvedEdgeStyle style, double fontSize) {
-    List<Segment> verticalSegments = verticalSegments(edge);
-    if (verticalSegments.isEmpty()) {
-      return List.of();
-    }
-    if (firstHorizontalSegment(edge).isEmpty()) {
-      Segment segment = verticalSegments.get(0);
-      double minY = edge.points().stream().mapToDouble(Point::y).min().orElse(segment.start().y());
-      double maxY = edge.points().stream().mapToDouble(Point::y).max().orElse(segment.end().y());
-      return verticalLabelCandidates(
-          edge, style, segment.start().x(), (minY + maxY) / 2.0, fontSize);
-    }
-    List<EdgeLabel> candidates = new ArrayList<>();
-    for (Segment segment : verticalSegments) {
-      candidates.addAll(
-          verticalLabelCandidates(
-              edge,
-              style,
-              segment.start().x(),
-              (segment.start().y() + segment.end().y()) / 2.0,
-              fontSize));
-    }
-    return candidates;
-  }
-
-  public static List<EdgeLabel> verticalLabelCandidates(
-      LaidOutEdge edge, ResolvedEdgeStyle style, double segmentX, double y, double fontSize) {
-    List<EdgeLabel> candidates = new ArrayList<>();
-    List<SvgEdgeLabelVerticalSide> sides =
-        style.labelVerticalSide() == SvgEdgeLabelVerticalSide.RIGHT
-            ? List.of(SvgEdgeLabelVerticalSide.RIGHT, SvgEdgeLabelVerticalSide.LEFT)
-            : List.of(SvgEdgeLabelVerticalSide.LEFT, SvgEdgeLabelVerticalSide.RIGHT);
-    for (double offset : List.of(6.0, 34.0, 62.0)) {
-      for (SvgEdgeLabelVerticalSide side : sides) {
-        double x = side == SvgEdgeLabelVerticalSide.RIGHT ? segmentX + offset : segmentX - offset;
-        String anchor = side == SvgEdgeLabelVerticalSide.RIGHT ? "start" : "end";
-        candidates.add(edgeLabelCandidate(x, y, anchor, edge.label(), fontSize));
-      }
-    }
-    return candidates;
-  }
-
-  public static double autoHorizontalLabelOffset(LaidOutEdge edge, int segmentIndex) {
-    if (segmentIndex + 2 < edge.points().size()) {
-      Point segmentStart = edge.points().get(segmentIndex);
-      Point next = edge.points().get(segmentIndex + 2);
-      if (next.y() < segmentStart.y()) {
-        return -10.0;
-      }
-    }
-    return 18.0;
-  }
-
-  public static Optional<Segment> firstHorizontalSegment(LaidOutEdge edge) {
-    if (edge.routingHints().contains("shared_source_junction")) {
-      for (int index = edge.points().size() - 2; index >= 0; index--) {
-        Point start = edge.points().get(index);
-        Point end = edge.points().get(index + 1);
-        if (nearlyEqual(start.y(), end.y()) && Math.abs(start.x() - end.x()) > 0.001) {
-          return Optional.of(new Segment(index, start, end));
-        }
-      }
-    }
-    for (int index = 0; index < edge.points().size() - 1; index++) {
-      Point start = edge.points().get(index);
-      Point end = edge.points().get(index + 1);
-      if (nearlyEqual(start.y(), end.y()) && Math.abs(start.x() - end.x()) > 0.001) {
-        return Optional.of(new Segment(index, start, end));
-      }
-    }
-    return Optional.empty();
-  }
-
-  public static List<Segment> verticalSegments(LaidOutEdge edge) {
-    List<Segment> segments = new ArrayList<>();
-    for (int index = 0; index < edge.points().size() - 1; index++) {
-      Point start = edge.points().get(index);
-      Point end = edge.points().get(index + 1);
-      if (nearlyEqual(start.x(), end.x()) && Math.abs(start.y() - end.y()) > 0.001) {
-        segments.add(new Segment(index, start, end));
-      }
-    }
-    return segments;
   }
 }

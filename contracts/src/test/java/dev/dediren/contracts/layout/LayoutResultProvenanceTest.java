@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 class LayoutResultProvenanceTest {
   @Test
   void schemaVersionIsV2() {
-    assertThat(ContractVersions.LAYOUT_RESULT_SCHEMA_VERSION).isEqualTo("layout-result.schema.v2");
+    assertThat(ContractVersions.LAYOUT_RESULT_SCHEMA_VERSION).isEqualTo("layout-result.schema.v3");
   }
 
   @Test

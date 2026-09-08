@@ -172,6 +172,76 @@ class SchemaValidatorTest {
   }
 
   @Test
+  void layoutResultRouteUnionRejectsLegacyAndMixedRouteShapes() throws Exception {
+    var mapper = dev.dediren.contracts.json.JsonSupport.objectMapper();
+    String layout =
+        """
+        {
+          "layout_result_schema_version": "layout-result.schema.v3",
+          "view_id": "routes", "nodes": [],
+          "edges": [{
+            "id": "edge", "source": "a", "target": "b", "source_id": "edge",
+            "projection_id": "edge", "route": %s, "label": ""
+          }],
+          "groups": [], "warnings": []
+        }
+        """;
+    String polyline = "{\"kind\":\"polyline\",\"points\":[{\"x\":0,\"y\":0},{\"x\":1,\"y\":1}]}";
+    String cubic =
+        """
+        {"kind":"cubic_bezier","start":{"x":0,"y":0},"segments":[
+          {"control1":{"x":0,"y":1},"control2":{"x":1,"y":1},"end":{"x":1,"y":0}}
+        ]}
+        """;
+
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(),
+                "schemas/layout-result.schema.json",
+                mapper.readTree(layout.formatted(polyline))))
+        .isEmpty();
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(),
+                "schemas/layout-result.schema.json",
+                mapper.readTree(layout.formatted(cubic))))
+        .isEmpty();
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(),
+                "schemas/layout-result.schema.json",
+                mapper.readTree(
+                    layout
+                        .replace(
+                            "\"route\": %s, \"label\"",
+                            "\"route\": %s, \"points\":[{\"x\":0,\"y\":0}], \"label\"")
+                        .formatted(polyline))))
+        .isNotEmpty();
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(),
+                "schemas/layout-result.schema.json",
+                mapper.readTree(layout.formatted("{\"kind\":\"bezier\"}"))))
+        .isNotEmpty();
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(),
+                "schemas/layout-result.schema.json",
+                mapper.readTree(
+                    layout.formatted(
+                        "{\"kind\":\"cubic_bezier\",\"start\":{\"x\":0,\"y\":0},\"segments\":[{\"control1\":{\"x\":0,\"y\":1},\"end\":{\"x\":1,\"y\":0}}]}"))))
+        .isNotEmpty();
+    assertThat(
+            SchemaAssertions.validate(
+                workspaceRoot(),
+                "schemas/layout-result.schema.json",
+                mapper.readTree(
+                    layout.formatted(
+                        "{\"kind\":\"polyline\",\"points\":[{\"x\":0,\"y\":0}],\"segments\":[]}"))))
+        .isNotEmpty();
+  }
+
+  @Test
   void exportResultBaseSchemaAcceptsAnyHonestArtifactKind() {
     // The published export-result contract is the base any export plugin can satisfy honestly:
     // artifact_kind is a pattern, not the closed first-party enum.
@@ -353,7 +423,7 @@ class SchemaValidatorTest {
     noPolicy.putObject("source").put("model_schema_version", "model.schema.v1");
     noPolicy
         .putObject("layout_result")
-        .put("layout_result_schema_version", "layout-result.schema.v2");
+        .put("layout_result_schema_version", "layout-result.schema.v3");
     assertThat(
             SchemaAssertions.validate(
                 workspaceRoot(), "schemas/export-request.schema.json", noPolicy))
@@ -382,7 +452,7 @@ class SchemaValidatorTest {
     request.putObject("source").put("model_schema_version", "model.schema.v1");
     request
         .putObject("layout_result")
-        .put("layout_result_schema_version", "layout-result.schema.v2");
+        .put("layout_result_schema_version", "layout-result.schema.v3");
     request.set("policy", policy);
     return request;
   }

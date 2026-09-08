@@ -3,8 +3,11 @@ package dev.dediren.plugins.elklayout;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import dev.dediren.contracts.layout.GroupProvenance;
+import dev.dediren.contracts.layout.LaidOutGroup;
 import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.layout.Point;
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -118,7 +121,7 @@ class OrthogonalRouteNormalizerTest {
   }
 
   @Test
-  void prefersTheFewestTurnRouteFromTheSourceBoundary() {
+  void preservesTheSourceApproachInsteadOfPivotingAtTheBoundary() {
     List<Point> staircase =
         List.of(
             new Point(0, 0),
@@ -131,7 +134,9 @@ class OrthogonalRouteNormalizerTest {
     List<Point> normalized =
         OrthogonalRouteNormalizer.collapseStairSteps(staircase, List.of(), "source", "target");
 
-    assertEquals(List.of(new Point(0, 0), new Point(0, 4), new Point(100, 4)), normalized);
+    assertEquals(
+        List.of(new Point(0, 0), new Point(10, 0), new Point(10, 4), new Point(100, 4)),
+        normalized);
   }
 
   @Test
@@ -147,11 +152,9 @@ class OrthogonalRouteNormalizerTest {
 
     List<Point> normalized =
         OrthogonalRouteNormalizer.collapseStairSteps(
-            staircase, List.of(), "source", "target", false);
+            staircase, List.of(), List.of(), "source", "target", true, List.of());
 
-    assertEquals(
-        List.of(new Point(0, 0), new Point(10, 0), new Point(10, 4), new Point(100, 4)),
-        normalized);
+    assertEquals(staircase, normalized);
   }
 
   @Test
@@ -189,7 +192,147 @@ class OrthogonalRouteNormalizerTest {
     List<Point> normalized =
         OrthogonalRouteNormalizer.collapseStairSteps(staircase, List.of(), "source", "target");
 
-    assertEquals(List.of(new Point(0, 0), new Point(40, 0), new Point(40, 100)), normalized);
+    assertEquals(
+        List.of(new Point(0, 0), new Point(0, 10), new Point(40, 10), new Point(40, 100)),
+        normalized);
+  }
+
+  @Test
+  void preservesTheNativeRouteWhenEveryCandidateWouldEnterAGroup() {
+    List<Point> staircase = tallStaircase();
+    List<LaidOutGroup> groups =
+        List.of(group("left-channel", 5, 70, 10, 40), group("right-channel", 85, 10, 10, 40));
+
+    List<Point> normalized =
+        OrthogonalRouteNormalizer.collapseStairSteps(
+            staircase, List.of(), groups, "source", "target", false, List.of());
+
+    assertEquals(staircase, normalized);
+  }
+
+  @Test
+  void preservesTheNativeRouteWhenCandidatesWouldReduceNodeClearance() {
+    List<Point> staircase = tallStaircase();
+    List<LaidOutNode> nodes =
+        List.of(
+            new LaidOutNode("left", "left", "left", 12, 80, 10, 20, "Left"),
+            new LaidOutNode("right", "right", "right", 78, 20, 10, 20, "Right"));
+
+    List<Point> normalized =
+        OrthogonalRouteNormalizer.collapseStairSteps(
+            staircase, nodes, List.of(), "source", "target", false, List.of());
+
+    assertEquals(staircase, normalized);
+  }
+
+  @Test
+  void preservesTheNativeRouteWhenAnySegmentHasUnknownNonOrthogonalClearance() {
+    List<Point> route = new ArrayList<>(tallStaircase());
+    route.add(new Point(110, 130));
+    List<LaidOutNode> nodes =
+        List.of(new LaidOutNode("near", "near", "near", 12, 80, 10, 20, "Near"));
+
+    List<Point> normalized =
+        OrthogonalRouteNormalizer.collapseStairSteps(
+            route, nodes, List.of(), "source", "target", false, List.of());
+
+    assertEquals(route, normalized);
+  }
+
+  @Test
+  void preservesTheNativeRouteWhenCandidatesWouldReduceGroupClearance() {
+    List<Point> staircase = tallStaircase();
+    List<LaidOutGroup> groups =
+        List.of(group("left", 12, 80, 10, 20), group("right", 78, 20, 10, 20));
+
+    List<Point> normalized =
+        OrthogonalRouteNormalizer.collapseStairSteps(
+            staircase, List.of(), groups, "source", "target", false, List.of());
+
+    assertEquals(staircase, normalized);
+  }
+
+  @Test
+  void preservesTheNativeRouteWhenCandidatesWouldCrossSiblingRoutes() {
+    List<Point> staircase = tallStaircase();
+    List<List<Point>> siblings =
+        List.of(
+            List.of(new Point(0, 90), new Point(20, 90)),
+            List.of(new Point(80, 30), new Point(100, 30)));
+
+    List<Point> normalized =
+        OrthogonalRouteNormalizer.collapseStairSteps(
+            staircase, List.of(), List.of(), "source", "target", false, siblings);
+
+    assertEquals(staircase, normalized);
+  }
+
+  @Test
+  void preservesTheNativeRouteWhenACrossingMovesInsteadOfChangingCount() {
+    List<Point> staircase = tallStaircase();
+    List<List<Point>> sibling = List.of(List.of(new Point(-10, 90), new Point(110, 90)));
+
+    List<Point> normalized =
+        OrthogonalRouteNormalizer.collapseStairSteps(
+            staircase, List.of(), List.of(), "source", "target", false, sibling);
+
+    assertEquals(staircase, normalized);
+  }
+
+  @Test
+  void preservesTheNativeRouteWhenCandidatesCrossAtSiblingVertices() {
+    List<Point> staircase = tallStaircase();
+    List<List<Point>> siblings =
+        List.of(
+            List.of(new Point(-10, 90), new Point(10, 90), new Point(30, 90)),
+            List.of(new Point(70, 30), new Point(90, 30), new Point(110, 30)));
+
+    List<Point> normalized =
+        OrthogonalRouteNormalizer.collapseStairSteps(
+            staircase, List.of(), List.of(), "source", "target", false, siblings);
+
+    assertEquals(staircase, normalized);
+  }
+
+  @Test
+  void preservesTheNativeRouteWhenCandidatesWouldCreateCloseParallelRuns() {
+    List<Point> staircase = tallStaircase();
+    List<List<Point>> siblings =
+        List.of(
+            List.of(new Point(20, 70), new Point(20, 115)),
+            List.of(new Point(80, 5), new Point(80, 50)));
+
+    List<Point> normalized =
+        OrthogonalRouteNormalizer.collapseStairSteps(
+            staircase, List.of(), List.of(), "source", "target", false, siblings);
+
+    assertEquals(staircase, normalized);
+  }
+
+  @Test
+  void preservesAnIntentionalSharedJunctionRoute() {
+    List<Point> staircase = tallStaircase();
+
+    List<Point> normalized =
+        OrthogonalRouteNormalizer.collapseStairSteps(
+            staircase, List.of(), List.of(), "source", "target", true, List.of());
+
+    assertEquals(staircase, normalized);
+  }
+
+  private static List<Point> tallStaircase() {
+    return List.of(
+        new Point(0, 0),
+        new Point(10, 0),
+        new Point(10, 60),
+        new Point(90, 60),
+        new Point(90, 120),
+        new Point(100, 120));
+  }
+
+  private static LaidOutGroup group(String id, double x, double y, double width, double height) {
+    return new LaidOutGroup(
+        id, id, id, GroupProvenance.semanticBacked(id), x, y, width, height, List.of(), id);
   }
 
   @Test

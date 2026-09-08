@@ -1,12 +1,12 @@
 {
-  "layout_result_schema_version" : "layout-result.schema.v2",
+  "layout_result_schema_version" : "layout-result.schema.v3",
   "view_id" : "state-machine-multi-cycle-view",
   "nodes" : [ {
     "id" : "preparing",
     "source_id" : "preparing",
     "projection_id" : "preparing",
-    "x" : 108.25,
-    "y" : 76.0,
+    "x" : 97.5,
+    "y" : 901.75,
     "width" : 150.0,
     "height" : 72.0,
     "label" : "Preparing",
@@ -15,8 +15,8 @@
     "id" : "running",
     "source_id" : "running",
     "projection_id" : "running",
-    "x" : 86.75,
-    "y" : 318.0,
+    "x" : 97.5,
+    "y" : 367.25,
     "width" : 150.0,
     "height" : 72.0,
     "label" : "Running",
@@ -25,8 +25,8 @@
     "id" : "paused",
     "source_id" : "paused",
     "projection_id" : "paused",
-    "x" : 76.0,
-    "y" : 624.0,
+    "x" : 97.5,
+    "y" : 76.0,
     "width" : 150.0,
     "height" : 72.0,
     "label" : "Paused",
@@ -35,8 +35,8 @@
     "id" : "reviewing",
     "source_id" : "reviewing",
     "projection_id" : "reviewing",
-    "x" : 298.0,
-    "y" : 624.0,
+    "x" : 76.0,
+    "y" : 634.5,
     "width" : 150.0,
     "height" : 72.0,
     "label" : "Reviewing",
@@ -49,13 +49,28 @@
     "source_id" : "t-start",
     "projection_id" : "t-start",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 161.75,
-      "y" : 149.0
-    }, {
-      "x" : 161.75,
-      "y" : 317.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 194.0,
+        "y" : 900.75
+      }, {
+        "x" : 194.0,
+        "y" : 852.75
+      }, {
+        "x" : 298.0,
+        "y" : 852.75
+      }, {
+        "x" : 298.0,
+        "y" : 488.25
+      }, {
+        "x" : 194.0,
+        "y" : 488.25
+      }, {
+        "x" : 194.0,
+        "y" : 440.25
+      } ]
+    },
     "label" : "start",
     "source_pointer" : "/relationships/2"
   }, {
@@ -65,19 +80,16 @@
     "source_id" : "t-pause",
     "projection_id" : "t-pause",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 161.75,
-      "y" : 391.0
-    }, {
-      "x" : 161.75,
-      "y" : 479.0
-    }, {
-      "x" : 172.5,
-      "y" : 479.0
-    }, {
-      "x" : 172.5,
-      "y" : 623.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 194.0,
+        "y" : 366.25
+      }, {
+        "x" : 194.0,
+        "y" : 149.0
+      } ]
+    },
     "label" : "pause",
     "source_pointer" : "/relationships/3"
   }, {
@@ -87,13 +99,16 @@
     "source_id" : "t-resume",
     "projection_id" : "t-resume",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 129.5,
-      "y" : 623.0
-    }, {
-      "x" : 129.5,
-      "y" : 391.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 151.0,
+        "y" : 149.0
+      }, {
+        "x" : 151.0,
+        "y" : 366.25
+      } ]
+    },
     "label" : "resume",
     "source_pointer" : "/relationships/4"
   }, {
@@ -103,19 +118,16 @@
     "source_id" : "t-review",
     "projection_id" : "t-review",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 194.0,
-      "y" : 391.0
-    }, {
-      "x" : 194.0,
-      "y" : 439.0
-    }, {
-      "x" : 351.5,
-      "y" : 439.0
-    }, {
-      "x" : 351.5,
-      "y" : 623.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 151.0,
+        "y" : 440.25
+      }, {
+        "x" : 151.0,
+        "y" : 633.5
+      } ]
+    },
     "label" : "review",
     "source_pointer" : "/relationships/5"
   }, {
@@ -125,19 +137,16 @@
     "source_id" : "t-rework",
     "projection_id" : "t-rework",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 394.5,
-      "y" : 623.0
-    }, {
-      "x" : 394.5,
-      "y" : 197.0
-    }, {
-      "x" : 204.75,
-      "y" : 197.0
-    }, {
-      "x" : 204.75,
-      "y" : 149.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 151.0,
+        "y" : 707.5
+      }, {
+        "x" : 151.0,
+        "y" : 900.75
+      } ]
+    },
     "label" : "rework",
     "source_pointer" : "/relationships/6"
   } ],
@@ -152,8 +161,8 @@
     },
     "x" : 12.0,
     "y" : 12.0,
-    "width" : 500.0,
-    "height" : 748.0,
+    "width" : 392.953,
+    "height" : 1025.75,
     "members" : [ "multi-cycle-region-frame" ],
     "label" : "Session Lifecycle"
   }, {
@@ -167,8 +176,8 @@
     },
     "x" : 44.0,
     "y" : 44.0,
-    "width" : 436.0,
-    "height" : 684.0,
+    "width" : 328.953,
+    "height" : 961.75,
     "members" : [ "preparing", "running", "paused", "reviewing" ],
     "label" : "Session Region"
   } ],

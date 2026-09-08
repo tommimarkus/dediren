@@ -47,11 +47,13 @@ class OutsideNodeLabelObstacleTest {
     double[] placed = estimatedTextInk(edgeText(labelled));
 
     assertThat(overlaps(junctionLabel, unobstructed))
-        .as("the fixture is only meaningful if the unobstructed placement collides with the label")
+        .as(
+            "outside node label %s must intersect unobstructed edge label %s",
+            java.util.Arrays.toString(junctionLabel), java.util.Arrays.toString(unobstructed))
         .isTrue();
-    assertThat(placed[0])
+    assertThat(placed[0] != unobstructed[0] || placed[1] != unobstructed[1])
         .as("the junction's label moved the edge label somewhere else")
-        .isNotEqualTo(unobstructed[0]);
+        .isTrue();
     assertThat(overlaps(junctionLabel, placed))
         .as("the placed edge label prints over the junction's label")
         .isFalse();
@@ -66,7 +68,7 @@ class OutsideNodeLabelObstacleTest {
   private static ObjectNode input(String junctionLabel) throws Exception {
     ObjectNode input = JsonSupport.objectMapper().createObjectNode();
     ObjectNode layout = input.putObject("layout_result");
-    layout.put("layout_result_schema_version", "layout-result.schema.v2");
+    layout.put("layout_result_schema_version", "layout-result.schema.v3");
     layout.put("view_id", "outside-node-label-obstacle");
 
     ObjectNode node = layout.putArray("nodes").addObject();
@@ -78,7 +80,7 @@ class OutsideNodeLabelObstacleTest {
     edge.put("id", "e").put("source", "a").put("target", "b");
     edge.put("source_id", "e").put("projection_id", "e");
     edge.putArray("routing_hints");
-    ArrayNode points = edge.putArray("points");
+    ArrayNode points = edge.putObject("route").put("kind", "polyline").putArray("points");
     points.addObject().put("x", 100).put("y", 100);
     points.addObject().put("x", 300).put("y", 100);
     edge.put("label", EDGE_LABEL);

@@ -14,6 +14,7 @@ import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LaidOutGroup;
 import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.layout.LayoutResult;
+import dev.dediren.contracts.layout.PolylineRoute;
 import dev.dediren.contracts.source.SourceDocument;
 import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.contracts.source.SourceRelationship;
@@ -130,7 +131,7 @@ class DrawioElementPropertyChannelTest {
                 "checkout-owns-port",
                 null,
                 List.of(),
-                List.of(),
+                new PolylineRoute(List.of()),
                 "")),
         List.of(),
         List.of());

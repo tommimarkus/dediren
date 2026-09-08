@@ -1,0 +1,29 @@
+{
+  "render_metadata_schema_version": "render-metadata.schema.v1",
+  "semantic_profile": "uml",
+  "nodes": {
+    "cache-decision": {
+      "type": "DecisionNode",
+      "source_id": "cache-decision"
+    },
+    "use-cache": {
+      "type": "Action",
+      "source_id": "use-cache"
+    },
+    "refresh-cache": {
+      "type": "Action",
+      "source_id": "refresh-cache"
+    }
+  },
+  "edges": {
+    "cache-hit": {
+      "type": "ControlFlow",
+      "source_id": "cache-hit"
+    },
+    "cache-miss": {
+      "type": "ControlFlow",
+      "source_id": "cache-miss"
+    }
+  },
+  "groups": {}
+}

@@ -1,5 +1,6 @@
 package dev.dediren.plugins.render;
 
+import static dev.dediren.ir.RouteGeometry.flatten;
 import static dev.dediren.plugins.render.svg.EdgeRenderer.edgeMarker;
 import static dev.dediren.plugins.render.svg.EdgeRenderer.pathData;
 import static dev.dediren.plugins.render.svg.Geometry.labelBox;
@@ -569,7 +570,7 @@ final class UmlSequenceRenderer {
     // the anchoring rule and the reference it hands back are the ones every edge in the product
     // goes through.
     String endMarkerId = edgeMarker(w, ids, edge, style, "end");
-    if (!edge.points().isEmpty()) {
+    if (!flatten(edge.route()).isEmpty()) {
       String dash = dashArrayValue(style.lineStyle(), style.dashPattern(), DASH_PATTERN);
       w.empty("path")
           .attr("data-dediren-sequence-message", edge.id())
@@ -689,17 +690,18 @@ final class UmlSequenceRenderer {
   }
 
   private LabelPoint labelPoint(LaidOutEdge edge) {
-    for (int index = 0; index < edge.points().size() - 1; index++) {
-      Point start = edge.points().get(index);
-      Point end = edge.points().get(index + 1);
+    List<Point> routePoints = flatten(edge.route());
+    for (int index = 0; index < routePoints.size() - 1; index++) {
+      Point start = routePoints.get(index);
+      Point end = routePoints.get(index + 1);
       if (Math.abs(start.y() - end.y()) < 0.001 && Math.abs(start.x() - end.x()) > 0.001) {
         return new LabelPoint((start.x() + end.x()) / 2.0, start.y() - 8.0);
       }
     }
-    if (edge.points().isEmpty()) {
+    if (routePoints.isEmpty()) {
       return new LabelPoint(0.0, 0.0);
     }
-    Point point = edge.points().get(edge.points().size() / 2);
+    Point point = routePoints.get(routePoints.size() / 2);
     return new LabelPoint(point.x(), point.y() - 8.0);
   }
 
@@ -720,7 +722,8 @@ final class UmlSequenceRenderer {
           Math.max(4.0, Math.min(target.width(), target.height()) / 2.0),
           strokeWidth);
     }
-    Point point = edge.points().isEmpty() ? new Point(0.0, 0.0) : edge.points().getLast();
+    List<Point> routePoints = flatten(edge.route());
+    Point point = routePoints.isEmpty() ? new Point(0.0, 0.0) : routePoints.getLast();
     return new PlacedDeleteMarker(edge.target(), paint, point.x(), point.y(), 10.0, strokeWidth);
   }
 
@@ -737,7 +740,7 @@ final class UmlSequenceRenderer {
       bottom = Math.max(bottom, node.y() + node.height());
     }
     for (LaidOutEdge edge : result.edges()) {
-      for (Point point : edge.points()) {
+      for (Point point : flatten(edge.route())) {
         bottom = Math.max(bottom, point.y());
       }
     }
@@ -801,7 +804,7 @@ final class UmlSequenceRenderer {
     for (String fragmentId : operand.fragmentIds()) {
       LaidOutEdge edge = edgesById.get(fragmentId);
       if (edge != null) {
-        for (Point point : edge.points()) {
+        for (Point point : flatten(edge.route())) {
           content.includePoint(point.x(), point.y());
         }
         continue;
@@ -887,7 +890,7 @@ final class UmlSequenceRenderer {
       if (!belongsToInteraction(message, interactionId)) {
         continue;
       }
-      for (Point point : message.edge().points()) {
+      for (Point point : flatten(message.edge().route())) {
         content.includePoint(point.x(), point.y());
       }
     }

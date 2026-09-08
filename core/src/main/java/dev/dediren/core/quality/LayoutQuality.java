@@ -1,14 +1,21 @@
 package dev.dediren.core.quality;
 
+import static dev.dediren.ir.RouteGeometry.flatten;
+
 import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.DiagnosticSeverity;
+import dev.dediren.contracts.layout.CubicBezierRoute;
+import dev.dediren.contracts.layout.CubicBezierSegment;
+import dev.dediren.contracts.layout.EdgeRoute;
 import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LaidOutGroup;
 import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.layout.LayoutNodeRole;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.layout.Point;
+import dev.dediren.contracts.layout.PolylineRoute;
+import dev.dediren.ir.RouteGeometry;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -20,12 +27,18 @@ public final class LayoutQuality {
   private static final double ROUTE_DETOUR_EXCESS = 240.0;
   private static final double ROUTE_CLOSE_PARALLEL_DISTANCE = 20.0;
   private static final double ROUTE_CLOSE_PARALLEL_MIN_OVERLAP = 40.0;
+  private static final double ROUTE_NODE_CLEARANCE = 24.0;
+  private static final double TERMINAL_CONTACT_ALLOWANCE = 48.0;
+  private static final double QUALITY_FLATTENING_MAX_ERROR = 0.0625;
+  private static final double EVENT_DEDUPLICATION_TOLERANCE = 0.25;
+  private static final double NUMERIC_GEOMETRY_EPSILON = 1.0e-10;
   private static final double GEOMETRY_EPSILON = 0.001;
   private static final double ROUTE_ENDPOINT_TOLERANCE =
       dev.dediren.ir.quality.LayoutTolerances.ROUTE_ENDPOINT_TOLERANCE;
   // Layout units reserved for the group title row; render draws the group label inside the
   // top of the group rect, so members inside this band collide with the label visually.
   private static final double GROUP_LABEL_BAND_HEIGHT = 24.0;
+  private static final double GROUP_BOUNDARY_INTERIOR_INSET = 1.0;
   // Conservative label-fit estimate: generous per-char width and line height, and only flag
   // labels needing more than LABEL_OVERFLOW_FACTOR times the estimated capacity, so renderer
   // font differences cannot produce false positives.
@@ -52,21 +65,21 @@ public final class LayoutQuality {
   // Edge-label dissociation band (issue #31). LABEL_BAND_GAP spans ELK Layered's compact/readable
   // edge-edge spacing (40-48px) so genuinely adjacent parallel labeled runs qualify, while spacious
   // spacing (64px) and roomy layouts stay clear. LABEL_BAND_MIN_OVERLAP is the parallel run length
-  // needed to actually host an edge label. LABEL_BAND_MIN_NEIGHBOURS makes a band three-plus edges,
-  // so only a trapped edge (labeled neighbours on both sides) counts.
+  // needed to actually host an edge label. Only a run with neighbours on both sides counts.
   private static final double LABEL_BAND_GAP = 52.0;
   private static final double LABEL_BAND_MIN_OVERLAP = 48.0;
-  private static final int LABEL_BAND_MIN_NEIGHBOURS = 2;
 
   private LayoutQuality() {}
 
   public static LayoutQualityReport validateLayout(LayoutResult result) {
     int overlapCount = countOverlaps(result);
     int connectorThroughNodeCount = countConnectorThroughNodes(result);
+    int routeNodeClearanceIssueCount = countRouteNodeClearanceIssues(result);
     int invalidRouteCount =
         (int) result.edges().stream().filter(edge -> routeHasIntegrityIssue(edge, result)).count();
     int routeDetourCount =
-        (int) result.edges().stream().filter(edge -> hasExcessiveDetour(edge.points())).count();
+        (int) result.edges().stream().filter(edge -> hasExcessiveDetour(edge, result)).count();
+    int routeOverlapCount = countRouteOverlaps(result);
     int routeCloseParallelCount = countCloseParallelRoutes(result);
     int groupBoundaryIssueCount = countGroupBoundaryIssues(result);
     int groupLabelBandIssueCount = countGroupLabelBandIssues(result);
@@ -79,8 +92,10 @@ public final class LayoutQuality {
     String status =
         overlapCount == 0
                 && connectorThroughNodeCount == 0
+                && routeNodeClearanceIssueCount == 0
                 && invalidRouteCount == 0
                 && routeDetourCount == 0
+                && routeOverlapCount == 0
                 && routeCloseParallelCount == 0
                 && groupBoundaryIssueCount == 0
                 && groupLabelBandIssueCount == 0
@@ -94,8 +109,10 @@ public final class LayoutQuality {
         "draft",
         overlapCount,
         connectorThroughNodeCount,
+        routeNodeClearanceIssueCount,
         invalidRouteCount,
         routeDetourCount,
+        routeOverlapCount,
         routeCloseParallelCount,
         groupBoundaryIssueCount,
         groupLabelBandIssueCount,
@@ -118,8 +135,11 @@ public final class LayoutQuality {
     addQualityWarning(diagnostics, "overlap_count", report.overlapCount());
     addQualityWarning(
         diagnostics, "connector_through_node_count", report.connectorThroughNodeCount());
+    addQualityWarning(
+        diagnostics, "route_node_clearance_issue_count", report.routeNodeClearanceIssueCount());
     addQualityWarning(diagnostics, "invalid_route_count", report.invalidRouteCount());
     addQualityWarning(diagnostics, "route_detour_count", report.routeDetourCount());
+    addQualityWarning(diagnostics, "route_overlap_count", report.routeOverlapCount());
     addQualityWarning(diagnostics, "route_close_parallel_count", report.routeCloseParallelCount());
     addQualityWarning(diagnostics, "group_boundary_issue_count", report.groupBoundaryIssueCount());
     addQualityWarning(
@@ -280,17 +300,9 @@ public final class LayoutQuality {
     }
     for (int edgeIndex = 0; edgeIndex < result.edges().size(); edgeIndex++) {
       LaidOutEdge edge = result.edges().get(edgeIndex);
-      for (int pointIndex = 0; pointIndex < edge.points().size(); pointIndex++) {
-        Point point = edge.points().get(pointIndex);
-        if (!allFinite(point.x(), point.y())) {
-          diagnostics.add(
-              routeError(
-                  DiagnosticCode.LAYOUT_NON_FINITE_GEOMETRY,
-                  "edge '" + edge.id() + "' has a non-finite route point",
-                  "$.edges[" + edgeIndex + "].points[" + pointIndex + "]",
-                  edge.sourcePointer()));
-          break;
-        }
+      Diagnostic routeGeometryError = routeGeometryError(edge, edgeIndex);
+      if (routeGeometryError != null) {
+        diagnostics.add(routeGeometryError);
       }
     }
     for (int groupIndex = 0; groupIndex < result.groups().size(); groupIndex++) {
@@ -305,21 +317,25 @@ public final class LayoutQuality {
     }
     for (int edgeIndex = 0; edgeIndex < result.edges().size(); edgeIndex++) {
       LaidOutEdge edge = result.edges().get(edgeIndex);
-      if (edge.points().isEmpty()) {
+      if (routeGeometryError(edge, edgeIndex) != null) {
+        continue;
+      }
+      List<Point> points = routePoints(edge);
+      if (points.isEmpty()) {
         diagnostics.add(
             routeError(
                 DiagnosticCode.LAYOUT_ROUTE_POINTS_EMPTY,
                 "edge '" + edge.id() + "' has no route points",
-                "$.edges[" + edgeIndex + "].points",
+                routePath(edge, edgeIndex),
                 edge.sourcePointer()));
         continue;
       }
-      if (edge.points().size() < 2) {
+      if (points.size() < 2) {
         diagnostics.add(
             routeError(
                 DiagnosticCode.LAYOUT_ROUTE_POINTS_INSUFFICIENT,
                 "edge '" + edge.id() + "' must have at least start and end route points",
-                "$.edges[" + edgeIndex + "].points",
+                routePath(edge, edgeIndex),
                 edge.sourcePointer()));
         continue;
       }
@@ -328,7 +344,7 @@ public final class LayoutQuality {
       if (source == null || target == null) {
         continue;
       }
-      if (!endpointAccepted(edge.points().getFirst(), source, ROUTE_ENDPOINT_TOLERANCE)) {
+      if (!endpointAccepted(points.getFirst(), source, ROUTE_ENDPOINT_TOLERANCE)) {
         diagnostics.add(
             routeError(
                 DiagnosticCode.LAYOUT_ROUTE_ENDPOINT_OFF_NODE_PERIMETER,
@@ -337,10 +353,10 @@ public final class LayoutQuality {
                     + "' first route point is not on source node '"
                     + edge.source()
                     + "' perimeter",
-                "$.edges[" + edgeIndex + "].points[0]",
+                "$.edges[" + edgeIndex + "].route",
                 edge.sourcePointer()));
       }
-      if (!endpointAccepted(edge.points().getLast(), target, ROUTE_ENDPOINT_TOLERANCE)) {
+      if (!endpointAccepted(points.getLast(), target, ROUTE_ENDPOINT_TOLERANCE)) {
         diagnostics.add(
             routeError(
                 DiagnosticCode.LAYOUT_ROUTE_ENDPOINT_OFF_NODE_PERIMETER,
@@ -349,7 +365,7 @@ public final class LayoutQuality {
                     + "' last route point is not on target node '"
                     + edge.target()
                     + "' perimeter",
-                "$.edges[" + edgeIndex + "].points[-1]",
+                "$.edges[" + edgeIndex + "].route",
                 edge.sourcePointer()));
       }
     }
@@ -365,10 +381,11 @@ public final class LayoutQuality {
       double reach = Math.min(node.width(), node.height()) / 2.0 + JUNCTION_ROUTE_TOLERANCE;
       for (LaidOutEdge edge : result.edges()) {
         boolean incident = node.id().equals(edge.source()) || node.id().equals(edge.target());
-        if (!incident || edge.points().size() < 2) {
+        List<Point> points = routePoints(edge);
+        if (!incident || points.size() < 2) {
           continue;
         }
-        if (distanceToRoute(centerX, centerY, edge.points()) > reach) {
+        if (distanceToRoute(centerX, centerY, points) > reach) {
           diagnostics.add(
               routeError(
                   DiagnosticCode.LAYOUT_JUNCTION_OFF_INCIDENT_ROUTE,
@@ -384,11 +401,12 @@ public final class LayoutQuality {
     }
     for (int edgeIndex = 0; edgeIndex < result.edges().size(); edgeIndex++) {
       LaidOutEdge edge = result.edges().get(edgeIndex);
-      if (!edge.source().equals(edge.target()) || edge.points().size() < 2) {
+      List<Point> points = routePoints(edge);
+      if (!edge.source().equals(edge.target()) || points.size() < 2) {
         continue;
       }
       LaidOutNode node = findNode(result, edge.source());
-      if (node != null && !selfLoopEscapesNode(edge.points(), node)) {
+      if (node != null && !selfLoopEscapesNode(points, node)) {
         diagnostics.add(
             routeError(
                 DiagnosticCode.LAYOUT_SELF_LOOP_DEGENERATE,
@@ -406,6 +424,81 @@ public final class LayoutQuality {
 
   private static Diagnostic routeError(DiagnosticCode code, String message, String path) {
     return new Diagnostic(code.code(), DiagnosticSeverity.ERROR, message, path);
+  }
+
+  private static Diagnostic routeGeometryError(LaidOutEdge edge, int edgeIndex) {
+    String base = "$.edges[" + edgeIndex + "].route";
+    EdgeRoute route = edge.route();
+    if (route == null) {
+      return routeError(
+          DiagnosticCode.LAYOUT_ROUTE_POINTS_EMPTY,
+          "edge '" + edge.id() + "' has no route geometry",
+          base,
+          edge.sourcePointer());
+    }
+    if (route instanceof PolylineRoute polyline) {
+      for (int pointIndex = 0; pointIndex < polyline.points().size(); pointIndex++) {
+        Point point = polyline.points().get(pointIndex);
+        if (!finite(point)) {
+          return routeError(
+              DiagnosticCode.LAYOUT_NON_FINITE_GEOMETRY,
+              "edge '" + edge.id() + "' has a missing or non-finite route point",
+              base + ".points[" + pointIndex + "]",
+              edge.sourcePointer());
+        }
+      }
+      return null;
+    }
+    CubicBezierRoute cubic = (CubicBezierRoute) route;
+    if (!finite(cubic.start())) {
+      return routeError(
+          DiagnosticCode.LAYOUT_NON_FINITE_GEOMETRY,
+          "edge '" + edge.id() + "' has a missing or non-finite cubic start",
+          base + ".start",
+          edge.sourcePointer());
+    }
+    for (int segmentIndex = 0; segmentIndex < cubic.segments().size(); segmentIndex++) {
+      CubicBezierSegment segment = cubic.segments().get(segmentIndex);
+      String segmentPath = base + ".segments[" + segmentIndex + "]";
+      if (segment == null
+          || !finite(segment.control1())
+          || !finite(segment.control2())
+          || !finite(segment.end())) {
+        return routeError(
+            DiagnosticCode.LAYOUT_NON_FINITE_GEOMETRY,
+            "edge '" + edge.id() + "' has missing or non-finite cubic controls",
+            segmentPath,
+            edge.sourcePointer());
+      }
+    }
+    return null;
+  }
+
+  private static String routePath(LaidOutEdge edge, int edgeIndex) {
+    String suffix = edge.route() instanceof CubicBezierRoute ? ".segments" : ".points";
+    return "$.edges[" + edgeIndex + "].route" + suffix;
+  }
+
+  private static boolean finite(Point point) {
+    return point != null && allFinite(point.x(), point.y());
+  }
+
+  private static List<Point> routePoints(LaidOutEdge edge) {
+    try {
+      return flatten(edge.route());
+    } catch (IllegalArgumentException exception) {
+      return List.of();
+    }
+  }
+
+  // Quality decisions close to a curve use a tighter approximation than the shared 0.25-unit
+  // default. The route remains the sole authority; this only removes classification ambiguity.
+  private static List<Point> qualityRoutePoints(LaidOutEdge edge) {
+    try {
+      return RouteGeometry.flatten(edge.route(), QUALITY_FLATTENING_MAX_ERROR);
+    } catch (IllegalArgumentException exception) {
+      return List.of();
+    }
   }
 
   private static Diagnostic routeError(
@@ -439,7 +532,8 @@ public final class LayoutQuality {
   }
 
   private static boolean routeHasIntegrityIssue(LaidOutEdge edge, LayoutResult result) {
-    if (edge.points().size() < 2) {
+    List<Point> points = routePoints(edge);
+    if (points.size() < 2) {
       return true;
     }
     LaidOutNode source = findNode(result, edge.source());
@@ -447,8 +541,8 @@ public final class LayoutQuality {
     if (source == null || target == null) {
       return false;
     }
-    return !endpointAccepted(edge.points().getFirst(), source, ROUTE_ENDPOINT_TOLERANCE)
-        || !endpointAccepted(edge.points().getLast(), target, ROUTE_ENDPOINT_TOLERANCE);
+    return !endpointAccepted(points.getFirst(), source, ROUTE_ENDPOINT_TOLERANCE)
+        || !endpointAccepted(points.getLast(), target, ROUTE_ENDPOINT_TOLERANCE);
   }
 
   private static LaidOutNode findNode(LayoutResult result, String id) {
@@ -531,20 +625,25 @@ public final class LayoutQuality {
   private static int countConnectorThroughNodes(LayoutResult result) {
     int count = 0;
     for (LaidOutEdge edge : result.edges()) {
-      // Self-loops are excluded from the own-endpoint widening below: they already have a
-      // dedicated degenerate-loop check (LAYOUT_SELF_LOOP_DEGENERATE / selfLoopEscapesNode), and
-      // every ordinary escaping self-loop legitimately re-enters its own node's interior on the
-      // way back out, so widening this metric to them would just create a false-positive class.
+      // Degenerate loops have their own diagnostic. Escaping loops must also be checked for
+      // unintended own-node interior crossings between their valid perimeter attachments.
       boolean selfLoop = edge.source().equals(edge.target());
-      for (int i = 0; i + 1 < edge.points().size(); i++) {
-        Point start = edge.points().get(i);
-        Point end = edge.points().get(i + 1);
+      List<Point> points = routePoints(edge);
+      for (int i = 0; i + 1 < points.size(); i++) {
+        Point start = points.get(i);
+        Point end = points.get(i + 1);
         for (LaidOutNode node : result.nodes()) {
           if (isSequenceChrome(node)) {
             continue;
           }
           boolean ownEndpoint = node.id().equals(edge.source()) || node.id().equals(edge.target());
           if (ownEndpoint) {
+            if (selfLoop
+                && selfLoopEscapesNode(points, node)
+                && segmentPiercesOwnEndpointInterior(start, end, node)) {
+              count++;
+              break;
+            }
             // A lifeline is exempt from the own-endpoint widening for the same reason
             // endpointAccepted/onLifelineAxis exists: a Message anchors to the lifeline *axis*
             // (the head-box centre x, extended downward), which lies inside the head-box
@@ -568,6 +667,155 @@ public final class LayoutQuality {
       }
     }
     return count;
+  }
+
+  /** Counts route/node pairs closer than the standalone 24-unit readability floor. */
+  private static int countRouteNodeClearanceIssues(LayoutResult result) {
+    int count = 0;
+    for (int edgeIndex = 0; edgeIndex < result.edges().size(); edgeIndex++) {
+      LaidOutEdge edge = result.edges().get(edgeIndex);
+      if (routeGeometryError(edge, edgeIndex) != null) {
+        continue;
+      }
+      List<Point> points = qualityRoutePoints(edge);
+      if (points.size() < 2) {
+        continue;
+      }
+      boolean selfLoop = edge.source().equals(edge.target());
+      for (LaidOutNode node : result.nodes()) {
+        if (isSequenceChrome(node)) {
+          continue;
+        }
+        if (LayoutNodeRole.isLifeline(node.role())
+            && (node.id().equals(edge.source()) || node.id().equals(edge.target()))) {
+          continue;
+        }
+        double nearest = Double.POSITIVE_INFINITY;
+        for (int segment = 0; segment + 1 < points.size(); segment++) {
+          if (selfLoop && node.id().equals(edge.source())) {
+            if (selfLoopEscapesNode(points, node)
+                && segmentPiercesOwnEndpointInterior(
+                    points.get(segment), points.get(segment + 1), node)) {
+              count++;
+              break;
+            }
+            continue;
+          }
+          ClearanceSegment clearanceSegment = terminalClearanceSegment(edge, node, points, segment);
+          if (clearanceSegment == null) {
+            continue;
+          }
+          nearest =
+              Math.min(
+                  nearest,
+                  segmentRectangleDistance(clearanceSegment.start(), clearanceSegment.end(), node));
+        }
+        if (nearest <= ROUTE_NODE_CLEARANCE + QUALITY_FLATTENING_MAX_ERROR
+            && refinedRouteViolatesClearance(edge, node)) {
+          count++;
+        }
+      }
+    }
+    return count;
+  }
+
+  private static boolean refinedRouteViolatesClearance(LaidOutEdge edge, LaidOutNode node) {
+    double error = QUALITY_FLATTENING_MAX_ERROR;
+    while (error > NUMERIC_GEOMETRY_EPSILON) {
+      List<Point> refined = flattenAtError(edge, error);
+      double nearest = Double.POSITIVE_INFINITY;
+      for (int segment = 0; segment + 1 < refined.size(); segment++) {
+        ClearanceSegment clearanceSegment = terminalClearanceSegment(edge, node, refined, segment);
+        if (clearanceSegment == null) {
+          continue;
+        }
+        nearest =
+            Math.min(
+                nearest,
+                segmentRectangleDistance(clearanceSegment.start(), clearanceSegment.end(), node));
+      }
+      if (Math.abs(nearest - ROUTE_NODE_CLEARANCE) > error) {
+        return nearest < ROUTE_NODE_CLEARANCE;
+      }
+      error /= 4.0;
+    }
+    return false;
+  }
+
+  private static ClearanceSegment terminalClearanceSegment(
+      LaidOutEdge edge, LaidOutNode node, List<Point> points, int segment) {
+    if (node.id().equals(edge.source())) {
+      double length = 0.0;
+      for (int index = 0; index < segment; index++) {
+        length += pointDistance(points.get(index), points.get(index + 1));
+      }
+      Point start = points.get(segment);
+      Point end = points.get(segment + 1);
+      double segmentLength = pointDistance(start, end);
+      if (length + segmentLength <= TERMINAL_CONTACT_ALLOWANCE) {
+        return null;
+      }
+      if (length < TERMINAL_CONTACT_ALLOWANCE) {
+        start = interpolate(start, end, (TERMINAL_CONTACT_ALLOWANCE - length) / segmentLength);
+      }
+      return new ClearanceSegment(start, end);
+    }
+    if (node.id().equals(edge.target())) {
+      double length = 0.0;
+      for (int index = points.size() - 2; index > segment; index--) {
+        length += pointDistance(points.get(index), points.get(index + 1));
+      }
+      Point start = points.get(segment);
+      Point end = points.get(segment + 1);
+      double segmentLength = pointDistance(start, end);
+      if (length + segmentLength <= TERMINAL_CONTACT_ALLOWANCE) {
+        return null;
+      }
+      if (length < TERMINAL_CONTACT_ALLOWANCE) {
+        end = interpolate(end, start, (TERMINAL_CONTACT_ALLOWANCE - length) / segmentLength);
+      }
+      return new ClearanceSegment(start, end);
+    }
+    return new ClearanceSegment(points.get(segment), points.get(segment + 1));
+  }
+
+  private static double pointDistance(Point left, Point right) {
+    return Math.hypot(left.x() - right.x(), left.y() - right.y());
+  }
+
+  private static Point interpolate(Point start, Point end, double fraction) {
+    return new Point(
+        start.x() + (end.x() - start.x()) * fraction, start.y() + (end.y() - start.y()) * fraction);
+  }
+
+  private static double segmentRectangleDistance(Point start, Point end, LaidOutNode node) {
+    if (segmentIntersectsRect(start, end, node.x(), node.y(), node.width(), node.height())) {
+      return 0.0;
+    }
+    Point topLeft = new Point(node.x(), node.y());
+    Point topRight = new Point(node.x() + node.width(), node.y());
+    Point bottomRight = new Point(node.x() + node.width(), node.y() + node.height());
+    Point bottomLeft = new Point(node.x(), node.y() + node.height());
+    return Math.min(
+        Math.min(
+            segmentDistance(start, end, topLeft, topRight),
+            segmentDistance(start, end, topRight, bottomRight)),
+        Math.min(
+            segmentDistance(start, end, bottomRight, bottomLeft),
+            segmentDistance(start, end, bottomLeft, topLeft)));
+  }
+
+  private static double segmentDistance(Point a, Point b, Point c, Point d) {
+    if (segmentIntersection(a, b, c, d) != null) {
+      return 0.0;
+    }
+    return Math.min(
+        Math.min(pointSegmentDistance(a, c, d), pointSegmentDistance(b, c, d)),
+        Math.min(pointSegmentDistance(c, a, b), pointSegmentDistance(d, a, b)));
+  }
+
+  private static double pointSegmentDistance(Point point, Point start, Point end) {
+    return distanceToSegment(point.x(), point.y(), start, end);
   }
 
   // Widens the through-node check to an edge's own endpoint node: unlike an unrelated node
@@ -644,16 +892,27 @@ public final class LayoutQuality {
       }
     }
     for (LaidOutEdge edge : result.edges()) {
-      for (int i = 0; i + 1 < edge.points().size(); i++) {
-        Point start = edge.points().get(i);
-        Point end = edge.points().get(i + 1);
-        for (var group : result.groups()) {
-          if (groupContainsNode(result, group, edge.source(), new HashSet<>())
-              || groupContainsNode(result, group, edge.target(), new HashSet<>())) {
-            continue;
+      List<Point> points = routePoints(edge);
+      for (LaidOutGroup group : result.groups()) {
+        boolean sourceInGroup = groupContainsNode(result, group, edge.source(), new HashSet<>());
+        boolean targetInGroup = groupContainsNode(result, group, edge.target(), new HashSet<>());
+        if (sourceInGroup && targetInGroup) {
+          if (routeLeavesGroup(points, group)) {
+            count++;
           }
+          continue;
+        }
+        if (sourceInGroup || targetInGroup) {
+          continue;
+        }
+        for (int index = 0; index + 1 < points.size(); index++) {
           if (segmentIntersectsRect(
-              start, end, group.x(), group.y(), group.width(), group.height())) {
+              points.get(index),
+              points.get(index + 1),
+              group.x() + GROUP_BOUNDARY_INTERIOR_INSET,
+              group.y() + GROUP_BOUNDARY_INTERIOR_INSET,
+              group.width() - 2 * GROUP_BOUNDARY_INTERIOR_INSET,
+              group.height() - 2 * GROUP_BOUNDARY_INTERIOR_INSET)) {
             count++;
             break;
           }
@@ -699,8 +958,32 @@ public final class LayoutQuality {
           count++;
         }
       }
+      for (LaidOutEdge edge : result.edges()) {
+        List<Point> points = qualityRoutePoints(edge);
+        for (int index = 0; index + 1 < points.size(); index++) {
+          if (segmentIntersectsRect(
+              points.get(index),
+              points.get(index + 1),
+              group.x(),
+              group.y(),
+              group.width(),
+              GROUP_LABEL_BAND_HEIGHT)) {
+            count++;
+            break;
+          }
+        }
+      }
     }
     return count;
+  }
+
+  private static boolean routeLeavesGroup(List<Point> points, LaidOutGroup group) {
+    for (Point point : points) {
+      if (!pointInRectangle(point, group.x(), group.y(), group.width(), group.height())) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private static int countLabelSpaceIssues(LayoutResult result) {
@@ -723,20 +1006,8 @@ public final class LayoutQuality {
     return count;
   }
 
-  // Detects the layout precondition behind issue #31: a labeled edge trapped between parallel
-  // labeled neighbours so close that a centered edge label cannot sit on its own route without
-  // landing on a neighbour's route. The renderer then displaces the label away from its edge
-  // (often nearer a different edge), and the reader misattributes the relationship. Counting the
-  // trapped edges turns that otherwise-invisible dissociation into a nonzero, envelope-visible
-  // quality signal.
-  //
-  // An edge is trapped when it has at least LABEL_BAND_MIN_NEIGHBOURS unrelated labeled edges whose
-  // same-orientation run sits within LABEL_BAND_GAP perpendicular and overlaps its own run by at
-  // least LABEL_BAND_MIN_OVERLAP. The gap covers ELK Layered's compact/readable edge-edge spacing
-  // (40-48px); a band therefore needs three-plus members, so the outer edges of a band (open space
-  // on one side) and benign two-edge parallels are not counted. Edges sharing an endpoint node are
-  // excluded, matching the crossing and close-parallel checks: a reader groups a fan by its shared
-  // node.
+  // Advisory risk only: an actual route run must have nearby labeled neighbours on both sides.
+  // The renderer separately verifies visible text attachment and reports constrained placement.
   private static int countEdgeLabelDissociations(LayoutResult result) {
     List<LabeledEdgeRuns> labeled = new ArrayList<>();
     List<LaidOutEdge> edges = result.edges();
@@ -746,14 +1017,10 @@ public final class LayoutQuality {
         continue;
       }
       List<RouteSegment> segments = new ArrayList<>();
-      for (int i = 0; i + 1 < edge.points().size(); i++) {
+      List<Point> points = routePoints(edge);
+      for (int i = 0; i + 1 < points.size(); i++) {
         RouteSegment segment =
-            routeSegment(
-                edgeIndex,
-                edge.source(),
-                edge.target(),
-                edge.points().get(i),
-                edge.points().get(i + 1));
+            routeSegment(edgeIndex, edge.source(), edge.target(), points.get(i), points.get(i + 1));
         if (segment != null) {
           segments.add(segment);
         }
@@ -764,36 +1031,32 @@ public final class LayoutQuality {
     }
     int count = 0;
     for (LabeledEdgeRuns edge : labeled) {
-      int neighbours = 0;
-      for (LabeledEdgeRuns other : labeled) {
-        if (other == edge || edgesShareEndpointNode(edge.edge(), other.edge())) {
-          continue;
+      boolean trapped = false;
+      for (RouteSegment run : edge.segments()) {
+        boolean lower = false;
+        boolean higher = false;
+        for (LabeledEdgeRuns other : labeled) {
+          if (other == edge || edgesShareEndpointNode(edge.edge(), other.edge())) {
+            continue;
+          }
+          for (RouteSegment neighbor : other.segments()) {
+            double delta = neighbor.fixed() - run.fixed();
+            if (run.orientation() == neighbor.orientation()
+                && Math.abs(delta) <= LABEL_BAND_GAP
+                && overlapLength(run.min(), run.max(), neighbor.min(), neighbor.max())
+                    >= LABEL_BAND_MIN_OVERLAP) {
+              lower |= delta < -GEOMETRY_EPSILON;
+              higher |= delta > GEOMETRY_EPSILON;
+            }
+          }
         }
-        if (runsCompeteForLabelBand(edge.segments(), other.segments())) {
-          neighbours++;
-        }
+        trapped |= lower && higher;
       }
-      if (neighbours >= LABEL_BAND_MIN_NEIGHBOURS) {
+      if (trapped) {
         count++;
       }
     }
     return count;
-  }
-
-  private static boolean runsCompeteForLabelBand(
-      List<RouteSegment> left, List<RouteSegment> right) {
-    for (RouteSegment leftSegment : left) {
-      for (RouteSegment rightSegment : right) {
-        if (leftSegment.orientation() == rightSegment.orientation()
-            && Math.abs(leftSegment.fixed() - rightSegment.fixed()) <= LABEL_BAND_GAP
-            && overlapLength(
-                    leftSegment.min(), leftSegment.max(), rightSegment.min(), rightSegment.max())
-                >= LABEL_BAND_MIN_OVERLAP) {
-          return true;
-        }
-      }
-    }
-    return false;
   }
 
   private static LaidOutGroup findGroup(LayoutResult result, String id) {
@@ -836,14 +1099,10 @@ public final class LayoutQuality {
     var segments = new ArrayList<RouteSegment>();
     for (int edgeIndex = 0; edgeIndex < result.edges().size(); edgeIndex++) {
       LaidOutEdge edge = result.edges().get(edgeIndex);
-      for (int i = 0; i + 1 < edge.points().size(); i++) {
+      List<Point> points = routePoints(edge);
+      for (int i = 0; i + 1 < points.size(); i++) {
         RouteSegment segment =
-            routeSegment(
-                edgeIndex,
-                edge.source(),
-                edge.target(),
-                edge.points().get(i),
-                edge.points().get(i + 1));
+            routeSegment(edgeIndex, edge.source(), edge.target(), points.get(i), points.get(i + 1));
         if (segment != null) {
           segments.add(segment);
         }
@@ -906,8 +1165,12 @@ public final class LayoutQuality {
     return Math.max(0.0, Math.min(leftMax, rightMax) - Math.max(leftMin, rightMin));
   }
 
-  private static boolean hasExcessiveDetour(List<Point> points) {
+  private static boolean hasExcessiveDetour(LaidOutEdge edge, LayoutResult result) {
+    List<Point> points = routePoints(edge);
     if (points.size() < 2) {
+      return false;
+    }
+    if (directRouteIsBlocked(edge, points, result)) {
       return false;
     }
     double routeLength = routeLength(points);
@@ -919,6 +1182,25 @@ public final class LayoutQuality {
     return directLength > 0.0
         && routeLength > directLength * detourRatio
         && routeLength - directLength > ROUTE_DETOUR_EXCESS;
+  }
+
+  // This is a witness check, not a router: when the direct candidate crosses an unrelated node,
+  // the measured route may be longer for a necessary reason and remains advisory-clean.
+  private static boolean directRouteIsBlocked(
+      LaidOutEdge edge, List<Point> points, LayoutResult result) {
+    Point start = points.getFirst();
+    Point end = points.getLast();
+    for (LaidOutNode node : result.nodes()) {
+      if (node.id().equals(edge.source())
+          || node.id().equals(edge.target())
+          || isSequenceChrome(node)) {
+        continue;
+      }
+      if (segmentIntersectsRect(start, end, node.x(), node.y(), node.width(), node.height())) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private static boolean isSimpleSideReturn(List<Point> points) {
@@ -973,19 +1255,26 @@ public final class LayoutQuality {
 
   private static boolean segmentIntersectsRect(
       Point start, Point end, double rectX, double rectY, double rectWidth, double rectHeight) {
-    double minX = Math.min(start.x(), end.x());
-    double maxX = Math.max(start.x(), end.x());
-    double minY = Math.min(start.y(), end.y());
-    double maxY = Math.max(start.y(), end.y());
-    return rectanglesOverlap(
-        minX,
-        minY,
-        Math.max(maxX - minX, 1.0),
-        Math.max(maxY - minY, 1.0),
-        rectX,
-        rectY,
-        rectWidth,
-        rectHeight);
+    if (pointInRectangle(start, rectX, rectY, rectWidth, rectHeight)
+        || pointInRectangle(end, rectX, rectY, rectWidth, rectHeight)) {
+      return true;
+    }
+    Point topLeft = new Point(rectX, rectY);
+    Point topRight = new Point(rectX + rectWidth, rectY);
+    Point bottomRight = new Point(rectX + rectWidth, rectY + rectHeight);
+    Point bottomLeft = new Point(rectX, rectY + rectHeight);
+    return segmentIntersection(start, end, topLeft, topRight) != null
+        || segmentIntersection(start, end, topRight, bottomRight) != null
+        || segmentIntersection(start, end, bottomRight, bottomLeft) != null
+        || segmentIntersection(start, end, bottomLeft, topLeft) != null;
+  }
+
+  private static boolean pointInRectangle(
+      Point point, double rectX, double rectY, double rectWidth, double rectHeight) {
+    return point.x() >= rectX
+        && point.x() <= rectX + rectWidth
+        && point.y() >= rectY
+        && point.y() <= rectY + rectHeight;
   }
 
   private static double distanceToRoute(double x, double y, List<Point> points) {
@@ -1007,33 +1296,182 @@ public final class LayoutQuality {
     return Math.hypot(x - (start.x() + t * dx), y - (start.y() + t * dy));
   }
 
-  private static int countEdgeCrossings(LayoutResult result) {
+  private static int countRouteOverlaps(LayoutResult result) {
     int count = 0;
-    for (int i = 0; i < result.edges().size(); i++) {
-      for (int j = i + 1; j < result.edges().size(); j++) {
-        LaidOutEdge left = result.edges().get(i);
-        LaidOutEdge right = result.edges().get(j);
-        if (routesProperlyCross(left.points(), right.points())) {
-          count++;
+    for (int leftIndex = 0; leftIndex < result.edges().size(); leftIndex++) {
+      LaidOutEdge left = result.edges().get(leftIndex);
+      if (routeGeometryError(left, leftIndex) != null) {
+        continue;
+      }
+      List<Point> leftPoints = qualityRoutePoints(left);
+      for (int rightIndex = leftIndex + 1; rightIndex < result.edges().size(); rightIndex++) {
+        LaidOutEdge right = result.edges().get(rightIndex);
+        if (routeGeometryError(right, rightIndex) != null) {
+          continue;
         }
+        List<Point> rightPoints = qualityRoutePoints(right);
+        List<Point> events = new ArrayList<>();
+        for (int i = 0; i + 1 < leftPoints.size(); i++) {
+          for (int j = 0; j + 1 < rightPoints.size(); j++) {
+            Point event =
+                collinearOverlapMidpoint(
+                    leftPoints.get(i),
+                    leftPoints.get(i + 1),
+                    rightPoints.get(j),
+                    rightPoints.get(j + 1));
+            if (event != null
+                && !isIntentionalTerminalOverlap(left, right, event, leftPoints, rightPoints)) {
+              addDistinctEvent(events, event);
+            }
+          }
+        }
+        count += events.size();
       }
     }
     return count;
   }
 
-  private static boolean edgesShareEndpointNode(LaidOutEdge left, LaidOutEdge right) {
-    return left.source().equals(right.source())
-        || left.source().equals(right.target())
-        || left.target().equals(right.source())
-        || left.target().equals(right.target());
+  private static boolean isIntentionalTerminalOverlap(
+      LaidOutEdge left,
+      LaidOutEdge right,
+      Point event,
+      List<Point> leftPoints,
+      List<Point> rightPoints) {
+    return left.routingHints().contains("shared_source_junction")
+            && right.routingHints().contains("shared_source_junction")
+            && left.source().equals(right.source())
+            && sharedPrefixContains(leftPoints, rightPoints, event)
+        || left.routingHints().contains("shared_target_junction")
+            && right.routingHints().contains("shared_target_junction")
+            && left.target().equals(right.target())
+            && sharedSuffixContains(leftPoints, rightPoints, event);
   }
 
-  private static boolean routesProperlyCross(List<Point> leftPoints, List<Point> rightPoints) {
-    for (int i = 0; i + 1 < leftPoints.size(); i++) {
-      for (int j = 0; j + 1 < rightPoints.size(); j++) {
-        if (segmentsProperlyCross(
-            leftPoints.get(i), leftPoints.get(i + 1),
-            rightPoints.get(j), rightPoints.get(j + 1))) {
+  private static boolean sharedPrefixContains(List<Point> left, List<Point> right, Point event) {
+    return sharedTerminalContains(left, right, event, false);
+  }
+
+  private static boolean sharedSuffixContains(List<Point> left, List<Point> right, Point event) {
+    return sharedTerminalContains(left, right, event, true);
+  }
+
+  private static boolean sharedTerminalContains(
+      List<Point> left, List<Point> right, Point event, boolean reverse) {
+    int step = reverse ? -1 : 1;
+    int leftIndex = reverse ? left.size() - 1 : 0;
+    int rightIndex = reverse ? right.size() - 1 : 0;
+    Point leftCurrent = left.get(leftIndex);
+    Point rightCurrent = right.get(rightIndex);
+    while (leftIndex + step >= 0
+        && leftIndex + step < left.size()
+        && rightIndex + step >= 0
+        && rightIndex + step < right.size()) {
+      if (!near(leftCurrent, rightCurrent)) {
+        return false;
+      }
+      Point leftEnd = left.get(leftIndex + step);
+      Point rightEnd = right.get(rightIndex + step);
+      double leftDx = leftEnd.x() - leftCurrent.x();
+      double leftDy = leftEnd.y() - leftCurrent.y();
+      double rightDx = rightEnd.x() - rightCurrent.x();
+      double rightDy = rightEnd.y() - rightCurrent.y();
+      double leftLength = Math.hypot(leftDx, leftDy);
+      double rightLength = Math.hypot(rightDx, rightDy);
+      if (leftLength <= NUMERIC_GEOMETRY_EPSILON || rightLength <= NUMERIC_GEOMETRY_EPSILON) {
+        return false;
+      }
+      if (Math.abs(crossVector(leftDx, leftDy, rightDx, rightDy))
+              > orientationTolerance(leftCurrent, leftEnd, rightEnd)
+          || leftDx * rightDx + leftDy * rightDy <= 0.0) {
+        return false;
+      }
+      double sharedLength = Math.min(leftLength, rightLength);
+      Point sharedEnd =
+          new Point(
+              leftCurrent.x() + leftDx * sharedLength / leftLength,
+              leftCurrent.y() + leftDy * sharedLength / leftLength);
+      if (pointOnSegment(event, leftCurrent, sharedEnd)) {
+        return true;
+      }
+      if (leftLength <= rightLength + NUMERIC_GEOMETRY_EPSILON) {
+        leftIndex += step;
+        leftCurrent = leftEnd;
+      } else {
+        leftCurrent = sharedEnd;
+      }
+      if (rightLength <= leftLength + NUMERIC_GEOMETRY_EPSILON) {
+        rightIndex += step;
+        rightCurrent = rightEnd;
+      } else {
+        rightCurrent = sharedEnd;
+      }
+    }
+    return false;
+  }
+
+  private static int countEdgeCrossings(LayoutResult result) {
+    int count = 0;
+    for (int leftIndex = 0; leftIndex < result.edges().size(); leftIndex++) {
+      LaidOutEdge left = result.edges().get(leftIndex);
+      if (routeGeometryError(left, leftIndex) != null) {
+        continue;
+      }
+      for (int rightIndex = leftIndex + 1; rightIndex < result.edges().size(); rightIndex++) {
+        LaidOutEdge right = result.edges().get(rightIndex);
+        if (routeGeometryError(right, rightIndex) != null) {
+          continue;
+        }
+        List<Point> events = crossingEvents(left, right);
+        count += events.size();
+      }
+    }
+    return count;
+  }
+
+  private static List<Point> crossingEvents(LaidOutEdge left, LaidOutEdge right) {
+    List<Point> leftPoints = qualityRoutePoints(left);
+    List<Point> rightPoints = qualityRoutePoints(right);
+    List<Point> coarse = crossingEvents(leftPoints, rightPoints);
+    if (left.route() instanceof PolylineRoute && right.route() instanceof PolylineRoute) {
+      return coarse;
+    }
+    double error = QUALITY_FLATTENING_MAX_ERROR;
+    List<Point> events = coarse;
+    while (hasUnresolvedCrossingAmbiguity(leftPoints, rightPoints, events, error)
+        && error > EVENT_DEDUPLICATION_TOLERANCE * 1.0e-6) {
+      error /= 4.0;
+      leftPoints = flattenAtError(left, error);
+      rightPoints = flattenAtError(right, error);
+      events = crossingEvents(leftPoints, rightPoints);
+    }
+    return events;
+  }
+
+  private static List<Point> flattenAtError(LaidOutEdge edge, double error) {
+    try {
+      return RouteGeometry.flatten(edge.route(), error);
+    } catch (IllegalArgumentException exception) {
+      return List.of();
+    }
+  }
+
+  private static boolean hasUnresolvedCrossingAmbiguity(
+      List<Point> left, List<Point> right, List<Point> events, double error) {
+    for (int i = 0; i + 1 < left.size(); i++) {
+      for (int j = 0; j + 1 < right.size(); j++) {
+        Point start = left.get(i);
+        Point end = left.get(i + 1);
+        Point otherStart = right.get(j);
+        Point otherEnd = right.get(j + 1);
+        if (!segmentBoundsWithin(start, end, otherStart, otherEnd, 2.0 * error)
+            || segmentDistance(start, end, otherStart, otherEnd) > 2.0 * error) {
+          continue;
+        }
+        if (events.stream()
+            .noneMatch(
+                event ->
+                    pointOnSegment(event, start, end)
+                        && pointOnSegment(event, otherStart, otherEnd))) {
           return true;
         }
       }
@@ -1041,18 +1479,179 @@ public final class LayoutQuality {
     return false;
   }
 
-  // Proper crossing only (interiors intersect). Touches and collinear overlaps are excluded so
-  // orthogonal routes that share a corner coordinate do not count as crossings.
-  private static boolean segmentsProperlyCross(Point a, Point b, Point c, Point d) {
-    double o1 = orientation(a, b, c);
-    double o2 = orientation(a, b, d);
-    double o3 = orientation(c, d, a);
-    double o4 = orientation(c, d, b);
-    return o1 * o2 < 0 && o3 * o4 < 0;
+  private static boolean segmentBoundsWithin(Point a, Point b, Point c, Point d, double distance) {
+    return Math.max(Math.min(a.x(), b.x()), Math.min(c.x(), d.x()))
+            <= Math.min(Math.max(a.x(), b.x()), Math.max(c.x(), d.x())) + distance
+        && Math.max(Math.min(a.y(), b.y()), Math.min(c.y(), d.y()))
+            <= Math.min(Math.max(a.y(), b.y()), Math.max(c.y(), d.y())) + distance;
   }
 
-  private static double orientation(Point a, Point b, Point c) {
-    return (b.x() - a.x()) * (c.y() - a.y()) - (b.y() - a.y()) * (c.x() - a.x());
+  private static List<Point> crossingEvents(List<Point> left, List<Point> right) {
+    List<Point> events = new ArrayList<>();
+    for (int i = 0; i + 1 < left.size(); i++) {
+      for (int j = 0; j + 1 < right.size(); j++) {
+        Point event =
+            properSegmentIntersection(left.get(i), left.get(i + 1), right.get(j), right.get(j + 1));
+        if (event != null && !isGlobalEndpoint(event, left) && !isGlobalEndpoint(event, right)) {
+          addDistinctEvent(events, event);
+        }
+      }
+    }
+    for (int i = 1; i + 1 < left.size(); i++) {
+      if (vertexCrossesRoute(left, i, right) && !isGlobalEndpoint(left.get(i), right)) {
+        addDistinctEvent(events, left.get(i));
+      }
+    }
+    for (int i = 1; i + 1 < right.size(); i++) {
+      if (vertexCrossesRoute(right, i, left) && !isGlobalEndpoint(right.get(i), left)) {
+        addDistinctEvent(events, right.get(i));
+      }
+    }
+    return events;
+  }
+
+  private static boolean vertexCrossesRoute(List<Point> route, int vertexIndex, List<Point> other) {
+    Point vertex = route.get(vertexIndex);
+    for (int segment = 0; segment + 1 < other.size(); segment++) {
+      Point start = other.get(segment);
+      Point end = other.get(segment + 1);
+      if (!pointOnSegment(vertex, start, end)) {
+        continue;
+      }
+      double before = cross(start, end, route.get(vertexIndex - 1));
+      double after = cross(start, end, route.get(vertexIndex + 1));
+      if (opposite(
+          before,
+          after,
+          orientationTolerance(
+              start, end, route.get(vertexIndex - 1), route.get(vertexIndex + 1)))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static Point properSegmentIntersection(Point a, Point b, Point c, Point d) {
+    double denominator = crossVector(b.x() - a.x(), b.y() - a.y(), d.x() - c.x(), d.y() - c.y());
+    if (Math.abs(denominator) <= orientationTolerance(a, b, c, d)) {
+      return null;
+    }
+    double t =
+        crossVector(c.x() - a.x(), c.y() - a.y(), d.x() - c.x(), d.y() - c.y()) / denominator;
+    double u =
+        crossVector(c.x() - a.x(), c.y() - a.y(), b.x() - a.x(), b.y() - a.y()) / denominator;
+    double tolerance =
+        coordinateTolerance(a, b, c, d) / Math.max(1.0, Math.hypot(b.x() - a.x(), b.y() - a.y()));
+    if (t <= tolerance || t >= 1.0 - tolerance || u <= tolerance || u >= 1.0 - tolerance) {
+      return null;
+    }
+    return new Point(a.x() + t * (b.x() - a.x()), a.y() + t * (b.y() - a.y()));
+  }
+
+  private static Point segmentIntersection(Point a, Point b, Point c, Point d) {
+    Point proper = properSegmentIntersection(a, b, c, d);
+    if (proper != null) {
+      return proper;
+    }
+    for (Point candidate : List.of(a, b, c, d)) {
+      if (pointOnSegment(candidate, a, b) && pointOnSegment(candidate, c, d)) {
+        return candidate;
+      }
+    }
+    return null;
+  }
+
+  private static Point collinearOverlapMidpoint(Point a, Point b, Point c, Point d) {
+    double tolerance = orientationTolerance(a, b, c, d);
+    if (Math.abs(cross(a, b, c)) > tolerance || Math.abs(cross(a, b, d)) > tolerance) {
+      return null;
+    }
+    boolean xAxis = Math.abs(b.x() - a.x()) >= Math.abs(b.y() - a.y());
+    double a0 = xAxis ? a.x() : a.y();
+    double a1 = xAxis ? b.x() : b.y();
+    double c0 = xAxis ? c.x() : c.y();
+    double c1 = xAxis ? d.x() : d.y();
+    double start = Math.max(Math.min(a0, a1), Math.min(c0, c1));
+    double end = Math.min(Math.max(a0, a1), Math.max(c0, c1));
+    if (end - start <= EVENT_DEDUPLICATION_TOLERANCE) {
+      return null;
+    }
+    double factor = (start + end) / 2.0 - a0;
+    double length = xAxis ? b.x() - a.x() : b.y() - a.y();
+    double t = factor / length;
+    return new Point(a.x() + t * (b.x() - a.x()), a.y() + t * (b.y() - a.y()));
+  }
+
+  private static void addDistinctEvent(List<Point> events, Point candidate) {
+    if (events.stream().noneMatch(existing -> near(existing, candidate))) {
+      events.add(candidate);
+    }
+  }
+
+  private static boolean isGlobalEndpoint(Point candidate, List<Point> points) {
+    return !points.isEmpty()
+        && (near(candidate, points.getFirst()) || near(candidate, points.getLast()));
+  }
+
+  private static boolean near(Point left, Point right) {
+    return Math.hypot(left.x() - right.x(), left.y() - right.y()) <= EVENT_DEDUPLICATION_TOLERANCE;
+  }
+
+  private static boolean pointOnSegment(Point point, Point start, Point end) {
+    double tolerance = orientationTolerance(point, start, end);
+    return Math.abs(cross(start, end, point)) <= tolerance
+        && point.x() >= Math.min(start.x(), end.x()) - coordinateTolerance(point, start, end)
+        && point.x() <= Math.max(start.x(), end.x()) + coordinateTolerance(point, start, end)
+        && point.y() >= Math.min(start.y(), end.y()) - coordinateTolerance(point, start, end)
+        && point.y() <= Math.max(start.y(), end.y()) + coordinateTolerance(point, start, end);
+  }
+
+  private static boolean opposite(double left, double right, double tolerance) {
+    return left < -tolerance && right > tolerance || left > tolerance && right < -tolerance;
+  }
+
+  private static double orientationTolerance(Point... points) {
+    double minX = points[0].x();
+    double minY = points[0].y();
+    double maxX = minX;
+    double maxY = minY;
+    for (Point point : points) {
+      minX = Math.min(minX, point.x());
+      minY = Math.min(minY, point.y());
+      maxX = Math.max(maxX, point.x());
+      maxY = Math.max(maxY, point.y());
+    }
+    double scale = Math.max(1.0, Math.max(maxX - minX, maxY - minY));
+    return NUMERIC_GEOMETRY_EPSILON * scale * scale;
+  }
+
+  private static double coordinateTolerance(Point... points) {
+    double minX = points[0].x();
+    double minY = points[0].y();
+    double maxX = minX;
+    double maxY = minY;
+    for (Point point : points) {
+      minX = Math.min(minX, point.x());
+      minY = Math.min(minY, point.y());
+      maxX = Math.max(maxX, point.x());
+      maxY = Math.max(maxY, point.y());
+    }
+    return NUMERIC_GEOMETRY_EPSILON * Math.max(1.0, Math.max(maxX - minX, maxY - minY));
+  }
+
+  private static double cross(Point a, Point b, Point c) {
+    return crossVector(b.x() - a.x(), b.y() - a.y(), c.x() - a.x(), c.y() - a.y());
+  }
+
+  private static double crossVector(double ax, double ay, double bx, double by) {
+    return ax * by - ay * bx;
+  }
+
+  private static boolean edgesShareEndpointNode(LaidOutEdge left, LaidOutEdge right) {
+    return left.source().equals(right.source())
+        || left.source().equals(right.target())
+        || left.target().equals(right.source())
+        || left.target().equals(right.target());
   }
 
   private enum Orientation {
@@ -1068,6 +1667,8 @@ public final class LayoutQuality {
       double fixed,
       double min,
       double max) {}
+
+  private record ClearanceSegment(Point start, Point end) {}
 
   private record LabeledEdgeRuns(LaidOutEdge edge, List<RouteSegment> segments) {}
 }

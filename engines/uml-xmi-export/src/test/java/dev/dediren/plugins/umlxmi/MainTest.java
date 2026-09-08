@@ -774,7 +774,7 @@ class MainTest {
                     """
                 {"id":"customer-is-account","source":"class-customer","target":"class-account",
                  "source_id":"customer-is-account","projection_id":"customer-is-account",
-                 "points":[{"x":120,"y":112},{"x":700,"y":112}],"label":""}
+                 "route":{"kind":"polyline","points":[{"x":120,"y":112},{"x":700,"y":112}]},"label":""}
                 """));
 
     String xml = exportXml(input);
@@ -838,7 +838,7 @@ class MainTest {
                 .readTree(
                     """
                 {"id":"m-delete","source":"customer","target":"service","source_id":"m-delete",
-                 "projection_id":"m-delete","points":[{"x":166,"y":360},{"x":442,"y":360}],
+                 "projection_id":"m-delete","route":{"kind":"polyline","points":[{"x":166,"y":360},{"x":442,"y":360}]},
                  "label":"close"}
                 """));
 
@@ -931,10 +931,10 @@ class MainTest {
                   "target": "payment",
                   "source_id": "m-between-fragments",
                   "projection_id": "m-between-fragments",
-                  "points": [
+                  "route":{"kind":"polyline","points": [
                     { "x": 394, "y": 360 },
                     { "x": 850, "y": 360 }
-                  ],
+                  ]},
                   "label": "authorizeStandalone"
                 }
                 """));
@@ -1072,7 +1072,7 @@ class MainTest {
                   "target": "service-destroyed",
                   "source_id": "m5",
                   "projection_id": "m5",
-                  "points": [ { "x": 166, "y": 298 }, { "x": 442, "y": 298 } ],
+                  "route":{"kind":"polyline","points": [ { "x": 166, "y": 298 }, { "x": 442, "y": 298 } ]},
                   "label": "cancelOrder"
                 }
                 """));

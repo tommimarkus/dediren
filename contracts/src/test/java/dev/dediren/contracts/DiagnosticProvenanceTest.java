@@ -76,7 +76,7 @@ class DiagnosticProvenanceTest {
       root.put("status", "warning");
       root.putArray("diagnostics").add(diagnostic);
     } else if (schemaPath.endsWith("layout-result.schema.json")) {
-      root.put("layout_result_schema_version", "layout-result.schema.v2");
+      root.put("layout_result_schema_version", "layout-result.schema.v3");
       root.put("view_id", "main");
       root.putArray("nodes");
       root.putArray("edges");

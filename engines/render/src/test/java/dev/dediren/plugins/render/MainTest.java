@@ -34,7 +34,7 @@ class MainTest {
 
   private static final String MINIMAL_LAYOUT =
       """
-            {"layout_result_schema_version":"layout-result.schema.v2","view_id":"t","nodes":[{"id":"n","source_id":"n","projection_id":"n","x":0,"y":0,"width":200,"height":100,"label":"Node"}],"edges":[],"groups":[],"warnings":[]}""";
+            {"layout_result_schema_version":"layout-result.schema.v3","view_id":"t","nodes":[{"id":"n","source_id":"n","projection_id":"n","x":0,"y":0,"width":200,"height":100,"label":"Node"}],"edges":[],"groups":[],"warnings":[]}""";
 
   @Test
   void moduleLoads() {
@@ -1068,7 +1068,7 @@ class MainTest {
                     "source": "class-customer", "target": "class-order",
                     "source_id": "customer-places-order",
                     "projection_id": "customer-places-order",
-                    "points": [{"x": 200, "y": 100}, {"x": 400, "y": 100}],
+                    "route": {"kind": "polyline", "points": [{"x": 200, "y": 100}, {"x": 400, "y": 100}]},
                     "label": "places"
                   }
                   """));
@@ -1175,7 +1175,7 @@ class MainTest {
                     "id": "order-has-lines",
                     "source": "class-order", "target": "class-order-line",
                     "source_id": "order-has-lines", "projection_id": "order-has-lines",
-                    "points": [{"x": 510, "y": 130}, {"x": 510, "y": 320}],
+                    "route": {"kind": "polyline", "points": [{"x": 510, "y": 130}, {"x": 510, "y": 320}]},
                     "label": "lines"
                   }
                   """));
@@ -1257,7 +1257,7 @@ class MainTest {
     @Test
     void archimateGroupingMetadataRendersGroupDecorator() throws Exception {
       ObjectNode layout = JsonSupport.objectMapper().createObjectNode();
-      layout.put("layout_result_schema_version", "layout-result.schema.v2");
+      layout.put("layout_result_schema_version", "layout-result.schema.v3");
       layout.put("view_id", "main");
       layout.set("nodes", JsonSupport.objectMapper().createArrayNode());
       layout.set("edges", JsonSupport.objectMapper().createArrayNode());
@@ -1340,7 +1340,7 @@ class MainTest {
     @Test
     void nonGroupingGroupContainerRendersSolidBorder() throws Exception {
       ObjectNode layout = JsonSupport.objectMapper().createObjectNode();
-      layout.put("layout_result_schema_version", "layout-result.schema.v2");
+      layout.put("layout_result_schema_version", "layout-result.schema.v3");
       layout.put("view_id", "main");
       layout.set("nodes", JsonSupport.objectMapper().createArrayNode());
       layout.set("edges", JsonSupport.objectMapper().createArrayNode());
@@ -2302,11 +2302,11 @@ class MainTest {
                         "target": "target-node",
                         "source_id": "routed-edge",
                         "projection_id": "routed-edge",
-                        "points": [
+                        "route": {"kind": "polyline", "points": [
                           { "x": 100, "y": 0 },
                           { "x": 100, "y": 100 },
                           { "x": 100, "y": 200 }
-                        ],
+                        ]},
                         "label": "routed label"
                       }
                     ]
@@ -2342,10 +2342,10 @@ class MainTest {
                         "target": "target-node",
                         "source_id": "horizontal-edge",
                         "projection_id": "horizontal-edge",
-                        "points": [
+                        "route": {"kind": "polyline", "points": [
                           { "x": 0, "y": 120 },
                           { "x": 100, "y": 120 }
-                        ],
+                        ]},
                         "label": "start"
                       }
                     ]
@@ -2375,10 +2375,10 @@ class MainTest {
                         "target": "target-node",
                         "source_id": "horizontal-edge",
                         "projection_id": "horizontal-edge",
-                        "points": [
+                        "route": {"kind": "polyline", "points": [
                           { "x": 0, "y": 120 },
                           { "x": 100, "y": 120 }
-                        ],
+                        ]},
                         "label": "center label"
                       }
                     ]
@@ -2421,13 +2421,13 @@ class MainTest {
                         "target": "target-node",
                         "source_id": "labeled-edge",
                         "projection_id": "labeled-edge",
-                        "points": [
+                        "route": {"kind": "polyline", "points": [
                           { "x": 478, "y": 248 },
                           { "x": 542, "y": 248 },
                           { "x": 688, "y": 248 },
                           { "x": 849, "y": 248 },
                           { "x": 849, "y": 361 }
-                        ],
+                        ]},
                         "label": "requests payment authorization"
                       },
                       {
@@ -2436,10 +2436,10 @@ class MainTest {
                         "target": "right",
                         "source_id": "crossing-route",
                         "projection_id": "crossing-route",
-                        "points": [
+                        "route": {"kind": "polyline", "points": [
                           { "x": 397, "y": 313 },
                           { "x": 687, "y": 313 }
-                        ],
+                        ]},
                         "label": ""
                       }
                     ]
@@ -2469,10 +2469,10 @@ class MainTest {
                         "target": "right",
                         "source_id": "labeled-edge",
                         "projection_id": "labeled-edge",
-                        "points": [
+                        "route": {"kind": "polyline", "points": [
                           { "x": 100, "y": 200 },
                           { "x": 300, "y": 200 }
-                        ],
+                        ]},
                         "label": "shared route label"
                       },
                       {
@@ -2481,16 +2481,17 @@ class MainTest {
                         "target": "right-copy",
                         "source_id": "identical-route",
                         "projection_id": "identical-route",
-                        "points": [
+                        "route": {"kind": "polyline", "points": [
                           { "x": 100, "y": 200 },
                           { "x": 300, "y": 200 }
-                        ],
+                        ]},
                         "label": ""
                       }
                     ]
                     """,
               "{ \"edge\": { \"label_horizontal_position\": \"center\" } }");
-      Document document = svgDocument(okContent(render(input)));
+      Document document =
+          svgDocument(warningContent(render(input), "DEDIREN_RENDER_EDGE_LABEL_CONSTRAINED"));
 
       Element edge = groupWithAttribute(document, "data-dediren-edge-id", "labeled-edge");
       java.util.List<Element> labels = childElements(edge, "text");
@@ -2514,10 +2515,10 @@ class MainTest {
                         "target": "right",
                         "source_id": "duplicate-route",
                         "projection_id": "duplicate-route",
-                        "points": [
+                        "route": {"kind": "polyline", "points": [
                           { "x": 100, "y": 200 },
                           { "x": 300, "y": 200 }
-                        ],
+                        ]},
                         "label": "shared route label"
                       },
                       {
@@ -2526,16 +2527,17 @@ class MainTest {
                         "target": "right-copy",
                         "source_id": "duplicate-route-copy",
                         "projection_id": "duplicate-route-copy",
-                        "points": [
+                        "route": {"kind": "polyline", "points": [
                           { "x": 100, "y": 200 },
                           { "x": 300, "y": 200 }
-                        ],
+                        ]},
                         "label": ""
                       }
                     ]
                     """,
               "{ \"edge\": { \"label_horizontal_position\": \"center\" } }");
-      Document document = svgDocument(okContent(render(input)));
+      Document document =
+          svgDocument(warningContent(render(input), "DEDIREN_RENDER_EDGE_LABEL_CONSTRAINED"));
 
       Element edge = groupWithAttribute(document, "data-dediren-edge-id", "duplicate-route");
       java.util.List<Element> labels = childElements(edge, "text");
@@ -2559,10 +2561,10 @@ class MainTest {
                         "target": "right",
                         "source_id": "labeled-edge",
                         "projection_id": "labeled-edge",
-                        "points": [
+                        "route": {"kind": "polyline", "points": [
                           { "x": 300, "y": 120 },
                           { "x": 500, "y": 120 }
-                        ],
+                        ]},
                         "label": "pay"
                       },
                       {
@@ -2571,10 +2573,10 @@ class MainTest {
                         "target": "near-right",
                         "source_id": "endpoint-route",
                         "projection_id": "endpoint-route",
-                        "points": [
+                        "route": {"kind": "polyline", "points": [
                           { "x": 240, "y": 138 },
                           { "x": 300, "y": 138 }
-                        ],
+                        ]},
                         "label": ""
                       }
                     ]
@@ -2603,11 +2605,11 @@ class MainTest {
                         "target": "bottom",
                         "source_id": "mixed-route",
                         "projection_id": "mixed-route",
-                        "points": [
+                        "route": {"kind": "polyline", "points": [
                           { "x": 100, "y": 200 },
                           { "x": 300, "y": 200 },
                           { "x": 300, "y": 330 }
-                        ],
+                        ]},
                         "label": "vertical fallback clear"
                       },
                       {
@@ -2616,10 +2618,10 @@ class MainTest {
                         "target": "block-bottom-left",
                         "source_id": "left-candidate-blocker",
                         "projection_id": "left-candidate-blocker",
-                        "points": [
+                        "route": {"kind": "polyline", "points": [
                           { "x": 100, "y": 50 },
                           { "x": 100, "y": 380 }
-                        ],
+                        ]},
                         "label": ""
                       },
                       {
@@ -2628,10 +2630,10 @@ class MainTest {
                         "target": "block-bottom-middle",
                         "source_id": "middle-candidate-blocker",
                         "projection_id": "middle-candidate-blocker",
-                        "points": [
+                        "route": {"kind": "polyline", "points": [
                           { "x": 250, "y": 50 },
                           { "x": 250, "y": 380 }
-                        ],
+                        ]},
                         "label": ""
                       }
                     ]
@@ -2683,10 +2685,10 @@ class MainTest {
                         "target": "right",
                         "source_id": "group-title-edge",
                         "projection_id": "group-title-edge",
-                        "points": [
+                        "route": {"kind": "polyline", "points": [
                           { "x": 300, "y": 80 },
                           { "x": 620, "y": 80 }
-                        ],
+                        ]},
                         "label": "must clear group label"
                       }
                     ]
@@ -2698,7 +2700,15 @@ class MainTest {
       java.util.List<Element> labels = childElements(edge, "text");
       Element label = labels.get(labels.size() - 1);
 
-      assertThat(rectanglesIntersect(textBox(label), 250.0, 70.0, 840.0, 94.0)).isFalse();
+      Element title =
+          firstChildElement(
+              groupWithAttribute(document, "data-dediren-group-id", "application-services"),
+              "text");
+      double[] titleBox = textBox(title);
+      assertThat(
+              rectanglesIntersect(
+                  textBox(label), titleBox[0], titleBox[1], titleBox[2], titleBox[3]))
+          .isFalse();
     }
 
     @Test
@@ -2715,10 +2725,10 @@ class MainTest {
                         "target": "target-node",
                         "source_id": "labeled-edge",
                         "projection_id": "labeled-edge",
-                        "points": [
+                        "route": {"kind": "polyline", "points": [
                           { "x": 0, "y": 100 },
                           { "x": 200, "y": 100 }
-                        ],
+                        ]},
                         "label": "clear label"
                       }
                     ]
@@ -2760,10 +2770,10 @@ class MainTest {
                         "target": "target-node",
                         "source_id": "labeled-edge",
                         "projection_id": "labeled-edge",
-                        "points": [
+                        "route": {"kind": "polyline", "points": [
                           { "x": 0, "y": 100 },
                           { "x": 200, "y": 100 }
-                        ],
+                        ]},
                         "label": "clear label"
                       }
                     ]
@@ -2804,10 +2814,10 @@ class MainTest {
                         "target": "right",
                         "source_id": "first-edge",
                         "projection_id": "first-edge",
-                        "points": [
+                        "route": {"kind": "polyline", "points": [
                           { "x": 0, "y": 100 },
                           { "x": 200, "y": 100 }
-                        ],
+                        ]},
                         "label": "first"
                       },
                       {
@@ -2816,10 +2826,10 @@ class MainTest {
                         "target": "bottom",
                         "source_id": "front-edge",
                         "projection_id": "front-edge",
-                        "points": [
+                        "route": {"kind": "polyline", "points": [
                           { "x": 100, "y": 0 },
                           { "x": 100, "y": 200 }
-                        ],
+                        ]},
                         "label": "front"
                       }
                     ]
@@ -2870,10 +2880,10 @@ class MainTest {
                         "target": "right",
                         "source_id": "back-edge",
                         "projection_id": "back-edge",
-                        "points": [
+                        "route": {"kind": "polyline", "points": [
                           { "x": 60, "y": 140 },
                           { "x": 260, "y": 140 }
-                        ],
+                        ]},
                         "label": "back"
                       },
                       {
@@ -2882,10 +2892,10 @@ class MainTest {
                         "target": "bottom",
                         "source_id": "front-edge",
                         "projection_id": "front-edge",
-                        "points": [
+                        "route": {"kind": "polyline", "points": [
                           { "x": 160, "y": 60 },
                           { "x": 160, "y": 240 }
-                        ],
+                        ]},
                         "label": "front"
                       }
                     ]
@@ -2939,10 +2949,10 @@ class MainTest {
                         "target": "right",
                         "source_id": "back-edge",
                         "projection_id": "back-edge",
-                        "points": [
+                        "route": {"kind": "polyline", "points": [
                           { "x": 60, "y": 140 },
                           { "x": 260, "y": 140 }
-                        ],
+                        ]},
                         "label": "back"
                       },
                       {
@@ -2951,10 +2961,10 @@ class MainTest {
                         "target": "bottom",
                         "source_id": "front-edge",
                         "projection_id": "front-edge",
-                        "points": [
+                        "route": {"kind": "polyline", "points": [
                           { "x": 160, "y": 60 },
                           { "x": 160, "y": 240 }
-                        ],
+                        ]},
                         "label": "front"
                       }
                     ]
@@ -2999,10 +3009,10 @@ class MainTest {
                         "target": "right",
                         "source_id": "first-edge",
                         "projection_id": "first-edge",
-                        "points": [
+                        "route": {"kind": "polyline", "points": [
                           { "x": 0, "y": 40 },
                           { "x": 220, "y": 40 }
-                        ],
+                        ]},
                         "label": "first"
                       },
                       {
@@ -3011,11 +3021,11 @@ class MainTest {
                         "target": "side",
                         "source_id": "front-edge",
                         "projection_id": "front-edge",
-                        "points": [
+                        "route": {"kind": "polyline", "points": [
                           { "x": 100, "y": 0 },
                           { "x": 100, "y": 100 },
                           { "x": 180, "y": 100 }
-                        ],
+                        ]},
                         "label": "front"
                       }
                     ]
@@ -3083,12 +3093,12 @@ class MainTest {
                         "source_id": "gateway-prices-cart",
                         "projection_id": "gateway-prices-cart",
                         "routing_hints": ["shared_source_junction"],
-                        "points": [
+                        "route": {"kind": "polyline", "points": [
                           { "x": 0, "y": 120 },
                           { "x": 100, "y": 120 },
                           { "x": 100, "y": 40 },
                           { "x": 300, "y": 40 }
-                        ],
+                        ]},
                         "label": "prices cart"
                       }
                     ]
@@ -3102,8 +3112,8 @@ class MainTest {
 
       assertThat(Double.parseDouble(label.getAttribute("x")))
           .isCloseTo(200.0, org.assertj.core.data.Offset.offset(1.0));
-      assertThat(Double.parseDouble(label.getAttribute("y")))
-          .isCloseTo(40.0, org.assertj.core.data.Offset.offset(18.0));
+      double[] labelBox = textBox(label);
+      assertThat(Math.max(40.0 - labelBox[3], labelBox[1] - 40.0)).isBetween(2.0, 8.0);
     }
 
     @Test
@@ -3120,12 +3130,12 @@ class MainTest {
                         "target": "right",
                         "source_id": "stepped-edge",
                         "projection_id": "stepped-edge",
-                        "points": [
+                        "route": {"kind": "polyline", "points": [
                           { "x": 0, "y": 100 },
                           { "x": 80, "y": 100 },
                           { "x": 80, "y": 105 },
                           { "x": 160, "y": 105 }
-                        ],
+                        ]},
                         "label": "step"
                       }
                     ]
@@ -3145,7 +3155,7 @@ class MainTest {
     }
 
     @Test
-    void suppressesLineJumpBetweenSharedJunctionEdges() throws Exception {
+    void keepsLineJumpBetweenDistinctRunsOfSharedSourceEdges() throws Exception {
       JsonNode input =
           styledInlineInput(
               "[]",
@@ -3158,11 +3168,11 @@ class MainTest {
                         "target": "top-target",
                         "source_id": "first-edge",
                         "projection_id": "first-edge",
-                        "points": [
+                        "route": {"kind": "polyline", "points": [
                           { "x": 0, "y": 100 },
                           { "x": 80, "y": 100 },
                           { "x": 80, "y": 40 }
-                        ],
+                        ]},
                         "label": "first"
                       },
                       {
@@ -3172,10 +3182,10 @@ class MainTest {
                         "source_id": "merged-edge",
                         "projection_id": "merged-edge",
                         "routing_hints": ["shared_source_junction"],
-                        "points": [
+                        "route": {"kind": "polyline", "points": [
                           { "x": 0, "y": 90 },
                           { "x": 120, "y": 90 }
-                        ],
+                        ]},
                         "label": "merged"
                       }
                     ]
@@ -3187,7 +3197,7 @@ class MainTest {
           firstChildElement(
               groupWithAttribute(document, "data-dediren-edge-id", "merged-edge"), "path");
 
-      assertThat(path.getAttribute("d")).doesNotContain(" Q ");
+      assertThat(path.getAttribute("d")).contains(" Q ");
     }
 
     @Test
@@ -3209,16 +3219,21 @@ class MainTest {
                         "target": "right-node",
                         "source_id": "left-to-right",
                         "projection_id": "left-to-right",
-                        "points": [
+                        "route": {"kind": "polyline", "points": [
                           { "x": 172, "y": 72 },
                           { "x": 212, "y": 72 }
-                        ],
+                        ]},
                         "label": "very long clipped edge label"
                       }
                     ]
                     """,
               "{}");
-      Document document = svgDocument(okContent(render(input)));
+      Document document =
+          svgDocument(
+              warningContent(
+                  render(input),
+                  "DEDIREN_RENDER_EDGE_LABEL_CONSTRAINED",
+                  "DEDIREN_RENDER_EDGE_LABEL_OCCLUDED"));
 
       String viewBox = document.getDocumentElement().getAttribute("viewBox");
       String[] parts = viewBox.split("\\s+");
@@ -3417,10 +3432,10 @@ class MainTest {
                         "target": "payments",
                         "source_id": "upper-edge",
                         "projection_id": "upper-edge",
-                        "points": [
+                        "route": {"kind": "polyline", "points": [
                           { "x": 100, "y": 160 },
                           { "x": 320, "y": 160 }
-                        ],
+                        ]},
                         "label": "writes orders"
                       },
                       {
@@ -3429,10 +3444,10 @@ class MainTest {
                         "target": "database",
                         "source_id": "lower-edge",
                         "projection_id": "lower-edge",
-                        "points": [
+                        "route": {"kind": "polyline", "points": [
                           { "x": 100, "y": 172 },
                           { "x": 320, "y": 172 }
-                        ],
+                        ]},
                         "label": "requests payment authorization"
                       }
                     ]
@@ -3465,6 +3480,17 @@ class MainTest {
 
   private static String okContent(PluginResult result) throws Exception {
     return okData(result).at("/artifacts/0/content").asText();
+  }
+
+  private static String warningContent(PluginResult result, String... expectedCodes)
+      throws Exception {
+    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+    assertThat(result.exitCode()).describedAs(result.stderr()).isZero();
+    assertThat(envelope.at("/status").asText()).isEqualTo("warning");
+    List<String> codes = new ArrayList<>();
+    envelope.get("diagnostics").forEach(diagnostic -> codes.add(diagnostic.get("code").asText()));
+    assertThat(codes).containsExactlyInAnyOrder(expectedCodes);
+    return envelope.at("/data/artifacts/0/content").asText();
   }
 
   private static JsonNode error(PluginResult result, String expectedCode) throws Exception {
@@ -3552,7 +3578,7 @@ class MainTest {
             .readTree(
                 """
                 {
-                  "layout_result_schema_version": "layout-result.schema.v2",
+                  "layout_result_schema_version": "layout-result.schema.v3",
                   "view_id": "sequence-view",
                   "nodes": [
                     {
@@ -3608,7 +3634,7 @@ class MainTest {
                       "target": "service-destroyed",
                       "source_id": "m5",
                       "projection_id": "m5",
-                      "points": [ { "x": 166, "y": 298 }, { "x": 442, "y": 298 } ],
+                      "route": {"kind": "polyline", "points": [ { "x": 166, "y": 298 }, { "x": 442, "y": 298 } ]},
                       "label": "cancelOrder"
                     },
                     {
@@ -3617,9 +3643,9 @@ class MainTest {
                       "target": "receipt",
                       "source_id": "m4",
                       "projection_id": "m4",
-                      "points": [
+                      "route": {"kind": "polyline", "points": [
                         { "x": 442, "y": 262 }, { "x": 570, "y": 262 }, { "x": 600, "y": 96 }
-                      ],
+                      ]},
                       "label": "createReceipt"
                     },
                     {
@@ -3628,7 +3654,7 @@ class MainTest {
                       "target": "customer",
                       "source_id": "m2",
                       "projection_id": "m2",
-                      "points": [ { "x": 442, "y": 190 }, { "x": 166, "y": 190 } ],
+                      "route": {"kind": "polyline", "points": [ { "x": 442, "y": 190 }, { "x": 166, "y": 190 } ]},
                       "label": "accepted"
                     },
                     {
@@ -3637,7 +3663,7 @@ class MainTest {
                       "target": "service",
                       "source_id": "m1",
                       "projection_id": "m1",
-                      "points": [ { "x": 166, "y": 146 }, { "x": 442, "y": 146 } ],
+                      "route": {"kind": "polyline", "points": [ { "x": 166, "y": 146 }, { "x": 442, "y": 146 } ]},
                       "label": "placeOrder"
                     },
                     {
@@ -3646,7 +3672,7 @@ class MainTest {
                       "target": "customer",
                       "source_id": "m3",
                       "projection_id": "m3",
-                      "points": [ { "x": 442, "y": 238 }, { "x": 166, "y": 238 } ],
+                      "route": {"kind": "polyline", "points": [ { "x": 442, "y": 238 }, { "x": 166, "y": 238 } ]},
                       "label": "receiptReady"
                     }
                   ],
@@ -3825,7 +3851,7 @@ class MainTest {
       JsonNode policy, String nodes, String edges, String metadataNodes, String metadataEdges)
       throws Exception {
     ObjectNode layout = JsonSupport.objectMapper().createObjectNode();
-    layout.put("layout_result_schema_version", "layout-result.schema.v2");
+    layout.put("layout_result_schema_version", "layout-result.schema.v3");
     layout.put("view_id", "archimate-coverage");
     layout.set("nodes", JsonSupport.objectMapper().readTree(nodes));
     layout.set("edges", JsonSupport.objectMapper().readTree(edges));
@@ -3881,7 +3907,7 @@ class MainTest {
       ObjectNode metadataEdges,
       JsonNode policy) {
     ObjectNode layout = JsonSupport.objectMapper().createObjectNode();
-    layout.put("layout_result_schema_version", "layout-result.schema.v2");
+    layout.put("layout_result_schema_version", "layout-result.schema.v3");
     layout.put("view_id", semanticProfile + "-coverage");
     layout.set("nodes", nodes);
     layout.set("edges", edges);
@@ -3940,7 +3966,7 @@ class MainTest {
                       "id": "target-%d",
                       "source_id": "target-%d",
                       "projection_id": "target-%d",
-                      "x": 260,
+                      "x": 400,
                       "y": %d,
                       "width": 80,
                       "height": 32,
@@ -3958,10 +3984,10 @@ class MainTest {
                       "target": "target-%d",
                       "source_id": "%s",
                       "projection_id": "%s",
-                      "points": [
+                      "route": {"kind": "polyline", "points": [
                         { "x": 120, "y": %d },
-                        { "x": 260, "y": %d }
-                      ],
+                        { "x": 400, "y": %d }
+                      ]},
                       "label": "%s"
                     }
                     """
@@ -4042,7 +4068,7 @@ class MainTest {
   /** The shape element a UML {@code Pseudostate} of {@code kind} draws. */
   private static Element umlPseudostateShape(String kind) throws Exception {
     ObjectNode layout = JsonSupport.objectMapper().createObjectNode();
-    layout.put("layout_result_schema_version", "layout-result.schema.v2");
+    layout.put("layout_result_schema_version", "layout-result.schema.v3");
     layout.put("view_id", "main");
     layout.set(
         "nodes",
@@ -4118,7 +4144,7 @@ class MainTest {
    */
   private static Document renderArchimateContainer(String elementType) throws Exception {
     ObjectNode layout = JsonSupport.objectMapper().createObjectNode();
-    layout.put("layout_result_schema_version", "layout-result.schema.v2");
+    layout.put("layout_result_schema_version", "layout-result.schema.v3");
     layout.put("view_id", "main");
     layout.set("nodes", JsonSupport.objectMapper().createArrayNode());
     layout.set("edges", JsonSupport.objectMapper().createArrayNode());
@@ -4210,7 +4236,7 @@ class MainTest {
               .readTree(
                   """
                     {"id":"%s","source":"source-%d","target":"target-%d","source_id":"%s",
-                     "projection_id":"%s","points":[{"x":120,"y":%d},{"x":260,"y":%d}],"label":"%s"}
+                     "projection_id":"%s","route": {"kind": "polyline", "points":[{"x":120,"y":%d},{"x":260,"y":%d}]},"label":"%s"}
                     """
                       .formatted(id, index, index, id, id, y, y, relationshipType)));
       metadataEdges.set(
@@ -4366,7 +4392,7 @@ class MainTest {
   private static JsonNode styledInlineInput(String groups, String nodes, String edges, String style)
       throws Exception {
     ObjectNode layout = JsonSupport.objectMapper().createObjectNode();
-    layout.put("layout_result_schema_version", "layout-result.schema.v2");
+    layout.put("layout_result_schema_version", "layout-result.schema.v3");
     layout.put("view_id", "inline-test");
     layout.set("groups", JsonSupport.objectMapper().readTree(groups));
     layout.set("nodes", JsonSupport.objectMapper().readTree(nodes));

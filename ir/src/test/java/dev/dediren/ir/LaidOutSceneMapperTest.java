@@ -5,12 +5,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticSeverity;
+import dev.dediren.contracts.layout.CubicBezierRoute;
+import dev.dediren.contracts.layout.CubicBezierSegment;
 import dev.dediren.contracts.layout.GroupProvenance;
 import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LaidOutGroup;
 import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.layout.Point;
+import dev.dediren.contracts.layout.PolylineRoute;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -27,7 +30,7 @@ class LaidOutSceneMapperTest {
             "src-e1",
             "p1",
             List.of("hint-1"),
-            List.of(new Point(0, 0), new Point(10, 10)),
+            new PolylineRoute(List.of(new Point(0, 0), new Point(10, 10))),
             "E1",
             "/relationships/0");
     LaidOutGroup group =
@@ -108,7 +111,10 @@ class LaidOutSceneMapperTest {
             "src-e1",
             "p1",
             List.of("hint-1"),
-            List.of(new Point(0, 0)),
+            new CubicBezierRoute(
+                new Point(0, 0),
+                List.of(
+                    new CubicBezierSegment(new Point(2, 3), new Point(7, 8), new Point(10, 10)))),
             "E1",
             null);
     LaidOutScene scene =
@@ -118,5 +124,6 @@ class LaidOutSceneMapperTest {
 
     assertThat(result.nodes().get(0).sourcePointer()).isNull();
     assertThat(result.edges().get(0).sourcePointer()).isNull();
+    assertThat(result.edges().get(0).route()).isEqualTo(edge.route());
   }
 }

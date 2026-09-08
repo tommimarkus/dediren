@@ -48,15 +48,14 @@ layout-constraint `kind` (or a malformed gap encoding) on the
 former fail-open silent-ignore in the deleted `SequenceLayoutConstraints`;
 and `validate-layout`/`build` now run `ir.quality.SequenceInvariants` against
 an agent-suppliable `LayoutResult`, folding any violation into the hard-error
-lane as `DEDIREN_LAYOUT_SEQUENCE_INVARIANT_VIOLATED`. The `render` lane accepts
-a `LayoutResult` and turns it into an SVG artifact but does not validate it — it
-emits layout-quality diagnostics (non-finite geometry, duplicate ids, non-positive
-extents) as warnings instead of rejecting, a deliberate warn-first decision with
-hard rejection deferred to a later release-noted change; as a residual, a
-non-finite layout result still renders (e.g. `width="Infinity"`) with a warning
-attached. Normal tests separately assert that the supported generated SVG corpus
-conforms to Dediren's SVG 2 subset. That test-only control does not change this
-runtime trust boundary and is not arbitrary-input validation.
+lane as `DEDIREN_LAYOUT_SEQUENCE_INVARIANT_VIOLATED`. Malformed or non-finite
+route geometry is now hard-rejected before rendering, so it cannot create an
+SVG path with invalid numeric attributes. Ordinary node and extent quality
+findings remain warnings: they preserve the artifact and disclose a repairable
+layout defect rather than treating every imperfect diagram as malformed input.
+Normal tests separately assert that the supported generated SVG corpus conforms
+to Dediren's SVG 2 subset. That test-only control does not change this runtime
+trust boundary and is not arbitrary-input validation.
 
 Input ceilings bound what this boundary ingests (core `SourceLimits`, enforced
 through `BoundedReads` and `SourceValidator` on the CLI and MCP lanes alike):

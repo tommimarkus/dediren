@@ -92,6 +92,53 @@ class SvgRenderEngineTest {
   }
 
   @Test
+  void renderWarnsWhenNoCandidateCanClearTheCompetingRouteAndNodeObstacles() throws Exception {
+    byte[] input =
+        renderInputWithLayout(overlappingLabelLayout(), "fixtures/render-policy/default-svg.json");
+    SvgRenderEngine.ParsedInput parsed = engine.parseInput(input);
+
+    EngineResult<?> result =
+        engine.render(
+            LaidOutSceneMapper.toScene(parsed.layoutResult()),
+            parsed.policy(),
+            parsed.renderMetadata());
+
+    assertThat(result.diagnostics())
+        .anySatisfy(
+            diagnostic -> {
+              assertThat(diagnostic.code()).isEqualTo("DEDIREN_RENDER_EDGE_LABEL_CONSTRAINED");
+              assertThat(diagnostic.severity().toString()).isEqualTo("WARNING");
+            });
+  }
+
+  @Test
+  void diagonalRouteBoundingBoxDoesNotConstrainAClearLabel() throws Exception {
+    JsonNode layout =
+        JsonSupport.objectMapper()
+            .readTree(
+                """
+        {"layout_result_schema_version":"layout-result.schema.v3","view_id":"diagonal-clear",
+         "nodes":[],"groups":[],"warnings":[],"edges":[
+          {"id":"owner","source":"a","target":"b","source_id":"owner","projection_id":"owner",
+           "label":"owner relationship","routing_hints":[],
+           "route":{"kind":"polyline","points":[{"x":0,"y":100},{"x":300,"y":100}]}},
+          {"id":"diagonal","source":"c","target":"d","source_id":"diagonal","projection_id":"diagonal",
+           "label":"","routing_hints":[],
+           "route":{"kind":"polyline","points":[{"x":0,"y":-300},{"x":600,"y":300}]}}
+         ]}
+        """);
+    var parsed =
+        engine.parseInput(renderInputWithLayout(layout, "fixtures/render-policy/default-svg.json"));
+    var result =
+        engine.render(
+            LaidOutSceneMapper.toScene(parsed.layoutResult()),
+            parsed.policy(),
+            parsed.renderMetadata());
+    assertThat(result.diagnostics())
+        .noneMatch(diagnostic -> diagnostic.code().equals("DEDIREN_RENDER_EDGE_LABEL_CONSTRAINED"));
+  }
+
+  @Test
   void renderPublishesNoLabelOcclusionDiagnosticForAClearView() throws Exception {
     byte[] input =
         renderInput("fixtures/layout-result/basic.json", "fixtures/render-policy/default-svg.json");
@@ -171,7 +218,7 @@ class SvgRenderEngineTest {
     String json =
         """
         {
-          "layout_result_schema_version": "layout-result.schema.v2",
+          "layout_result_schema_version": "layout-result.schema.v3",
           "view_id": "main",
           "nodes": [
             {
@@ -195,7 +242,7 @@ class SvgRenderEngineTest {
               "id": "client-calls-api", "source": "client", "target": "api",
               "source_id": "client-calls-api", "projection_id": "client-calls-api",
               "routing_hints": [],
-              "points": [ { "x": 172.0, "y": 52.0 }, { "x": 254.0, "y": 52.0 } ],
+              "route": {"kind": "polyline", "points": [ { "x": 172.0, "y": 52.0 }, { "x": 254.0, "y": 52.0 } ]},
               "label": "calls",
               "source_pointer": "/relationships/0"
             }

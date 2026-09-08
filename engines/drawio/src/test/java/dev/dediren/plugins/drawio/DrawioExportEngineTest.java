@@ -14,6 +14,7 @@ import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.layout.Point;
+import dev.dediren.contracts.layout.PolylineRoute;
 import dev.dediren.contracts.source.SourceDocument;
 import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.contracts.source.SourceRelationship;
@@ -98,7 +99,7 @@ class DrawioExportEngineTest {
                 "orders-realizes-service",
                 null,
                 List.of(),
-                List.of(new Point(173, 52), new Point(253, 52)),
+                new PolylineRoute(List.of(new Point(173, 52), new Point(253, 52))),
                 "realizes")),
         List.of(),
         List.of());

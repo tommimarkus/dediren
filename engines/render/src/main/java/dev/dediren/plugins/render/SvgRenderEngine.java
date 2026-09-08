@@ -67,6 +67,8 @@ public final class SvgRenderEngine implements RenderEngine {
       throw failure(DiagnosticCode.SVG_POLICY_INVALID.code(), error.getMessage(), error.path());
     } catch (RenderInputValidator.RenderMetadataUsageException error) {
       throw failure(error.code(), error.getMessage(), error.path());
+    } catch (RenderInputValidator.RouteGeometryValidationException error) {
+      throw EngineException.structuralFailure(error.code(), error.getMessage(), error.path());
     } catch (ArchimateTypeValidationException error) {
       throw failure(error.code(), error.message(), error.path());
     } catch (UmlValidationException error) {
@@ -135,20 +137,35 @@ public final class SvgRenderEngine implements RenderEngine {
     List<Diagnostic> diagnostics = new ArrayList<>();
     for (PlacedScene.PlacedEdge placedEdge : scene.edges()) {
       PlacedScene.PlacedEdgeLabel label = placedEdge.label();
-      if (label == null || nodeBoxes.stream().noneMatch(label.visibleBox()::overlaps)) {
+      if (label == null) {
         continue;
       }
-      diagnostics.add(
-          new Diagnostic(
-              DiagnosticCode.RENDER_EDGE_LABEL_OCCLUDED.code(),
-              DiagnosticSeverity.WARNING,
-              "edge label \""
-                  + label.text()
-                  + "\" on edge "
-                  + placedEdge.edge().id()
-                  + " still overlaps a node after placement and may be painted underneath it,"
-                  + " making the label invisible",
-              "edges[" + placedEdge.edge().id() + "].label"));
+      if (label.constrained()) {
+        diagnostics.add(
+            new Diagnostic(
+                DiagnosticCode.RENDER_EDGE_LABEL_CONSTRAINED.code(),
+                DiagnosticSeverity.WARNING,
+                "edge label \""
+                    + label.text()
+                    + "\" on edge "
+                    + placedEdge.edge().id()
+                    + " has no clear route-attached placement and uses the deterministic"
+                    + " least-overlap candidate",
+                "edges[" + placedEdge.edge().id() + "].label"));
+      }
+      if (nodeBoxes.stream().anyMatch(label.visibleBox()::overlaps)) {
+        diagnostics.add(
+            new Diagnostic(
+                DiagnosticCode.RENDER_EDGE_LABEL_OCCLUDED.code(),
+                DiagnosticSeverity.WARNING,
+                "edge label \""
+                    + label.text()
+                    + "\" on edge "
+                    + placedEdge.edge().id()
+                    + " still overlaps a node after placement and may be painted underneath it,"
+                    + " making the label invisible",
+                "edges[" + placedEdge.edge().id() + "].label"));
+      }
     }
     return diagnostics;
   }

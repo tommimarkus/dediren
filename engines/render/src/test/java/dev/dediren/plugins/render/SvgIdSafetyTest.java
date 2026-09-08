@@ -37,7 +37,7 @@ class SvgIdSafetyTest {
   private static ObjectNode adversarialIdLayout() throws Exception {
     ObjectNode input = JsonSupport.objectMapper().createObjectNode();
     ObjectNode layout = input.putObject("layout_result");
-    layout.put("layout_result_schema_version", "layout-result.schema.v2");
+    layout.put("layout_result_schema_version", "layout-result.schema.v3");
     layout.put("view_id", "svg-id-safety");
 
     ArrayNode nodes = layout.putArray("nodes");
@@ -66,7 +66,7 @@ class SvgIdSafetyTest {
     ObjectNode edge = edges.addObject();
     edge.put("id", id).put("source", "n1").put("target", "n2");
     edge.put("source_id", id).put("projection_id", id);
-    ArrayNode points = edge.putArray("points");
+    ArrayNode points = edge.putObject("route").put("kind", "polyline").putArray("points");
     points.addObject().put("x", 200).put("y", 70);
     points.addObject().put("x", 320).put("y", 70);
     edge.put("label", "");

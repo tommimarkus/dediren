@@ -1,5 +1,6 @@
 package dev.dediren.plugins.elklayout;
 
+import static dev.dediren.ir.RouteGeometry.flatten;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.dediren.contracts.ContractVersions;
@@ -7,6 +8,7 @@ import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.layout.Point;
+import dev.dediren.contracts.layout.PolylineRoute;
 import dev.dediren.ir.Axis;
 import dev.dediren.ir.BandMember;
 import dev.dediren.ir.LayoutIntent;
@@ -75,7 +77,7 @@ class LayoutIntentNormalizerTest {
     LayoutResult normalized =
         LayoutIntentNormalizer.from(intents, Map.of(), Map.of()).normalize(result);
 
-    List<Point> points = edge(normalized, "msg").points();
+    List<Point> points = flatten(edge(normalized, "msg").route());
     assertThat(points).hasSize(2);
     assertThat(points.get(0).x()).isEqualTo(170.0);
     assertThat(points.get(1).x()).isEqualTo(590.0);
@@ -87,7 +89,7 @@ class LayoutIntentNormalizerTest {
     // boxes overlap by 51 -- distinct x, yet overlapping. Reproduces the property-test
     // counterexample from SequenceLifelineColumnOverlapTest.
     return new LayoutResult(
-        "layout-result.schema.v2",
+        "layout-result.schema.v3",
         "seq",
         List.of(
             new LaidOutNode("a", "a", "a", 12, 0, 140, 40, "A", "lifeline"),
@@ -100,7 +102,7 @@ class LayoutIntentNormalizerTest {
                 "m1",
                 "m1",
                 List.of(),
-                List.of(new Point(82, 60), new Point(171, 60)),
+                new PolylineRoute(List.of(new Point(82, 60), new Point(171, 60))),
                 "m1")),
         List.of(),
         List.of());
@@ -110,7 +112,7 @@ class LayoutIntentNormalizerTest {
     // a's box occupies x=[0,140); b starts exactly at x=140, so a.x + a.width == b.x -- the
     // touching (not overlapping) boundary distinct from overlappingTwoLifelineResult() above.
     return new LayoutResult(
-        "layout-result.schema.v2",
+        "layout-result.schema.v3",
         "seq",
         List.of(
             new LaidOutNode("a", "a", "a", 0, 0, 140, 40, "A", "lifeline"),
@@ -123,7 +125,7 @@ class LayoutIntentNormalizerTest {
                 "m1",
                 "m1",
                 List.of(),
-                List.of(new Point(70, 60), new Point(210, 60)),
+                new PolylineRoute(List.of(new Point(70, 60), new Point(210, 60))),
                 "m1")),
         List.of(),
         List.of());
@@ -137,7 +139,7 @@ class LayoutIntentNormalizerTest {
 
     // m2 is b->b; stemX(b) = 236 + 140/2 = 306.0
     // slot y for m2 = headBottom(48) + MESSAGE_HEAD_GAP(24) + MESSAGE_Y_STEP(32) = 104.0
-    List<Point> hook = edge(normalized, "m2").points();
+    List<Point> hook = flatten(edge(normalized, "m2").route());
     assertThat(hook)
         .containsExactly(
             new Point(306.0, 104.0),
@@ -155,8 +157,8 @@ class LayoutIntentNormalizerTest {
         LayoutIntentNormalizer.from(selfMessageIntents(), Map.of(), Map.of())
             .normalize(selfMessageResult());
 
-    double m2Top = edge(normalized, "m2").points().get(0).y(); // 104.0
-    double m3Y = edge(normalized, "m3").points().get(0).y();
+    double m2Top = flatten(edge(normalized, "m2").route()).get(0).y(); // 104.0
+    double m3Y = flatten(edge(normalized, "m3").route()).get(0).y();
     // m3 must clear the hook's lower leg (m2Top + LOOP_HEIGHT = 128.0), not just MESSAGE_Y_STEP:
     // m3 = m2Top + MESSAGE_Y_STEP(32) + SELF_MESSAGE_LOOP_HEIGHT(24) = 160.0
     assertThat(m3Y).isEqualTo(160.0);
@@ -175,9 +177,9 @@ class LayoutIntentNormalizerTest {
 
     // headBottom = max(node.y() + node.height()) = 48.0; Y0 = headBottom + MESSAGE_HEAD_GAP(24)
     double y0 = 72.0;
-    List<Point> m1Hook = edge(normalized, "m1").points();
-    List<Point> m2Hook = edge(normalized, "m2").points();
-    List<Point> m3Points = edge(normalized, "m3").points();
+    List<Point> m1Hook = flatten(edge(normalized, "m1").route());
+    List<Point> m2Hook = flatten(edge(normalized, "m2").route());
+    List<Point> m3Points = flatten(edge(normalized, "m3").route());
 
     double m1SlotY = m1Hook.get(0).y();
     double m2SlotY = m2Hook.get(0).y();
@@ -235,7 +237,7 @@ class LayoutIntentNormalizerTest {
                 "m1",
                 "m1",
                 List.of(),
-                List.of(new Point(70.0, 60.0), new Point(306.0, 60.0)),
+                new PolylineRoute(List.of(new Point(70.0, 60.0), new Point(306.0, 60.0))),
                 "m1"),
             new LaidOutEdge(
                 "m2",
@@ -244,7 +246,7 @@ class LayoutIntentNormalizerTest {
                 "m2",
                 "m2",
                 List.of(),
-                List.of(new Point(306.0, 90.0), new Point(306.0, 90.0)),
+                new PolylineRoute(List.of(new Point(306.0, 90.0), new Point(306.0, 90.0))),
                 "m2"),
             new LaidOutEdge(
                 "m3",
@@ -253,7 +255,7 @@ class LayoutIntentNormalizerTest {
                 "m3",
                 "m3",
                 List.of(),
-                List.of(new Point(306.0, 120.0), new Point(70.0, 120.0)),
+                new PolylineRoute(List.of(new Point(306.0, 120.0), new Point(70.0, 120.0))),
                 "m3")),
         List.of(),
         List.of());
@@ -286,7 +288,7 @@ class LayoutIntentNormalizerTest {
                 "m1",
                 "m1",
                 List.of(),
-                List.of(new Point(306.0, 60.0), new Point(306.0, 60.0)),
+                new PolylineRoute(List.of(new Point(306.0, 60.0), new Point(306.0, 60.0))),
                 "m1"),
             new LaidOutEdge(
                 "m2",
@@ -295,7 +297,7 @@ class LayoutIntentNormalizerTest {
                 "m2",
                 "m2",
                 List.of(),
-                List.of(new Point(306.0, 90.0), new Point(306.0, 90.0)),
+                new PolylineRoute(List.of(new Point(306.0, 90.0), new Point(306.0, 90.0))),
                 "m2"),
             new LaidOutEdge(
                 "m3",
@@ -304,7 +306,7 @@ class LayoutIntentNormalizerTest {
                 "m3",
                 "m3",
                 List.of(),
-                List.of(new Point(306.0, 120.0), new Point(70.0, 120.0)),
+                new PolylineRoute(List.of(new Point(306.0, 120.0), new Point(70.0, 120.0))),
                 "m3")),
         List.of(),
         List.of());
@@ -339,7 +341,7 @@ class LayoutIntentNormalizerTest {
         LayoutIntentNormalizer.from(lifecycleIntents(), Map.of(), Map.of())
             .normalize(lifecycleResult());
 
-    List<Point> pts = edge(out, "m3").points();
+    List<Point> pts = flatten(edge(out, "m3").route());
     assertThat(pts)
         .containsExactly(
             new Point(70.0, 136.0), // a's stem
@@ -370,7 +372,7 @@ class LayoutIntentNormalizerTest {
         LayoutIntentNormalizer.from(intents, Map.of(), Map.of()).normalize(lifecycleResult());
 
     LaidOutNode destruction = node(out, "destroy-b");
-    List<Point> pts = edge(out, "m3").points();
+    List<Point> pts = flatten(edge(out, "m3").route());
     assertThat(pts).hasSize(2);
     assertThat(pts.get(1).x())
         .as("terminates on the destruction's RIGHT edge, its near side")
@@ -514,7 +516,8 @@ class LayoutIntentNormalizerTest {
   }
 
   private static LaidOutEdge message(String id, String source, String target, Point... points) {
-    return new LaidOutEdge(id, source, target, id, id, List.of(), List.of(points), id);
+    return new LaidOutEdge(
+        id, source, target, id, id, List.of(), new PolylineRoute(List.of(points)), id);
   }
 
   private static LayoutResult twoLifelineMessageWithBendPoints() {
@@ -535,11 +538,12 @@ class LayoutIntentNormalizerTest {
                 "msg",
                 "msg",
                 List.of(),
-                List.of(
-                    new Point(999.0, 10.0),
-                    new Point(700.0, 20.0),
-                    new Point(300.0, 30.0),
-                    new Point(-50.0, 40.0)),
+                new PolylineRoute(
+                    List.of(
+                        new Point(999.0, 10.0),
+                        new Point(700.0, 20.0),
+                        new Point(300.0, 30.0),
+                        new Point(-50.0, 40.0))),
                 "placeOrder")),
         List.of(),
         List.of());

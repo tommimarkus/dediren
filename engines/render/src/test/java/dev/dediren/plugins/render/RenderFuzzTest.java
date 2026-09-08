@@ -66,7 +66,7 @@ class RenderFuzzTest {
   private ObjectNode randomLayoutInput(Random random) throws Exception {
     ObjectNode input = JsonSupport.objectMapper().createObjectNode();
     ObjectNode layout = input.putObject("layout_result");
-    layout.put("layout_result_schema_version", "layout-result.schema.v2");
+    layout.put("layout_result_schema_version", "layout-result.schema.v3");
     layout.put("view_id", "fuzz");
 
     int nodeCount = random.nextInt(9); // 0..8
@@ -89,7 +89,7 @@ class RenderFuzzTest {
       ObjectNode edge = edges.addObject();
       edge.put("id", id).put("source", source).put("target", target);
       edge.put("source_id", id).put("projection_id", id);
-      ArrayNode points = edge.putArray("points");
+      ArrayNode points = edge.putObject("route").put("kind", "polyline").putArray("points");
       points.addObject().put("x", random.nextInt(1000)).put("y", random.nextInt(600));
       points.addObject().put("x", random.nextInt(1000)).put("y", random.nextInt(600));
       edge.put("label", random.nextBoolean() ? label(random) : "");

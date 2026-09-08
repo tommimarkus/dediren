@@ -1,14 +1,14 @@
 {
-  "layout_result_schema_version" : "layout-result.schema.v2",
+  "layout_result_schema_version" : "layout-result.schema.v3",
   "view_id" : "activity-view",
   "nodes" : [ {
     "id" : "initial-submit",
     "source_id" : "initial-submit",
     "projection_id" : "initial-submit",
     "x" : 12.0,
-    "y" : 36.0,
+    "y" : 12.0,
     "width" : 32.0,
-    "height" : 32.0,
+    "height" : 119.0,
     "label" : "",
     "source_pointer" : "/nodes/5"
   }, {
@@ -18,7 +18,7 @@
     "x" : 142.0,
     "y" : 12.0,
     "width" : 160.0,
-    "height" : 80.0,
+    "height" : 119.0,
     "label" : "Enter order",
     "source_pointer" : "/nodes/6"
   }, {
@@ -26,29 +26,29 @@
     "source_id" : "decision-valid",
     "projection_id" : "decision-valid",
     "x" : 400.0,
-    "y" : 36.0,
+    "y" : 12.0,
     "width" : 32.0,
-    "height" : 32.0,
+    "height" : 119.0,
     "label" : "Valid?",
     "source_pointer" : "/nodes/7"
   }, {
     "id" : "action-submit",
     "source_id" : "action-submit",
     "projection_id" : "action-submit",
-    "x" : 626.0,
+    "x" : 659.96240234375,
     "y" : 12.0,
     "width" : 160.0,
-    "height" : 80.0,
+    "height" : 119.0,
     "label" : "Submit",
     "source_pointer" : "/nodes/8"
   }, {
     "id" : "final-submit",
     "source_id" : "final-submit",
     "projection_id" : "final-submit",
-    "x" : 884.0,
-    "y" : 36.0,
+    "x" : 917.96240234375,
+    "y" : 12.0,
     "width" : 32.0,
-    "height" : 32.0,
+    "height" : 119.0,
     "label" : "",
     "source_pointer" : "/nodes/9"
   } ],
@@ -59,13 +59,16 @@
     "source_id" : "flow-start-enter",
     "projection_id" : "flow-start-enter",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 45.0,
-      "y" : 52.0
-    }, {
-      "x" : 141.0,
-      "y" : 52.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 45.0,
+        "y" : 71.5
+      }, {
+        "x" : 141.0,
+        "y" : 71.5
+      } ]
+    },
     "label" : "",
     "source_pointer" : "/relationships/2"
   }, {
@@ -75,13 +78,16 @@
     "source_id" : "flow-enter-valid",
     "projection_id" : "flow-enter-valid",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 303.0,
-      "y" : 52.0
-    }, {
-      "x" : 399.0,
-      "y" : 52.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 303.0,
+        "y" : 71.5
+      }, {
+        "x" : 399.0,
+        "y" : 71.5
+      } ]
+    },
     "label" : "",
     "source_pointer" : "/relationships/3"
   }, {
@@ -91,13 +97,16 @@
     "source_id" : "flow-valid-submit",
     "projection_id" : "flow-valid-submit",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 433.0,
-      "y" : 52.0
-    }, {
-      "x" : 625.0,
-      "y" : 52.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 433.0,
+        "y" : 71.5
+      }, {
+        "x" : 658.96240234375,
+        "y" : 71.5
+      } ]
+    },
     "label" : "yes",
     "source_pointer" : "/relationships/4"
   }, {
@@ -107,13 +116,16 @@
     "source_id" : "flow-submit-final",
     "projection_id" : "flow-submit-final",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 787.0,
-      "y" : 52.0
-    }, {
-      "x" : 883.0,
-      "y" : 52.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 820.96240234375,
+        "y" : 71.5
+      }, {
+        "x" : 916.96240234375,
+        "y" : 71.5
+      } ]
+    },
     "label" : "",
     "source_pointer" : "/relationships/5"
   } ],

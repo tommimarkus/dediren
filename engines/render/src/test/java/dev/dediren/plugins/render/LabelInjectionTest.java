@@ -47,18 +47,18 @@ class LabelInjectionTest {
   private static ObjectNode injectionInput() throws Exception {
     ObjectNode input = JsonSupport.objectMapper().createObjectNode();
     ObjectNode layout = input.putObject("layout_result");
-    layout.put("layout_result_schema_version", "layout-result.schema.v2");
+    layout.put("layout_result_schema_version", "layout-result.schema.v3");
     layout.put("view_id", "injection");
 
     ArrayNode nodes = layout.putArray("nodes");
     addNode(nodes, "n1", 40, 40, 220, 80, NODE_LABEL);
-    addNode(nodes, "n2", 360, 40, 180, 80, "Target");
+    addNode(nodes, "n2", 560, 40, 180, 80, "Target");
 
     ArrayNode edges = layout.putArray("edges");
-    addEdge(edges, "e1", "n1", "n2", EDGE_LABEL, 260, 80, 360, 80);
+    addEdge(edges, "e1", "n1", "n2", EDGE_LABEL, 260, 80, 560, 80);
 
     ArrayNode groups = layout.putArray("groups");
-    addGroup(groups, "g1", 16, 16, 540, 140, List.of("n1", "n2"), GROUP_LABEL);
+    addGroup(groups, "g1", 16, 16, 740, 140, List.of("n1", "n2"), GROUP_LABEL);
 
     layout.putArray("warnings");
     input.set("policy", RenderTestSupport.fixtureJson("fixtures/render-policy/default-svg.json"));
@@ -85,7 +85,7 @@ class LabelInjectionTest {
     ObjectNode edge = edges.addObject();
     edge.put("id", id).put("source", source).put("target", target);
     edge.put("source_id", id).put("projection_id", id);
-    ArrayNode points = edge.putArray("points");
+    ArrayNode points = edge.putObject("route").put("kind", "polyline").putArray("points");
     points.addObject().put("x", x1).put("y", y1);
     points.addObject().put("x", x2).put("y", y2);
     edge.put("label", label);

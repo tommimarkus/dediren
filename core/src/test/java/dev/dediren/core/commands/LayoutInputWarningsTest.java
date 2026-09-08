@@ -42,7 +42,7 @@ class LayoutInputWarningsTest {
     String layout =
         """
         {
-          "layout_result_schema_version": "layout-result.schema.v2",
+          "layout_result_schema_version": "layout-result.schema.v3",
           "view_id": "main",
           "nodes": [
             { "id": "a", "source_id": "a", "projection_id": "a", "x": 0.0, "y": 0.0, "width": 100.0, "height": 80.0, "label": "A" },
@@ -74,7 +74,7 @@ class LayoutInputWarningsTest {
     String layout =
         """
         {
-          "layout_result_schema_version": "layout-result.schema.v2",
+          "layout_result_schema_version": "layout-result.schema.v3",
           "view_id": "main",
           "nodes": [
             { "id": "collapsed", "source_id": "collapsed", "projection_id": "collapsed", "x": 0.0, "y": 0.0, "width": 0.0, "height": 80.0, "label": "Collapsed" },
@@ -113,15 +113,15 @@ class LayoutInputWarningsTest {
     String layout =
         """
         {
-          "layout_result_schema_version": "layout-result.schema.v2",
+          "layout_result_schema_version": "layout-result.schema.v3",
           "view_id": "main",
           "nodes": [
             { "id": "a", "source_id": "a", "projection_id": "a", "x": 0.0, "y": 0.0, "width": 100.0, "height": 60.0, "label": "A" },
             { "id": "b", "source_id": "b", "projection_id": "b", "x": 300.0, "y": 0.0, "width": 100.0, "height": 60.0, "label": "B" }
           ],
           "edges": [
-            { "id": "flow", "source": "a", "target": "b", "source_id": "flow", "projection_id": "flow", "points": [ { "x": 100.0, "y": 30.0 }, { "x": 300.0, "y": 30.0 } ], "label": "" },
-            { "id": "flow", "source": "b", "target": "a", "source_id": "flow", "projection_id": "flow", "points": [ { "x": 300.0, "y": 50.0 }, { "x": 100.0, "y": 50.0 } ], "label": "" }
+            { "id": "flow", "source": "a", "target": "b", "source_id": "flow", "projection_id": "flow", "route": {"kind": "polyline", "points": [ { "x": 100.0, "y": 30.0 }, { "x": 300.0, "y": 30.0 } ]}, "label": "" },
+            { "id": "flow", "source": "b", "target": "a", "source_id": "flow", "projection_id": "flow", "route": {"kind": "polyline", "points": [ { "x": 300.0, "y": 50.0 }, { "x": 100.0, "y": 50.0 } ]}, "label": "" }
           ],
           "groups": [],
           "warnings": []
@@ -149,7 +149,7 @@ class LayoutInputWarningsTest {
     String layout =
         """
         {
-          "layout_result_schema_version": "layout-result.schema.v2",
+          "layout_result_schema_version": "layout-result.schema.v3",
           "view_id": "main",
           "nodes": [
             { "id": "shared", "source_id": "shared", "projection_id": "shared", "x": 40.0, "y": 40.0, "width": 100.0, "height": 80.0, "label": "Member" }
@@ -185,7 +185,7 @@ class LayoutInputWarningsTest {
     String layout =
         """
         {
-          "layout_result_schema_version": "layout-result.schema.v2",
+          "layout_result_schema_version": "layout-result.schema.v3",
           "view_id": "main",
           "nodes": [
             { "id": "a", "source_id": "a", "projection_id": "a", "x": 0.0, "y": 0.0, "width": 1e999, "height": 80.0, "label": "A" }
@@ -215,7 +215,7 @@ class LayoutInputWarningsTest {
     String layout =
         """
         {
-          "layout_result_schema_version": "layout-result.schema.v2",
+          "layout_result_schema_version": "layout-result.schema.v3",
           "view_id": "main",
           "nodes": [
             { "id": "a", "source_id": "a", "projection_id": "a", "x": 0.0, "y": 0.0, "width": 100.0, "height": 80.0, "label": "A" },
@@ -245,7 +245,7 @@ class LayoutInputWarningsTest {
     String layout =
         """
         {
-          "layout_result_schema_version": "layout-result.schema.v2",
+          "layout_result_schema_version": "layout-result.schema.v3",
           "view_id": "main",
           "nodes": [
             { "id": "a", "source_id": "a", "projection_id": "a", "x": 0.0, "y": 0.0, "width": 100.0, "height": 80.0, "label": "A" },
@@ -258,10 +258,10 @@ class LayoutInputWarningsTest {
               "target": "b",
               "source_id": "a-to-b",
               "projection_id": "a-to-b",
-              "points": [
+              "route": {"kind": "polyline", "points": [
                 { "x": 100.0, "y": 40.0 },
                 { "x": 300.0, "y": 40.0 }
-              ],
+              ]},
               "label": "calls"
             }
           ],
@@ -313,7 +313,7 @@ class LayoutInputWarningsTest {
   private static final String DUPLICATE_ID_LAYOUT =
       """
       {
-        "layout_result_schema_version": "layout-result.schema.v2",
+        "layout_result_schema_version": "layout-result.schema.v3",
         "view_id": "main",
         "nodes": [
           { "id": "same", "source_id": "same", "projection_id": "same", "x": 0.0, "y": 0.0, "width": 100.0, "height": 60.0, "label": "One" },

@@ -8,6 +8,8 @@ import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.export.DrawioExportPolicy;
 import dev.dediren.contracts.json.JsonSupport;
+import dev.dediren.contracts.layout.CubicBezierRoute;
+import dev.dediren.contracts.layout.CubicBezierSegment;
 import dev.dediren.contracts.layout.GroupProvenance;
 import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LaidOutGroup;
@@ -15,6 +17,7 @@ import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.layout.LayoutNodeRole;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.layout.Point;
+import dev.dediren.contracts.layout.PolylineRoute;
 import dev.dediren.contracts.source.SourceDocument;
 import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.contracts.source.SourceRelationship;
@@ -127,11 +130,12 @@ class DrawioDocumentBuilderTest {
                         "a-serves-b",
                         null,
                         List.of(),
-                        List.of(
-                            new Point(172, 52),
-                            new Point(370, 52),
-                            new Point(370, 206),
-                            new Point(529, 206)),
+                        new PolylineRoute(
+                            List.of(
+                                new Point(172, 52),
+                                new Point(370, 52),
+                                new Point(370, 206),
+                                new Point(529, 206))),
                         "calls")),
                 List.of()),
             POLICY);
@@ -145,6 +149,130 @@ class DrawioDocumentBuilderTest {
     // layer even when both endpoints are inside a container.
     assertThat(edge.parent()).isEqualTo("1");
     assertThat(edge.edge()).isTrue();
+  }
+
+  @Test
+  void preservesDistinctAttachedPortsAsNormalizedDrawioAnchors() {
+    var document =
+        DrawioDocumentBuilder.build(
+            source(
+                List.of(node("a", "ApplicationComponent"), node("b", "ApplicationService")),
+                List.of(
+                    new SourceRelationship("upper", "Serving", "a", "b", "", Map.of()),
+                    new SourceRelationship("lower", "Serving", "a", "b", "", Map.of()))),
+            layout(
+                List.of(laidOut("a", 0, 0, 100, 100), laidOut("b", 300, 0, 100, 100)),
+                List.of(
+                    new LaidOutEdge(
+                        "upper",
+                        "a",
+                        "b",
+                        "upper",
+                        null,
+                        List.of(),
+                        new PolylineRoute(
+                            List.of(
+                                new Point(100, 25),
+                                new Point(200, 25),
+                                new Point(200, 75),
+                                new Point(300, 75))),
+                        ""),
+                    new LaidOutEdge(
+                        "lower",
+                        "a",
+                        "b",
+                        "lower",
+                        null,
+                        List.of(),
+                        new PolylineRoute(
+                            List.of(
+                                new Point(100, 75),
+                                new Point(200, 75),
+                                new Point(200, 25),
+                                new Point(300, 25))),
+                        "")),
+                List.of()),
+            POLICY);
+
+    assertThat(cellCarrying(document, "upper").style())
+        .contains("exitX=1;exitY=0.25;entryX=0;entryY=0.75;");
+    assertThat(cellCarrying(document, "lower").style())
+        .contains("exitX=1;exitY=0.75;entryX=0;entryY=0.25;");
+  }
+
+  @Test
+  void preservesSeparateSelfLoopEntryAndExitAnchors() {
+    var document =
+        DrawioDocumentBuilder.build(
+            source(
+                List.of(node("a", "ApplicationComponent")),
+                List.of(new SourceRelationship("loop", "Serving", "a", "a", "", Map.of()))),
+            layout(
+                List.of(laidOut("a", 100, 100, 100, 100)),
+                List.of(
+                    new LaidOutEdge(
+                        "loop",
+                        "a",
+                        "a",
+                        "loop",
+                        null,
+                        List.of(),
+                        new PolylineRoute(
+                            List.of(
+                                new Point(200, 125),
+                                new Point(250, 125),
+                                new Point(250, 175),
+                                new Point(200, 175))),
+                        "")),
+                List.of()),
+            POLICY);
+
+    assertThat(cellCarrying(document, "loop").style())
+        .contains("exitX=1;exitY=0.25;entryX=1;entryY=0.75;");
+  }
+
+  @Test
+  void flattensAGroupedObstacleSplineWithoutWritingItsControlPointsAsBends() {
+    var document =
+        DrawioDocumentBuilder.build(
+            source(
+                List.of(node("a", "ApplicationComponent"), node("b", "ApplicationService")),
+                List.of(new SourceRelationship("around", "Serving", "a", "b", "", Map.of()))),
+            layout(
+                List.of(laidOut("a", 0, 100, 100, 100), laidOut("b", 300, 100, 100, 100)),
+                List.of(
+                    new LaidOutEdge(
+                        "around",
+                        "a",
+                        "b",
+                        "around",
+                        null,
+                        List.of(),
+                        new CubicBezierRoute(
+                            new Point(100, 150),
+                            List.of(
+                                new CubicBezierSegment(
+                                    new Point(100, 0), new Point(300, 0), new Point(300, 150)))),
+                        "")),
+                List.of(
+                    new LaidOutGroup(
+                        "obstacle",
+                        null,
+                        null,
+                        GroupProvenance.visualOnlyGroup(),
+                        175,
+                        75,
+                        50,
+                        150,
+                        List.of(),
+                        "Obstacle"))),
+            POLICY);
+
+    MxCell edge = cellCarrying(document, "around");
+    assertThat(edge.style()).contains("exitX=1;exitY=0.5;entryX=0;entryY=0.5;");
+    assertThat(edge.geometry().points()).hasSizeGreaterThan(3);
+    assertThat(edge.geometry().points()).doesNotContain(new MxPoint(100, 0), new MxPoint(300, 0));
+    assertThat(edge.geometry().points()).anySatisfy(point -> assertThat(point.y()).isLessThan(75));
   }
 
   // ---------------------------------------------------------------- containment
@@ -401,7 +529,7 @@ class DrawioDocumentBuilderTest {
                         "m1",
                         null,
                         List.of(),
-                        List.of(),
+                        new PolylineRoute(List.of()),
                         "placeOrder")),
                 List.of()),
             POLICY);
@@ -435,7 +563,7 @@ class DrawioDocumentBuilderTest {
                         "m1",
                         null,
                         List.of(),
-                        List.of(),
+                        new PolylineRoute(List.of()),
                         "placeOrder")),
                 List.of()),
             POLICY);
@@ -611,7 +739,14 @@ class DrawioDocumentBuilderTest {
                 List.of(laidOut("A node", 0, 0, 10, 10), laidOut("B node", 40, 0, 10, 10)),
                 List.of(
                     new LaidOutEdge(
-                        "r 1", "A node", "B node", "r 1", null, List.of(), List.of(), null)),
+                        "r 1",
+                        "A node",
+                        "B node",
+                        "r 1",
+                        null,
+                        List.of(),
+                        new PolylineRoute(List.of()),
+                        null)),
                 List.of()),
             POLICY);
 
@@ -873,9 +1008,24 @@ class DrawioDocumentBuilderTest {
             layout(
                 List.of(laidOut("a", 0, 0, 150, 75), laidOut("b", 300, 0, 150, 75)),
                 List.of(
-                    new LaidOutEdge("owns", "a", "b", "owns", null, List.of(), List.of(), null),
                     new LaidOutEdge(
-                        "serves", "a", "b", "serves", null, List.of(), List.of(), null)),
+                        "owns",
+                        "a",
+                        "b",
+                        "owns",
+                        null,
+                        List.of(),
+                        new PolylineRoute(List.of()),
+                        null),
+                    new LaidOutEdge(
+                        "serves",
+                        "a",
+                        "b",
+                        "serves",
+                        null,
+                        List.of(),
+                        new PolylineRoute(List.of()),
+                        null)),
                 List.of()),
             POLICY);
 
@@ -904,7 +1054,14 @@ class DrawioDocumentBuilderTest {
                 List.of(laidOut("base", 0, 0, 160, 80), laidOut("derived", 300, 0, 160, 80)),
                 List.of(
                     new LaidOutEdge(
-                        "isa", "derived", "base", "isa", null, List.of(), List.of(), null)),
+                        "isa",
+                        "derived",
+                        "base",
+                        "isa",
+                        null,
+                        List.of(),
+                        new PolylineRoute(List.of()),
+                        null)),
                 List.of()),
             POLICY);
 
@@ -923,7 +1080,16 @@ class DrawioDocumentBuilderTest {
                 List.of(new SourceRelationship("odd", "Generalization", "a", "b", null, Map.of()))),
             layout(
                 List.of(laidOut("a", 0, 0, 150, 75), laidOut("b", 300, 0, 150, 75)),
-                List.of(new LaidOutEdge("odd", "a", "b", "odd", null, List.of(), List.of(), null)),
+                List.of(
+                    new LaidOutEdge(
+                        "odd",
+                        "a",
+                        "b",
+                        "odd",
+                        null,
+                        List.of(),
+                        new PolylineRoute(List.of()),
+                        null)),
                 List.of()),
             POLICY);
 

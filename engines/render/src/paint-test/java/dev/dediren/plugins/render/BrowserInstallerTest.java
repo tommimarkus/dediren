@@ -1,7 +1,9 @@
 package dev.dediren.plugins.render;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -10,9 +12,53 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.junit.jupiter.api.io.TempDir;
 
 @EnabledIfSystemProperty(named = "dediren.render.paint.enabled", matches = "true")
 class BrowserInstallerTest {
+
+  @Test
+  void rejectsMissingOrMismatchedResolvedDriverMetadataBeforeBrowserLaunch() {
+    String matchingMetadata =
+        """
+        {"browsers":[{"name":"chromium-headless-shell","revision":"1234","browserVersion":"151.0.7922.34"}]}
+        """;
+
+    BrowserTestSupport.requireCompatibleDriverMetadata(
+        "1.62.0", "1.62.0", matchingMetadata.getBytes(StandardCharsets.UTF_8));
+
+    assertThatThrownBy(
+            () -> BrowserTestSupport.requireCompatibleDriverMetadata("1.62.0", "1.62.0", null))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("driver metadata");
+    assertThatThrownBy(
+            () ->
+                BrowserTestSupport.requireCompatibleDriverMetadata(
+                    "1.62.0", "1.61.0", matchingMetadata.getBytes(StandardCharsets.UTF_8)))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("driver");
+    assertThatThrownBy(
+            () ->
+                BrowserTestSupport.requireCompatibleDriverMetadata(
+                    "1.62.0",
+                    "1.62.0",
+                    """
+                    {"browsers":[{"name":"chromium-headless-shell","revision":"1228","browserVersion":"149.0.7827.55"}]}
+                    """
+                        .getBytes(StandardCharsets.UTF_8)))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("1234");
+  }
+
+  @Test
+  void staleRevision1228CacheCannotSatisfyTheRevision1234Runtime(@TempDir Path temporaryDirectory)
+      throws Exception {
+    Files.createDirectories(temporaryDirectory.resolve("chromium_headless_shell-1228"));
+
+    assertThatThrownBy(() -> BrowserTestSupport.requireInstalledBrowser(temporaryDirectory))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("chromium_headless_shell-1234");
+  }
 
   @Test
   @Timeout(600)

@@ -113,8 +113,13 @@ preferred.
 Edge label placement tries candidate positions that avoid node boxes, group
 title/border bands, other edge route segments, and labels already placed earlier
 in the SVG, then falls back to the preferred route position when no clear
-candidate is available. Line-jump masks use the local group fill when the jump
-occurs inside a group, falling back to the page background outside groups.
+candidate is available. It keeps the label attached to its own route with a
+2–6px normal offset. When constrained geometry cannot satisfy that attachment,
+the renderer preserves the label and reports
+`DEDIREN_RENDER_EDGE_LABEL_CONSTRAINED`; it does not silently associate the
+label with a neighbouring route. Line-jump masks use the local group fill when
+the jump occurs inside a group, falling back to the page background outside
+groups.
 
 ## Notation Rendering & Render Metadata
 
@@ -172,8 +177,8 @@ and [custom data attribute rules](https://www.w3.org/TR/SVG2/struct.html#DataAtt
 
 The opt-in `render-paint` Maven profile validates behavior that byte-exact SVG
 goldens and XML inspection do not cover. The repository wrapper installs only
-Chromium headless shell 149.0.7827.55 (revision 1228) into
-`.cache/playwright`, then runs the Playwright Java 1.61.0 lane:
+Chromium headless shell 151.0.7922.34 (revision 1234) into
+`.cache/playwright`, then runs the Playwright Java 1.62.0 lane:
 
 ```bash
 ./scripts/test-render-paint.sh
@@ -258,7 +263,7 @@ environment changes.
 Maven state stays in `.cache/maven`; the browser shell stays in
 `.cache/playwright`. These repository-local caches are ignored, recoverable,
 and never shipped; commit no native binary, browser cache, or new font. The
-Thursday 06:00 UTC/manual job runs in the digest-pinned Playwright Java 1.61.0
+Thursday 06:00 UTC/manual job runs in the digest-pinned Playwright Java 1.62.0
 Noble image, which remains a good environment but is no longer *required* to
 regenerate — determinism comes from the repository, not the image: Playwright
 downloads a pinned Chromium and the font is embedded as a data URI, so the host

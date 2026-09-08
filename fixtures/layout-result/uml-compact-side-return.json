@@ -1,5 +1,5 @@
 {
-  "layout_result_schema_version" : "layout-result.schema.v2",
+  "layout_result_schema_version" : "layout-result.schema.v3",
   "view_id" : "compact-side-return",
   "nodes" : [ {
     "id" : "continue-decision",
@@ -16,7 +16,7 @@
     "source_id" : "take-action",
     "projection_id" : "take-action",
     "x" : 12.0,
-    "y" : 190.0,
+    "y" : 215.25,
     "width" : 160.0,
     "height" : 80.0,
     "label" : "Take action",
@@ -26,7 +26,7 @@
     "source_id" : "resume",
     "projection_id" : "resume",
     "x" : 12.0,
-    "y" : 344.0,
+    "y" : 369.25,
     "width" : 160.0,
     "height" : 80.0,
     "label" : "Resume",
@@ -36,7 +36,7 @@
     "source_id" : "done",
     "projection_id" : "done",
     "x" : 76.0,
-    "y" : 498.0,
+    "y" : 523.25,
     "width" : 32.0,
     "height" : 32.0,
     "label" : "",
@@ -49,13 +49,16 @@
     "source_id" : "continue-yes",
     "projection_id" : "continue-yes",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 92.0,
-      "y" : 45.0
-    }, {
-      "x" : 92.0,
-      "y" : 189.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 92.0,
+        "y" : 45.0
+      }, {
+        "x" : 92.0,
+        "y" : 214.25
+      } ]
+    },
     "label" : "yes",
     "source_pointer" : "/relationships/0"
   }, {
@@ -65,19 +68,22 @@
     "source_id" : "continue-no",
     "projection_id" : "continue-no",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 109.0,
-      "y" : 28.0
-    }, {
-      "x" : 244.0,
-      "y" : 28.0
-    }, {
-      "x" : 244.0,
-      "y" : 514.0
-    }, {
-      "x" : 109.0,
-      "y" : 514.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 109.0,
+        "y" : 28.0
+      }, {
+        "x" : 244.0,
+        "y" : 28.0
+      }, {
+        "x" : 244.0,
+        "y" : 539.25
+      }, {
+        "x" : 109.0,
+        "y" : 539.25
+      } ]
+    },
     "label" : "no",
     "source_pointer" : "/relationships/1"
   }, {
@@ -87,13 +93,16 @@
     "source_id" : "action-resume",
     "projection_id" : "action-resume",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 92.0,
-      "y" : 271.0
-    }, {
-      "x" : 92.0,
-      "y" : 343.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 92.0,
+        "y" : 296.25
+      }, {
+        "x" : 92.0,
+        "y" : 368.25
+      } ]
+    },
     "label" : "",
     "source_pointer" : "/relationships/2"
   }, {
@@ -103,13 +112,16 @@
     "source_id" : "resume-done",
     "projection_id" : "resume-done",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 92.0,
-      "y" : 425.0
-    }, {
-      "x" : 92.0,
-      "y" : 497.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 92.0,
+        "y" : 450.25
+      }, {
+        "x" : 92.0,
+        "y" : 522.25
+      } ]
+    },
     "label" : "",
     "source_pointer" : "/relationships/3"
   } ],

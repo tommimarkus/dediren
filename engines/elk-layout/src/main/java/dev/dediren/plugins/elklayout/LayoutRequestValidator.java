@@ -13,7 +13,11 @@ import dev.dediren.contracts.layout.LayoutNode;
 import dev.dediren.contracts.layout.LayoutPlacementStrategy;
 import dev.dediren.contracts.layout.LayoutPreferences;
 import dev.dediren.contracts.layout.LayoutRequest;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /** Package-private validation for layout requests. */
 final class LayoutRequestValidator {
@@ -74,6 +78,8 @@ final class LayoutRequestValidator {
       }
     }
 
+    validateVisualBandMembership(request);
+
     for (int index = 0; index < request.constraints().size(); index++) {
       LayoutConstraint constraint = request.constraints().get(index);
       String path = "$.constraints[" + index + "]";
@@ -84,6 +90,64 @@ final class LayoutRequestValidator {
       for (int subjectIndex = 0; subjectIndex < constraint.subjects().size(); subjectIndex++) {
         requireNonNull(
             constraint.subjects().get(subjectIndex), path + ".subjects[" + subjectIndex + "]");
+      }
+    }
+  }
+
+  private static void validateVisualBandMembership(LayoutRequest request) {
+    if (request.groups().isEmpty()) {
+      return;
+    }
+    Set<String> groupIds = new HashSet<>();
+    for (LayoutGroup group : request.groups()) {
+      groupIds.add(group.id());
+      if (!Boolean.TRUE.equals(group.provenance().visualOnly())) {
+        return;
+      }
+    }
+    for (LayoutGroup group : request.groups()) {
+      if (group.members().stream().anyMatch(groupIds::contains)) {
+        return;
+      }
+    }
+
+    Map<String, Integer> nodeIndexById = new HashMap<>();
+    for (int nodeIndex = 0; nodeIndex < request.nodes().size(); nodeIndex++) {
+      nodeIndexById.put(request.nodes().get(nodeIndex).id(), nodeIndex);
+    }
+    Map<String, String> claimedBandByNode = new HashMap<>();
+    for (int groupIndex = 0; groupIndex < request.groups().size(); groupIndex++) {
+      LayoutGroup group = request.groups().get(groupIndex);
+      for (int memberIndex = 0; memberIndex < group.members().size(); memberIndex++) {
+        String member = group.members().get(memberIndex);
+        Integer nodeIndex = nodeIndexById.get(member);
+        if (nodeIndex == null) {
+          continue;
+        }
+        String previous = claimedBandByNode.putIfAbsent(member, group.id());
+        if (previous != null) {
+          throw new IllegalArgumentException(
+              "$.groups["
+                  + groupIndex
+                  + "].members["
+                  + memberIndex
+                  + "] assigns node "
+                  + member
+                  + " to visual band "
+                  + group.id()
+                  + " but it is already in visual band "
+                  + previous);
+        }
+        Integer partition = request.nodes().get(nodeIndex).partition();
+        if (partition != null && partition != groupIndex) {
+          throw new IllegalArgumentException(
+              "$.nodes["
+                  + nodeIndex
+                  + "].partition conflicts with visual band "
+                  + group.id()
+                  + " partition "
+                  + groupIndex);
+        }
       }
     }
   }

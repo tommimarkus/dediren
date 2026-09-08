@@ -2,21 +2,31 @@ package dev.dediren.plugins.umlxmi;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.within;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.export.ExportRequest;
 import dev.dediren.contracts.export.ExportResult;
 import dev.dediren.contracts.json.JsonSupport;
+import dev.dediren.contracts.layout.LayoutResult;
+import dev.dediren.contracts.source.SourceDocument;
 import dev.dediren.engine.EngineException;
 import dev.dediren.engine.EngineResult;
+import dev.dediren.engine.ModelExportRequest;
+import dev.dediren.plugins.umlxmi.build.XmiHelpers;
 import dev.dediren.plugins.umlxmi.schema.SchemaValidation;
+import dev.dediren.plugins.umlxmi.write.diagram.DiagramWriter;
+import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
@@ -73,6 +83,74 @@ class XmiExportEngineTest {
 
     assertThat(result.diagnostics())
         .noneMatch(diagnostic -> diagnostic.code().equals("DEDIREN_EXPORT_IDENTITY_PLACEHOLDER"));
+  }
+
+  @Test
+  void cubicRouteExportsOrderedWaypointsBeyondItsEndpoints() throws Exception {
+    JsonNode inputJson = exportInputJson();
+    ObjectNode route = (ObjectNode) inputJson.at("/layout_result/edges/0/route");
+    String layoutEdgeId = inputJson.at("/layout_result/edges/0/id").asText();
+    String viewId = inputJson.at("/layout_result/view_id").asText();
+    route.removeAll();
+    route.put("kind", "cubic_bezier");
+    route.putObject("start").put("x", 186.83333333333334).put("y", 165.0);
+    ArrayNode segments = route.putArray("segments");
+    ObjectNode segment = segments.addObject();
+    segment.putObject("control1").put("x", 186.83333333333334).put("y", 213.0);
+    segment.putObject("control2").put("x", 518.0).put("y", 213.0);
+    segment.putObject("end").put("x", 518.0).put("y", 261.0);
+
+    ModelExportRequest request =
+        new ModelExportRequest(
+            JsonSupport.objectMapper().treeToValue(inputJson.get("source"), SourceDocument.class),
+            List.of(
+                new ModelExportRequest.ViewLayout(
+                    viewId,
+                    JsonSupport.objectMapper()
+                        .treeToValue(inputJson.get("layout_result"), LayoutResult.class))),
+            inputJson.get("policy"));
+    String content =
+        engine
+            .exportModel(request, envWithXmiSchema(), Path.of("").toAbsolutePath())
+            .orElseThrow()
+            .value()
+            .content();
+
+    var document =
+        SchemaValidation.secureXmiDocumentBuilderFactory()
+            .newDocumentBuilder()
+            .parse(new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8)));
+    String expectedDiagramEdgeId = "id-di-edge-" + viewId + "-" + layoutEdgeId;
+    NodeList diagramEdges = document.getElementsByTagNameNS(DiagramWriter.UMLDI_NS, "UMLEdge");
+    Element diagramEdge = null;
+    for (int index = 0; index < diagramEdges.getLength(); index++) {
+      Element candidate = (Element) diagramEdges.item(index);
+      if (expectedDiagramEdgeId.equals(candidate.getAttributeNS(XmiHelpers.XMI_NS, "id"))) {
+        diagramEdge = candidate;
+        break;
+      }
+    }
+    assertThat(diagramEdge).isNotNull();
+    NodeList waypoints = diagramEdge.getElementsByTagNameNS(DiagramWriter.DI_NS, "waypoint");
+
+    assertThat(waypoints.getLength()).isGreaterThan(2);
+    Element first = (Element) waypoints.item(0);
+    Element last = (Element) waypoints.item(waypoints.getLength() - 1);
+    assertThat(Double.parseDouble(first.getAttribute("x")))
+        .isCloseTo(186.83333333333334, within(1e-9));
+    assertThat(Double.parseDouble(first.getAttribute("y"))).isCloseTo(165.0, within(1e-9));
+    assertThat(Double.parseDouble(last.getAttribute("x"))).isCloseTo(518.0, within(1e-9));
+    assertThat(Double.parseDouble(last.getAttribute("y"))).isCloseTo(261.0, within(1e-9));
+    boolean containsEvaluatedMidpoint = false;
+    for (int index = 1; index < waypoints.getLength() - 1; index++) {
+      Element waypoint = (Element) waypoints.item(index);
+      double x = Double.parseDouble(waypoint.getAttribute("x"));
+      double y = Double.parseDouble(waypoint.getAttribute("y"));
+      if (Math.abs(x - 352.4166666666667) <= 1e-9 && Math.abs(y - 213.0) <= 1e-9) {
+        containsEvaluatedMidpoint = true;
+      }
+    }
+    assertThat(containsEvaluatedMidpoint).isTrue();
   }
 
   @Test
@@ -316,7 +394,7 @@ class XmiExportEngineTest {
     edge.put("id", id).put("source", source).put("target", target);
     edge.put("source_id", id).put("projection_id", id);
     edge.putArray("routing_hints");
-    ArrayNode points = edge.putArray("points");
+    ArrayNode points = edge.putObject("route").put("kind", "polyline").putArray("points");
     points.addObject().put("x", 45.0).put("y", 216.0);
     points.addObject().put("x", 141.0).put("y", 216.0);
     edge.put("label", "").put("source_pointer", "/relationships/6");

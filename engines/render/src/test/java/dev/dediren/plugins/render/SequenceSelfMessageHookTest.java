@@ -43,12 +43,13 @@ class SequenceSelfMessageHookTest {
 
     Document svg = SvgAudit.parse(RenderTestSupport.render(input));
 
-    // Regression pin, not an independent oracle: 455.0 was rebaselined together with the golden
+    // Regression pin, not an independent oracle: 572.0 was rebaselined together with the golden
     // SVG and fixtures/layout-result/uml-sequence-self-message.json in the same pipeline run
-    // (commit 3d8d0e0). The stemX-derived checks below (points.get(0)/get(last) against this same
+    // after native edge-label reservation. The stemX-derived checks below (points.get(0)/get(last)
+    // against this same
     // stemX) are the actual invariant this test defends -- they hold regardless of the literal.
     double stemX = lifelineStemX(svg, "service");
-    assertThat(stemX).as("service lifeline stem centre-x").isEqualTo(455.0);
+    assertThat(stemX).as("service lifeline stem centre-x").isEqualTo(572.0);
 
     Element path = pathWithAttribute(svg, "data-dediren-sequence-message", "m2");
 
@@ -56,7 +57,7 @@ class SequenceSelfMessageHookTest {
     // uml-sequence-self-message.json's m2 points), now drawn through the shared
     // EdgeRenderer.pathData, so each of the hook's two corners is ROUNDED: the leg stops 8 units
     // short of the corner and a quadratic curve through it resumes 8 units along the next leg.
-    // The corner vertices (495,412) and (495,436) are therefore no longer path points -- the
+    // The corner vertices (612,412) and (612,436) are therefore no longer path points -- the
     // tangent points either side of them are.
     //
     // Still a regression pin rather than an independently derived expectation: it was rebaselined
@@ -66,8 +67,8 @@ class SequenceSelfMessageHookTest {
     // the independent invariant oracle: they still hold, unmoved, across that rebaseline.
     assertThat(path.getAttribute("d"))
         .isEqualTo(
-            "M 455.0 412.0 L 487.0 412.0 Q 495.0 412.0 495.0 420.0"
-                + " L 495.0 428.0 Q 495.0 436.0 487.0 436.0 L 455.0 436.0");
+            "M 572.0 412.0 L 604.0 412.0 Q 612.0 412.0 612.0 420.0"
+                + " L 612.0 428.0 Q 612.0 436.0 604.0 436.0 L 572.0 436.0");
 
     List<double[]> points = pathPoints(path.getAttribute("d"));
     // Still four line vertices: rounding turns each "L corner" into "L tangent Q corner tangent",

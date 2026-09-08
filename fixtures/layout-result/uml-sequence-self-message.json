@@ -1,5 +1,5 @@
 {
-  "layout_result_schema_version" : "layout-result.schema.v2",
+  "layout_result_schema_version" : "layout-result.schema.v3",
   "view_id" : "sequence-view",
   "nodes" : [ {
     "id" : "interaction-self-message",
@@ -7,7 +7,7 @@
     "projection_id" : "interaction-self-message",
     "x" : 101.0,
     "y" : 292.0,
-    "width" : 424.0,
+    "width" : 540.9684143066406,
     "height" : 176.0,
     "label" : "Validate Order",
     "role" : "interaction",
@@ -27,7 +27,7 @@
     "id" : "service",
     "source_id" : "service",
     "projection_id" : "service",
-    "x" : 385.0,
+    "x" : 501.9684143066406,
     "y" : 292.0,
     "width" : 140.0,
     "height" : 64.0,
@@ -42,13 +42,16 @@
     "source_id" : "m1",
     "projection_id" : "m1",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 171.0,
-      "y" : 380.0
-    }, {
-      "x" : 455.0,
-      "y" : 380.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 171.0,
+        "y" : 380.0
+      }, {
+        "x" : 571.9684143066406,
+        "y" : 380.0
+      } ]
+    },
     "label" : "placeOrder",
     "source_pointer" : "/relationships/0"
   }, {
@@ -58,19 +61,22 @@
     "source_id" : "m2",
     "projection_id" : "m2",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 455.0,
-      "y" : 412.0
-    }, {
-      "x" : 495.0,
-      "y" : 412.0
-    }, {
-      "x" : 495.0,
-      "y" : 436.0
-    }, {
-      "x" : 455.0,
-      "y" : 436.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 571.9684143066406,
+        "y" : 412.0
+      }, {
+        "x" : 611.9684143066406,
+        "y" : 412.0
+      }, {
+        "x" : 611.9684143066406,
+        "y" : 436.0
+      }, {
+        "x" : 571.9684143066406,
+        "y" : 436.0
+      } ]
+    },
     "label" : "validateOrder",
     "source_pointer" : "/relationships/1"
   }, {
@@ -80,13 +86,16 @@
     "source_id" : "m3",
     "projection_id" : "m3",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 455.0,
-      "y" : 468.0
-    }, {
-      "x" : 171.0,
-      "y" : 468.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 571.9684143066406,
+        "y" : 468.0
+      }, {
+        "x" : 171.0,
+        "y" : 468.0
+      } ]
+    },
     "label" : "orderConfirmed",
     "source_pointer" : "/relationships/2"
   } ],

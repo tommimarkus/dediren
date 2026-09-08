@@ -156,7 +156,7 @@ class MainTest {
                 + "<node identifier=\"id-vn-main-orders-component\" xsi:type=\"Element\""
                 + " elementRef=\"id-el-orders-component\" x=\"12\" y=\"12\" w=\"160\" h=\"80\"/>"
                 + "<node identifier=\"id-vn-main-orders-service\" xsi:type=\"Element\""
-                + " elementRef=\"id-el-orders-service\" x=\"254\" y=\"12\" w=\"160\" h=\"80\"/>"
+                + " elementRef=\"id-el-orders-service\" x=\"317\" y=\"12\" w=\"160\" h=\"80\"/>"
                 + "</node>");
     // Nested, not duplicated: each member view node appears exactly once in the document.
     assertThat(xml.split("id-vn-main-orders-component", -1)).hasSize(3); // node id + edge source
@@ -249,7 +249,7 @@ class MainTest {
     ((ObjectNode) layout.at("/nodes/0")).put("y", 40.75);
     ((ObjectNode) layout.at("/nodes/0")).put("width", 180.6);
     ((ObjectNode) layout.at("/nodes/0")).put("height", 80.4);
-    ArrayNode points = (ArrayNode) layout.at("/edges/0/points");
+    ArrayNode points = (ArrayNode) layout.at("/edges/0/route/points");
     ((ObjectNode) points.get(0)).put("x", 220.2);
     ((ObjectNode) points.get(0)).put("y", 80.8);
     points.insertObject(1).put("x", 260.6).put("y", 80.4);
@@ -277,7 +277,7 @@ class MainTest {
   void emitsSourceAndTargetAttachmentsForOnePointRoute() throws Exception {
     JsonNode source = fixtureJson("fixtures/source/valid-archimate-oef.json");
     JsonNode layout = fixtureJson("fixtures/layout-result/archimate-oef-basic.json");
-    ArrayNode points = (ArrayNode) layout.at("/edges/0/points");
+    ArrayNode points = (ArrayNode) layout.at("/edges/0/route/points");
     points.remove(1);
     ((ObjectNode) points.get(0)).put("x", 220.6);
     ((ObjectNode) points.get(0)).put("y", 80.2);
@@ -294,7 +294,7 @@ class MainTest {
   void emitsNoConnectionGeometryForEmptyRoute() throws Exception {
     JsonNode source = fixtureJson("fixtures/source/valid-archimate-oef.json");
     JsonNode layout = fixtureJson("fixtures/layout-result/archimate-oef-basic.json");
-    ((ArrayNode) layout.at("/edges/0/points")).removeAll();
+    ((ArrayNode) layout.at("/edges/0/route/points")).removeAll();
 
     String connection = connectionXml(exportXml(source, layout));
 
@@ -408,7 +408,7 @@ class MainTest {
                 .readTree(
                     """
                 {
-                  "layout_result_schema_version": "layout-result.schema.v2",
+                  "layout_result_schema_version": "layout-result.schema.v3",
                   "view_id": "main",
                   "nodes": [
                     { "id": "api", "source_id": "api", "projection_id": "api", "x": 20.0, "y": 80.0, "width": 160.0, "height": 80.0, "label": "API" },
@@ -417,9 +417,9 @@ class MainTest {
                     { "id": "billing", "source_id": "billing", "projection_id": "billing", "x": 340.0, "y": 150.0, "width": 160.0, "height": 80.0, "label": "Billing" }
                   ],
                   "edges": [
-                    { "id": "api-to-junction", "source": "api", "target": "flow-junction", "source_id": "api-to-junction", "projection_id": "api-to-junction", "points": [{ "x": 180.0, "y": 120.0 }, { "x": 240.0, "y": 120.0 }], "label": "" },
-                    { "id": "junction-to-orders", "source": "flow-junction", "target": "orders", "source_id": "junction-to-orders", "projection_id": "junction-to-orders", "points": [{ "x": 268.0, "y": 120.0 }, { "x": 340.0, "y": 80.0 }], "label": "" },
-                    { "id": "junction-to-billing", "source": "flow-junction", "target": "billing", "source_id": "junction-to-billing", "projection_id": "junction-to-billing", "points": [{ "x": 268.0, "y": 120.0 }, { "x": 340.0, "y": 190.0 }], "label": "" }
+                    { "id": "api-to-junction", "source": "api", "target": "flow-junction", "source_id": "api-to-junction", "projection_id": "api-to-junction", "route": {"kind": "polyline", "points": [{ "x": 180.0, "y": 120.0 }, { "x": 240.0, "y": 120.0 }]}, "label": "" },
+                    { "id": "junction-to-orders", "source": "flow-junction", "target": "orders", "source_id": "junction-to-orders", "projection_id": "junction-to-orders", "route": {"kind": "polyline", "points": [{ "x": 268.0, "y": 120.0 }, { "x": 340.0, "y": 80.0 }]}, "label": "" },
+                    { "id": "junction-to-billing", "source": "flow-junction", "target": "billing", "source_id": "junction-to-billing", "projection_id": "junction-to-billing", "route": {"kind": "polyline", "points": [{ "x": 268.0, "y": 120.0 }, { "x": 340.0, "y": 190.0 }]}, "label": "" }
                   ],
                   "groups": [],
                   "warnings": []
@@ -467,7 +467,7 @@ class MainTest {
                 .readTree(
                     """
                 {
-                  "layout_result_schema_version": "layout-result.schema.v2",
+                  "layout_result_schema_version": "layout-result.schema.v3",
                   "view_id": "main",
                   "nodes": [
                     { "id": "group", "source_id": "group", "projection_id": "group", "x": 0.0, "y": 0.0, "width": 440.0, "height": 180.0, "label": "Group" },
@@ -476,9 +476,9 @@ class MainTest {
                     { "id": "orders", "source_id": "orders", "projection_id": "orders", "x": 300.0, "y": 60.0, "width": 120.0, "height": 80.0, "label": "Orders" }
                   ],
                   "edges": [
-                    { "id": "group-contains-junction", "source": "group", "target": "junction", "source_id": "group-contains-junction", "projection_id": "group-contains-junction", "points": [{ "x": 220.0, "y": 86.0 }, { "x": 220.0, "y": 86.0 }], "label": "" },
-                    { "id": "api-to-junction", "source": "api", "target": "junction", "source_id": "api-to-junction", "projection_id": "api-to-junction", "points": [{ "x": 180.0, "y": 100.0 }, { "x": 220.0, "y": 100.0 }], "label": "" },
-                    { "id": "junction-to-orders", "source": "junction", "target": "orders", "source_id": "junction-to-orders", "projection_id": "junction-to-orders", "points": [{ "x": 248.0, "y": 100.0 }, { "x": 300.0, "y": 100.0 }], "label": "" }
+                    { "id": "group-contains-junction", "source": "group", "target": "junction", "source_id": "group-contains-junction", "projection_id": "group-contains-junction", "route": {"kind": "polyline", "points": [{ "x": 220.0, "y": 86.0 }, { "x": 220.0, "y": 86.0 }]}, "label": "" },
+                    { "id": "api-to-junction", "source": "api", "target": "junction", "source_id": "api-to-junction", "projection_id": "api-to-junction", "route": {"kind": "polyline", "points": [{ "x": 180.0, "y": 100.0 }, { "x": 220.0, "y": 100.0 }]}, "label": "" },
+                    { "id": "junction-to-orders", "source": "junction", "target": "orders", "source_id": "junction-to-orders", "projection_id": "junction-to-orders", "route": {"kind": "polyline", "points": [{ "x": 248.0, "y": 100.0 }, { "x": 300.0, "y": 100.0 }]}, "label": "" }
                   ],
                   "groups": [],
                   "warnings": []

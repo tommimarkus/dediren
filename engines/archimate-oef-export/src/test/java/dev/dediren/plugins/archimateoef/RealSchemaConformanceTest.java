@@ -87,7 +87,7 @@ class RealSchemaConformanceTest {
     // fatal here before the clamp. This is the assertion the stub schema cannot make.
     ObjectNode input = exportInput();
     ((ObjectNode) input.at("/layout_result/nodes/0")).put("x", -14.0).put("width", 0.4);
-    ((ObjectNode) input.at("/layout_result/edges/0/points/0")).put("y", -3.0);
+    ((ObjectNode) input.at("/layout_result/edges/0/route/points/0")).put("y", -3.0);
 
     assertThat(exportedContent(input)).contains("x=\"0\"", "w=\"1\"", "y=\"0\"");
   }

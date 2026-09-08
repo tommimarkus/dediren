@@ -12,6 +12,7 @@ import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.layout.LayoutRequest;
 import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.layout.Point;
+import dev.dediren.contracts.layout.PolylineRoute;
 import dev.dediren.core.engine.EngineExecutionException;
 import dev.dediren.core.engine.EngineRunOutcome;
 import dev.dediren.core.source.ValidationResult;
@@ -66,7 +67,7 @@ class CoreCommandsTest {
     String layout =
         """
                 {
-                  "layout_result_schema_version": "layout-result.schema.v2",
+                  "layout_result_schema_version": "layout-result.schema.v3",
                   "view_id": "main",
                   "nodes": [
                     { "id": "a", "source_id": "a", "projection_id": "a", "x": 0.0, "y": 0.0, "width": 100.0, "height": 80.0, "label": "A" },
@@ -94,7 +95,7 @@ class CoreCommandsTest {
     String layout =
         """
                 {
-                  "layout_result_schema_version": "layout-result.schema.v2",
+                  "layout_result_schema_version": "layout-result.schema.v3",
                   "view_id": "main",
                   "nodes": [
                     { "id": "a", "source_id": "a", "projection_id": "a", "x": 0.0, "y": 0.0, "width": 100.0, "height": 80.0, "label": "A" }
@@ -152,7 +153,7 @@ class CoreCommandsTest {
             "m1",
             "m1",
             List.of(),
-            List.of(new Point(100.0, 120.0), new Point(590.0, 120.0)),
+            new PolylineRoute(List.of(new Point(100.0, 120.0), new Point(590.0, 120.0))),
             "placeOrder",
             "/edges/0");
     LayoutResult result = layoutResult(List.of(customer, service), List.of(offAxisMessage));
@@ -240,7 +241,7 @@ class CoreCommandsTest {
         id,
         id,
         List.of(),
-        List.of(new Point(firstX, firstY), new Point(lastX, lastY)),
+        new PolylineRoute(List.of(new Point(firstX, firstY), new Point(lastX, lastY))),
         id);
   }
 
@@ -324,7 +325,7 @@ class CoreCommandsTest {
   private static final String MINIMAL_LAYOUT =
       """
       {
-        "layout_result_schema_version": "layout-result.schema.v2",
+        "layout_result_schema_version": "layout-result.schema.v3",
         "view_id": "main",
         "nodes": [
           { "id": "a", "source_id": "a", "projection_id": "a", "x": 0.0, "y": 0.0, "width": 100.0, "height": 80.0, "label": "A" }

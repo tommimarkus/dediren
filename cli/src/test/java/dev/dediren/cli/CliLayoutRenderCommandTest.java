@@ -49,7 +49,7 @@ class CliLayoutRenderCommandTest {
         layout,
         """
                 {
-                  "layout_result_schema_version": "layout-result.schema.v2",
+                  "layout_result_schema_version": "layout-result.schema.v3",
                   "view_id": "main",
                   "nodes": [
                     { "id": "a", "source_id": "a", "projection_id": "a", "x": 0.0, "y": 0.0, "width": 100.0, "height": 80.0, "label": "A" },
@@ -111,15 +111,15 @@ class CliLayoutRenderCommandTest {
         layout,
         """
                 {
-                  "layout_result_schema_version": "layout-result.schema.v2",
+                  "layout_result_schema_version": "layout-result.schema.v3",
                   "view_id": "main",
                   "nodes": [
                     { "id": "source", "source_id": "source", "projection_id": "source", "x": 0.0, "y": 0.0, "width": 100.0, "height": 80.0, "label": "Source" },
                     { "id": "target", "source_id": "target", "projection_id": "target", "x": 300.0, "y": 0.0, "width": 100.0, "height": 80.0, "label": "Target" }
                   ],
                   "edges": [
-                    { "id": "empty", "source": "source", "target": "target", "source_id": "empty", "projection_id": "empty", "routing_hints": [], "points": [], "label": "empty" },
-                    { "id": "misses-target", "source": "source", "target": "target", "source_id": "misses-target", "projection_id": "misses-target", "routing_hints": [], "points": [{"x": 100.0, "y": 40.0}, {"x": 250.0, "y": 40.0}], "label": "misses target" }
+                    { "id": "empty", "source": "source", "target": "target", "source_id": "empty", "projection_id": "empty", "routing_hints": [], "route": {"kind": "polyline", "points": []}, "label": "empty" },
+                    { "id": "misses-target", "source": "source", "target": "target", "source_id": "misses-target", "projection_id": "misses-target", "routing_hints": [], "route": {"kind": "polyline", "points": [{"x": 100.0, "y": 40.0}, {"x": 250.0, "y": 40.0}]}, "label": "misses target" }
                   ],
                   "groups": [],
                   "warnings": []

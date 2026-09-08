@@ -25,7 +25,27 @@ final class RenderScenarios {
         scenario("uml-complex-class", "uml-svg", "uml-complex-class"),
         scenario("uml-component-basic", "uml-svg", "uml-component-basic"),
         scenario("uml-deployment-basic", "uml-svg", "uml-deployment-basic"),
+        scenario(
+            "uml-compact-side-return",
+            "uml-compact-side-return",
+            "uml-svg",
+            "uml-compact-side-return"),
+        scenario(
+            "uml-compact-sibling-fan-out",
+            "uml-compact-sibling-fan-out",
+            "uml-svg",
+            "uml-compact-sibling-fan-out"),
         scenario("uml-state-machine-basic", "uml-svg", "uml-state-machine-basic"),
+        scenario(
+            "uml-state-machine-two-node-cycle",
+            "uml-state-machine-two-node-cycle",
+            "uml-svg",
+            "uml-state-machine-two-node-cycle"),
+        scenario(
+            "uml-state-machine-multi-cycle",
+            "uml-state-machine-multi-cycle",
+            "uml-svg",
+            "uml-state-machine-multi-cycle"),
         scenario("uml-use-case-basic", "uml-svg", "uml-use-case-basic"));
   }
 

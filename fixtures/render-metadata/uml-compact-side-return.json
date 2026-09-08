@@ -1,0 +1,41 @@
+{
+  "render_metadata_schema_version": "render-metadata.schema.v1",
+  "semantic_profile": "uml",
+  "nodes": {
+    "continue-decision": {
+      "type": "DecisionNode",
+      "source_id": "continue-decision"
+    },
+    "take-action": {
+      "type": "Action",
+      "source_id": "take-action"
+    },
+    "resume": {
+      "type": "Action",
+      "source_id": "resume"
+    },
+    "done": {
+      "type": "ActivityFinalNode",
+      "source_id": "done"
+    }
+  },
+  "edges": {
+    "continue-yes": {
+      "type": "ControlFlow",
+      "source_id": "continue-yes"
+    },
+    "continue-no": {
+      "type": "ControlFlow",
+      "source_id": "continue-no"
+    },
+    "action-resume": {
+      "type": "ControlFlow",
+      "source_id": "action-resume"
+    },
+    "resume-done": {
+      "type": "ControlFlow",
+      "source_id": "resume-done"
+    }
+  },
+  "groups": {}
+}

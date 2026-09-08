@@ -4,15 +4,15 @@
   "renderer" : {
     "name" : "Chromium headless shell via Playwright Java",
     "playwright" : {
-      "version" : "1.61.0",
-      "mavenArtifact" : "com.microsoft.playwright:playwright:1.61.0",
+      "version" : "1.62.0",
+      "mavenArtifact" : "com.microsoft.playwright:playwright:1.62.0",
       "scope" : "render-paint-test-profile-only",
       "upstream" : "https://playwright.dev/java/",
       "license" : "Apache-2.0"
     },
     "chromium" : {
-      "version" : "149.0.7827.55",
-      "revision" : "1228",
+      "version" : "151.0.7922.34",
+      "revision" : "1234",
       "distribution" : "chromium-headless-shell",
       "cache" : ".cache/playwright",
       "downloadedBy" : "playwright install --only-shell chromium",
@@ -61,7 +61,7 @@
   },
   "calibration" : {
     "purpose" : "Environment probe gating raster-golden regeneration. Regeneration is refused unless this environment reproduces the baseline pixels below, judged by the same comparator the goldens use.",
-    "rationale" : "Replaces a pinned container digest. The digest was a proxy for rasterizer fidelity and answered it badly in both directions; Chromium is Playwright-downloaded at a pinned version and the font is embedded as a data URI, so the host supplies neither the browser nor the glyphs.",
+    "rationale" : "Complements the pinned CI container digest with a direct rasterizer-fidelity check. Chromium is Playwright-downloaded at the pinned version and the font is embedded as a data URI; the unchanged calibration gates baseline regeneration in every environment.",
     "inputOwnership" : "Static repository-owned SVG, deliberately not produced by the render engine: a rendered fixture would move with the renderer and stop probing the environment alone.",
     "svg" : {
       "path" : "engines/render/src/paint-test/resources/raster-calibration/calibration.svg",
@@ -98,10 +98,10 @@
     "metadataFixture" : null,
     "baseline" : "engines/render/src/paint-test/resources/raster-golden/pipeline-rich-light.png",
     "dimensions" : {
-      "width" : 1458,
-      "height" : 517
+      "width" : 1980,
+      "height" : 408
     },
-    "sha256" : "3755de1ac78abd775c37daab743febba51a1d12c24d6552e366b25367062646c"
+    "sha256" : "b9466e9c453223f27e62d0a80bd7c71a34e13f334d7d1ad1b1134ab66647a4ff"
   }, {
     "name" : "pipeline-rich-dark",
     "description" : "The same rich standard graph, dark theme",
@@ -110,10 +110,10 @@
     "metadataFixture" : null,
     "baseline" : "engines/render/src/paint-test/resources/raster-golden/pipeline-rich-dark.png",
     "dimensions" : {
-      "width" : 1458,
-      "height" : 517
+      "width" : 1980,
+      "height" : 408
     },
-    "sha256" : "e7da53237657aea17eecc25fddad58856b2ef2b9fdf514e2d1fcf560e7528df1"
+    "sha256" : "480b1bd4d0106d86eb51621ecf61dd6ae3b845b0faf8ddf5db3a1d3100bdb963"
   }, {
     "name" : "archimate-decorators",
     "description" : "ArchiMate diagram with decorators and markers",
@@ -122,10 +122,10 @@
     "metadataFixture" : "fixtures/render-metadata/archimate-basic.json",
     "baseline" : "engines/render/src/paint-test/resources/raster-golden/archimate-decorators.png",
     "dimensions" : {
-      "width" : 531,
+      "width" : 594,
       "height" : 209
     },
-    "sha256" : "a07866184fdee741c1eeb1df36f16060bc06b024facd9ce8efc1517f56ddb728"
+    "sha256" : "e983c7765be3a396e37d8c93519813dd881a1de20ffa4e13bb9123b6a2ec06eb"
   }, {
     "name" : "uml-sequence-fragments",
     "description" : "UML sequence diagram with fragment chrome",
@@ -137,6 +137,54 @@
       "width" : 1073,
       "height" : 977
     },
-    "sha256" : "d6f12d54db8bf9cb1b8ce158e7bd53d2259a187f31493d674d0ce0744e1a3e9b"
+    "sha256" : "c8a754b9c09c7118d25cf0ca65b4cd55d122882925c084da7bd4cb764a4963de"
+  }, {
+    "name" : "uml-compact-side-return",
+    "description" : "Compact activity side-return routing witness",
+    "layoutFixture" : "fixtures/layout-result/uml-compact-side-return.json",
+    "policyFixture" : "fixtures/render-policy/uml-svg.json",
+    "metadataFixture" : "fixtures/render-metadata/uml-compact-side-return.json",
+    "baseline" : "engines/render/src/paint-test/resources/raster-golden/uml-compact-side-return.png",
+    "dimensions" : {
+      "width" : 361,
+      "height" : 697
+    },
+    "sha256" : "405b1e50de8a08ed88b3721240dbb8611a87e9b6356c8a0cccf67f47e5db2a81"
+  }, {
+    "name" : "uml-compact-sibling-fan-out",
+    "description" : "Compact activity sibling fan-out routing witness",
+    "layoutFixture" : "fixtures/layout-result/uml-compact-sibling-fan-out.json",
+    "policyFixture" : "fixtures/render-policy/uml-svg.json",
+    "metadataFixture" : "fixtures/render-metadata/uml-compact-sibling-fan-out.json",
+    "baseline" : "engines/render/src/paint-test/resources/raster-golden/uml-compact-sibling-fan-out.png",
+    "dimensions" : {
+      "width" : 481,
+      "height" : 329
+    },
+    "sha256" : "b52c60522701efcf2eb5306c472535a0ad4b4502bb86880d248e806f904d6017"
+  }, {
+    "name" : "uml-state-machine-two-node-cycle",
+    "description" : "Two-node state-machine cycle routing witness",
+    "layoutFixture" : "fixtures/layout-result/uml-state-machine-two-node-cycle.json",
+    "policyFixture" : "fixtures/render-policy/uml-svg.json",
+    "metadataFixture" : "fixtures/render-metadata/uml-state-machine-two-node-cycle.json",
+    "baseline" : "engines/render/src/paint-test/resources/raster-golden/uml-state-machine-two-node-cycle.png",
+    "dimensions" : {
+      "width" : 453,
+      "height" : 620
+    },
+    "sha256" : "2c11e6180f34fa9c76beb06dc58e9695bccfdd749387e8f9eab5a6058a08defd"
+  }, {
+    "name" : "uml-state-machine-multi-cycle",
+    "description" : "Multi-cycle state-machine routing witness",
+    "layoutFixture" : "fixtures/layout-result/uml-state-machine-multi-cycle.json",
+    "policyFixture" : "fixtures/render-policy/uml-svg.json",
+    "metadataFixture" : "fixtures/render-metadata/uml-state-machine-multi-cycle.json",
+    "baseline" : "engines/render/src/paint-test/resources/raster-golden/uml-state-machine-multi-cycle.png",
+    "dimensions" : {
+      "width" : 522,
+      "height" : 1155
+    },
+    "sha256" : "ec22b24a1cd57fbd5a97a63c4a57f33e48d60be711c98a5b48100efbd3d22dfa"
   } ]
 }

@@ -9,9 +9,10 @@ import static dev.dediren.plugins.render.svg.EdgeRenderer.markerInkBoxes;
 import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LaidOutGroup;
 import dev.dediren.contracts.layout.LaidOutNode;
-import dev.dediren.contracts.layout.Point;
 import dev.dediren.contracts.render.RenderMetadataSelector;
 import dev.dediren.contracts.render.RenderPolicy;
+import dev.dediren.ir.RouteBounds;
+import dev.dediren.ir.RouteGeometry;
 import dev.dediren.plugins.render.node.NodeLabelPlacement;
 import dev.dediren.plugins.render.style.ResolvedEdgeStyle;
 import dev.dediren.plugins.render.style.ResolvedGroupStyle;
@@ -121,17 +122,23 @@ record PlacedScene(
 
     @Override
     public void contributeBounds(SvgBounds bounds) {
-      // Half the stroke lies outside the route on either side, and stroke-linecap="round" puts the
-      // same half beyond each end of it, so one square per vertex covers the whole ribbon.
+      // Cubic extrema, rather than the flattened approximation used for placement, own the route
+      // ink's outer box. A viewBox must contain the exact SVG curve at its true apex.
       double half = style.strokeWidth() / 2.0;
-      for (Point point : edge.points()) {
-        includeStroked(bounds, point.x(), point.y(), 0.0, 0.0, style.strokeWidth());
+      RouteBounds routeBounds = RouteGeometry.bounds(edge.route());
+      if (routeBounds != null) {
+        includeStroked(
+            bounds,
+            routeBounds.minX(),
+            routeBounds.minY(),
+            routeBounds.maxX() - routeBounds.minX(),
+            routeBounds.maxY() - routeBounds.minY(),
+            style.strokeWidth());
       }
       for (MaskedLineJump masked : lineJumps) {
-        // The jump's arc, not its mask. The mask is a backdrop-coloured stroke, so where a jump is
-        // the outermost ink it is necessarily outside every group and painting the page's own
-        // background colour onto the page background — clipping it changes nothing visible.
+        // Account for both strokes from the same accepted jump used by the emission pass.
         includeBox(bounds, masked.jump().routeInkBox().expanded(half, half));
+        includeBox(bounds, masked.jump().maskInkBox());
       }
       for (LabelBox markerBox : markerInkBoxes(edge, style)) {
         includeBox(bounds, markerBox);
@@ -216,7 +223,7 @@ record PlacedScene(
    * <p>The box is carried rather than re-derived because the placement pass already computed it —
    * it is what the next edge's obstacle avoidance had to see.
    */
-  record PlacedEdgeLabel(EdgeLabel label, String text, LabelBox visibleBox) {}
+  record PlacedEdgeLabel(EdgeLabel label, String text, LabelBox visibleBox, boolean constrained) {}
 
   /** A placed UML association-end adornment and the box it inks, carried for the same reason. */
   record PlacedAdornment(EdgeEndAdornments.Adornment adornment, LabelBox visibleBox) {}

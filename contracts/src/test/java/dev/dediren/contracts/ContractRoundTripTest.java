@@ -9,6 +9,8 @@ import dev.dediren.contracts.export.DrawioExportPolicy;
 import dev.dediren.contracts.export.ExportRequest;
 import dev.dediren.contracts.export.UmlXmiExportPolicy;
 import dev.dediren.contracts.json.JsonSupport;
+import dev.dediren.contracts.layout.CubicBezierRoute;
+import dev.dediren.contracts.layout.CubicBezierSegment;
 import dev.dediren.contracts.layout.GroupProvenance;
 import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.layout.LayoutAlgorithm;
@@ -32,6 +34,8 @@ import dev.dediren.contracts.layout.LayoutResult;
 import dev.dediren.contracts.layout.LayoutRoutingStyle;
 import dev.dediren.contracts.layout.LayoutThoroughness;
 import dev.dediren.contracts.layout.LayoutWrapping;
+import dev.dediren.contracts.layout.Point;
+import dev.dediren.contracts.layout.PolylineRoute;
 import dev.dediren.contracts.pkg.PackageBuildResult;
 import dev.dediren.contracts.pkg.PackageDocument;
 import dev.dediren.contracts.pkg.PackageExport;
@@ -405,6 +409,67 @@ class ContractRoundTripTest {
   }
 
   @Test
+  void layoutResultV3RoundTripsPolylineAndCubicRoutesWithoutLegacyPoints() throws Exception {
+    String json =
+        """
+        {
+          "layout_result_schema_version": "layout-result.schema.v3",
+          "view_id": "routes",
+          "nodes": [],
+          "edges": [
+            {
+              "id": "line", "source": "a", "target": "b",
+              "source_id": "line", "projection_id": "line", "routing_hints": [],
+              "route": {
+                "kind": "polyline",
+                "points": [{"x": 1.0, "y": 2.0}, {"x": 3.0, "y": 4.0}]
+              },
+              "label": "line"
+            },
+            {
+              "id": "curve", "source": "a", "target": "b",
+              "source_id": "curve", "projection_id": "curve", "routing_hints": [],
+              "route": {
+                "kind": "cubic_bezier",
+                "start": {"x": 0.0, "y": 0.0},
+                "segments": [{
+                  "control1": {"x": 10.0, "y": 30.0},
+                  "control2": {"x": 20.0, "y": -30.0},
+                  "end": {"x": 30.0, "y": 0.0}
+                }]
+              },
+              "label": "curve"
+            }
+          ],
+          "groups": [],
+          "warnings": []
+        }
+        """;
+
+    LayoutResult result = JsonSupport.readValue(json, LayoutResult.class);
+
+    assertThat(result.layoutResultSchemaVersion())
+        .isEqualTo(ContractVersions.LAYOUT_RESULT_SCHEMA_VERSION);
+    assertThat(result.edges().get(0).route())
+        .isEqualTo(new PolylineRoute(List.of(new Point(1.0, 2.0), new Point(3.0, 4.0))));
+    assertThat(result.edges().get(1).route())
+        .isEqualTo(
+            new CubicBezierRoute(
+                new Point(0.0, 0.0),
+                List.of(
+                    new CubicBezierSegment(
+                        new Point(10.0, 30.0), new Point(20.0, -30.0), new Point(30.0, 0.0)))));
+
+    LayoutResult reparsed =
+        JsonSupport.objectMapper()
+            .readValue(JsonSupport.objectMapper().writeValueAsString(result), LayoutResult.class);
+    JsonNode encoded = JsonSupport.objectMapper().valueToTree(reparsed);
+    assertThat(encoded.at("/edges/0/route/kind").asText()).isEqualTo("polyline");
+    assertThat(encoded.at("/edges/1/route/kind").asText()).isEqualTo("cubic_bezier");
+    assertThat(encoded.at("/edges/0").has("points")).isFalse();
+  }
+
+  @Test
   void layoutNodesCarryOptionalRoleThatRoundTrips() throws Exception {
     LaidOutNode lifeline =
         new LaidOutNode("customer", "customer", "customer", 0, 0, 140, 48, "Customer", "lifeline");
@@ -565,7 +630,7 @@ class ContractRoundTripTest {
                     "plugins": {}
                   },
                   "layout_result": {
-                    "layout_result_schema_version": "layout-result.schema.v2",
+                    "layout_result_schema_version": "layout-result.schema.v3",
                     "view_id": "class-view",
                     "nodes": [],
                     "edges": [],

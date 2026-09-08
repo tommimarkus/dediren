@@ -1415,6 +1415,18 @@ A warning verdict is not a failure — the exit code stays `0`. ArchiMate juncti
 nodes detached from an incident edge route fail with
 `DEDIREN_LAYOUT_JUNCTION_OFF_INCIDENT_ROUTE`.
 
+Layout-result schema v3 gives each edge exactly one authoritative route:
+`polyline` or `cubic_bezier`. This generated result contract has no v2 fallback;
+the authored source-model, layout-request, and render-policy schemas are
+unchanged. Consumers flatten cubic curves with at most 0.25 layout-unit error
+when they need linear segments for waypoint exports or quality checks; SVG
+uses native cubic paths and exact curve bounds. Layout quality
+also covers route body hits, accidental coincident runs, node-face rides, dense
+label bands, and detached labels; the browser paint audit and render bounds
+check paint overflow. A fixture may require zero crossings where its graph
+admits that result, while the aggregate crossing count remains informational for
+arbitrary graphs.
+
 Hard-error layout diagnostics (severity `error`) additionally carry an optional
 `source_pointer` — a JSON-Pointer into the source model (for example `/nodes/3`
 or `/relationships/2`) naming the element to repair. Use it to jump straight
@@ -1435,6 +1447,12 @@ returns no edge routes. The `algorithm` option selects the layout algorithm
 (`resist_reversal`, `keep_short`, `keep_straight`) are also configurable under
 `layout_preferences`; see `schemas/layout-request.schema.json` for the allowed
 values.
+
+ELK remains the placement, free-port, and cycle-routing authority. The default
+uses orthogonal routing and high thoroughness (21); requested splines use
+conservative cubic geometry. An explicit
+`thoroughness: normal` remains a deliberate lower-cost request (7), not a
+silently rewritten default.
 
 The omitted-preference `compact` baseline is calibrated for Dediren's labels
 and ports (40 node–node and 24 edge/port clearances) and omits redundant
@@ -1706,6 +1724,12 @@ you can recover from stdout JSON alone.
   a node is painted underneath it and disappears from view. There is no
   automatic fix — widen the layout, shorten the label text, or reposition the
   offending node(s) so the label has clear space.
+- `DEDIREN_RENDER_EDGE_LABEL_CONSTRAINED`: the renderer kept an edge label on
+  its own route but could not find a placement with a 2–6px gap, clear surrounding paint,
+  and its own route nearer than competing routes (a
+  `warning`; the SVG was rendered). Widen the layout or shorten the label. A
+  larger render-policy font can cause this because layout reserves canonical
+  text space and does not receive policy-specific font overrides.
 - `DEDIREN_RENDER_METADATA_PROFILE_NOT_APPLIED`: the render metadata declares
   `semantic_profile` `uml` or `archimate` but the render policy declares none,
   so that notation's shapes, decorators, and label placement were not applied

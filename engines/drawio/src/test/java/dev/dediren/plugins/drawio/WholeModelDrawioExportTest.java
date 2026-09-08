@@ -11,6 +11,7 @@ import dev.dediren.contracts.json.JsonSupport;
 import dev.dediren.contracts.layout.LaidOutEdge;
 import dev.dediren.contracts.layout.LaidOutNode;
 import dev.dediren.contracts.layout.LayoutResult;
+import dev.dediren.contracts.layout.PolylineRoute;
 import dev.dediren.contracts.source.SourceDocument;
 import dev.dediren.contracts.source.SourceNode;
 import dev.dediren.contracts.source.SourceRelationship;
@@ -117,7 +118,7 @@ class WholeModelDrawioExportTest {
                 "orders-serves-billing",
                 null,
                 List.of(),
-                List.of(),
+                new PolylineRoute(List.of()),
                 "serves")),
         List.of(),
         List.of());

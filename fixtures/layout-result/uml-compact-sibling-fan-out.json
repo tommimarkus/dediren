@@ -1,5 +1,5 @@
 {
-  "layout_result_schema_version" : "layout-result.schema.v2",
+  "layout_result_schema_version" : "layout-result.schema.v3",
   "view_id" : "compact-sibling-fan-out",
   "nodes" : [ {
     "id" : "cache-decision",
@@ -15,7 +15,7 @@
     "id" : "use-cache",
     "source_id" : "use-cache",
     "projection_id" : "use-cache",
-    "x" : 134.0,
+    "x" : 175.64700317382812,
     "y" : 12.0,
     "width" : 160.0,
     "height" : 80.0,
@@ -25,7 +25,7 @@
     "id" : "refresh-cache",
     "source_id" : "refresh-cache",
     "projection_id" : "refresh-cache",
-    "x" : 134.0,
+    "x" : 175.64700317382812,
     "y" : 132.0,
     "width" : 160.0,
     "height" : 80.0,
@@ -39,13 +39,16 @@
     "source_id" : "cache-hit",
     "projection_id" : "cache-hit",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 45.0,
-      "y" : 52.0
-    }, {
-      "x" : 133.0,
-      "y" : 52.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 45.0,
+        "y" : 52.0
+      }, {
+        "x" : 174.64700317382812,
+        "y" : 52.0
+      } ]
+    },
     "label" : "hit",
     "source_pointer" : "/relationships/0"
   }, {
@@ -55,19 +58,22 @@
     "source_id" : "cache-miss",
     "projection_id" : "cache-miss",
     "routing_hints" : [ ],
-    "points" : [ {
-      "x" : 45.0,
-      "y" : 55.66666666666667
-    }, {
-      "x" : 69.0,
-      "y" : 55.66666666666667
-    }, {
-      "x" : 69.0,
-      "y" : 172.0
-    }, {
-      "x" : 133.0,
-      "y" : 172.0
-    } ],
+    "route" : {
+      "kind" : "polyline",
+      "points" : [ {
+        "x" : 45.0,
+        "y" : 55.66666666666667
+      }, {
+        "x" : 69.0,
+        "y" : 55.66666666666667
+      }, {
+        "x" : 69.0,
+        "y" : 172.0
+      }, {
+        "x" : 174.64700317382812,
+        "y" : 172.0
+      } ]
+    },
     "label" : "miss",
     "source_pointer" : "/relationships/1"
   } ],

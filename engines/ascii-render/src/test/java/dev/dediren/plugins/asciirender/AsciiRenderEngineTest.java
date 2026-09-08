@@ -7,6 +7,7 @@ import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticSeverity;
 import dev.dediren.contracts.layout.Point;
+import dev.dediren.contracts.layout.PolylineRoute;
 import dev.dediren.contracts.render.RenderMetadata;
 import dev.dediren.contracts.render.RenderMetadataSelector;
 import dev.dediren.contracts.render.RenderResult;
@@ -232,6 +233,169 @@ class AsciiRenderEngineTest {
   }
 
   @Test
+  void multiTurnDiagonalRouteRetainsItsOriginalTurnOnTheCharacterGrid() {
+    RoutedEdge diagonal =
+        edge("e1", "s", "t", "", new Point(0, 0), new Point(100, 100), new Point(200, 0));
+    LaidOutScene scene = new LaidOutScene("v", List.of(), List.of(diagonal), List.of(), List.of());
+    CoordinateGrid grid = CoordinateGrid.of(scene);
+    List<Diagnostic> diagnostics = new java.util.ArrayList<>();
+
+    List<int[]> cells = EdgeTracer.drawCells(grid, diagonal, diagnostics);
+
+    assertThat(cells)
+        .anySatisfy(cell -> assertThat(cell).containsExactly(grid.rowOf(100), grid.colOf(100)));
+    assertThat(diagnostics)
+        .filteredOn(diagnostic -> diagnostic.code().equals("DEDIREN_ASCII_EDGE_APPROXIMATED"))
+        .hasSize(1);
+  }
+
+  @Test
+  void diagonalRasterizationStaysWithinOneGridCellOfTheOriginalSegment() {
+    RoutedEdge diagonal = edge("e1", "s", "t", "", new Point(0, 0), new Point(200, 100));
+    LaidOutScene scene = new LaidOutScene("v", List.of(), List.of(diagonal), List.of(), List.of());
+    CoordinateGrid grid = CoordinateGrid.of(scene);
+    List<Diagnostic> diagnostics = new java.util.ArrayList<>();
+
+    List<int[]> cells = EdgeTracer.drawCells(grid, diagonal, diagnostics);
+    int endRow = grid.rowOf(100);
+    int endCol = grid.colOf(200);
+
+    for (int[] cell : cells) {
+      assertThat(distanceToGridSegment(cell[0], cell[1], 0, 0, endRow, endCol))
+          .isLessThanOrEqualTo(1.0);
+    }
+  }
+
+  @Test
+  void overlappingEdgeRunsReportTheLossOfDistinctGridIdentity() throws Exception {
+    RoutedEdge first = edge("first", "a", "b", "", new Point(0, 0), new Point(100, 0));
+    RoutedEdge second = edge("second", "c", "d", "", new Point(0, 0), new Point(100, 0));
+    LaidOutScene scene =
+        new LaidOutScene("v", List.of(), List.of(first, second), List.of(), List.of());
+
+    EngineResult<?> result = engine.render(scene, minimalPolicy(), null);
+
+    assertThat(result.diagnostics())
+        .anySatisfy(
+            diagnostic -> {
+              assertThat(diagnostic.code()).isEqualTo("DEDIREN_ASCII_EDGE_APPROXIMATED");
+              assertThat(diagnostic.path()).isEqualTo("edges[second]");
+              assertThat(diagnostic.message()).contains("collides");
+            });
+  }
+
+  @Test
+  void nodeInteriorThatErasesAnEdgeRunReportsTheLoss() throws Exception {
+    RoutedEdge edge = edge("through", "a", "b", "", new Point(0, 0), new Point(100, 0));
+    PlacedNode node = node("cover", 40, -16, 24, 32, "C");
+    LaidOutScene scene = new LaidOutScene("v", List.of(node), List.of(edge), List.of(), List.of());
+
+    EngineResult<?> result = engine.render(scene, minimalPolicy(), null);
+
+    assertThat(result.diagnostics())
+        .anySatisfy(
+            diagnostic -> {
+              assertThat(diagnostic.code()).isEqualTo("DEDIREN_ASCII_EDGE_APPROXIMATED");
+              assertThat(diagnostic.path()).isEqualTo("edges[through]");
+              assertThat(diagnostic.message()).contains("obscured");
+            });
+  }
+
+  @Test
+  void sharedJunctionHintDoesNotHideALaterRouteRejoin() throws Exception {
+    RoutedEdge first =
+        edge("first", "a", "b", "", new Point(0, 0), new Point(100, 0), new Point(100, 100));
+    RoutedEdge second =
+        new RoutedEdge(
+            "second",
+            "a",
+            "c",
+            "second",
+            "second",
+            List.of("shared_source_junction"),
+            new PolylineRoute(
+                List.of(
+                    new Point(0, 0), new Point(100, 0), new Point(200, 50), new Point(100, 100))),
+            "",
+            null);
+    LaidOutScene scene =
+        new LaidOutScene("v", List.of(), List.of(first, second), List.of(), List.of());
+
+    EngineResult<?> result = engine.render(scene, minimalPolicy(), null);
+
+    assertThat(result.diagnostics())
+        .anySatisfy(
+            diagnostic -> {
+              assertThat(diagnostic.code()).isEqualTo("DEDIREN_ASCII_EDGE_APPROXIMATED");
+              assertThat(diagnostic.path()).isEqualTo("edges[second]");
+              assertThat(diagnostic.message()).contains("collides");
+            });
+  }
+
+  @Test
+  void sharedSourceStubDoesNotReportAnOverlapBeforeTheRoutesDiverge() throws Exception {
+    RoutedEdge first =
+        new RoutedEdge(
+            "first",
+            "a",
+            "b",
+            "first",
+            "first",
+            List.of("shared_source_junction"),
+            new PolylineRoute(
+                List.of(new Point(0, 0), new Point(40, 0), new Point(80, 0), new Point(100, 60))),
+            "",
+            null);
+    RoutedEdge second =
+        new RoutedEdge(
+            "second",
+            "a",
+            "c",
+            "second",
+            "second",
+            List.of("shared_source_junction"),
+            new PolylineRoute(
+                List.of(new Point(0, 0), new Point(40, 0), new Point(80, 0), new Point(100, -60))),
+            "",
+            null);
+    EngineResult<?> result =
+        engine.render(
+            new LaidOutScene("v", List.of(), List.of(first, second), List.of(), List.of()),
+            minimalPolicy(),
+            null);
+
+    assertThat(result.diagnostics())
+        .noneMatch(
+            diagnostic ->
+                diagnostic.path().equals("edges[second]")
+                    && diagnostic.message().contains("collides"));
+  }
+
+  @Test
+  void nodeObscurationNamesEveryOverlappingEdgeOwner() throws Exception {
+    RoutedEdge first = edge("first", "a", "b", "", new Point(0, 0), new Point(100, 0));
+    RoutedEdge second = edge("second", "c", "d", "", new Point(0, 0), new Point(100, 0));
+    PlacedNode node = node("cover", 40, -16, 24, 32, "C");
+    LaidOutScene scene =
+        new LaidOutScene("v", List.of(node), List.of(first, second), List.of(), List.of());
+
+    EngineResult<?> result = engine.render(scene, minimalPolicy(), null);
+
+    assertThat(result.diagnostics())
+        .anySatisfy(
+            diagnostic -> {
+              assertThat(diagnostic.path()).isEqualTo("edges[first]");
+              assertThat(diagnostic.message()).contains("obscured");
+            });
+    assertThat(result.diagnostics())
+        .anySatisfy(
+            diagnostic -> {
+              assertThat(diagnostic.path()).isEqualTo("edges[second]");
+              assertThat(diagnostic.message()).contains("obscured");
+            });
+  }
+
+  @Test
   void sequenceShapedMetadataWarnsAndStillRendersNonEmptyOutput() throws Exception {
     RenderMetadata metadata =
         new RenderMetadata(
@@ -313,7 +477,23 @@ class AsciiRenderEngineTest {
 
   private static RoutedEdge edge(
       String id, String source, String target, String label, Point... points) {
-    return new RoutedEdge(id, source, target, id, id, List.of(), List.of(points), label, null);
+    return new RoutedEdge(
+        id, source, target, id, id, List.of(), new PolylineRoute(List.of(points)), label, null);
+  }
+
+  private static double distanceToGridSegment(
+      int row, int col, int rowStart, int colStart, int rowEnd, int colEnd) {
+    double dRow = rowEnd - rowStart;
+    double dCol = colEnd - colStart;
+    double lengthSquared = dRow * dRow + dCol * dCol;
+    double parameter =
+        lengthSquared == 0.0
+            ? 0.0
+            : Math.clamp(
+                ((row - rowStart) * dRow + (col - colStart) * dCol) / lengthSquared, 0.0, 1.0);
+    double nearestRow = rowStart + parameter * dRow;
+    double nearestCol = colStart + parameter * dCol;
+    return Math.hypot(row - nearestRow, col - nearestCol);
   }
 
   private static ObjectNode minimalPolicy() {
