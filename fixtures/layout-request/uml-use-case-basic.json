@@ -1,0 +1,145 @@
+{
+  "layout_request_schema_version": "layout-request.schema.v2",
+  "view_id": "use-case-view",
+  "nodes": [
+    {
+      "id": "customer",
+      "label": "Customer",
+      "source_id": "customer",
+      "width_hint": 80.0,
+      "height_hint": 120.0,
+      "source_pointer": "/nodes/1"
+    },
+    {
+      "id": "support-agent",
+      "label": "Support Agent",
+      "source_id": "support-agent",
+      "width_hint": 80.0,
+      "height_hint": 120.0,
+      "source_pointer": "/nodes/2"
+    },
+    {
+      "id": "place-order",
+      "label": "Place Order",
+      "source_id": "place-order",
+      "width_hint": 160.0,
+      "height_hint": 72.0,
+      "source_pointer": "/nodes/3"
+    },
+    {
+      "id": "track-order",
+      "label": "Track Order",
+      "source_id": "track-order",
+      "width_hint": 160.0,
+      "height_hint": 72.0,
+      "source_pointer": "/nodes/4"
+    },
+    {
+      "id": "authenticate-customer",
+      "label": "Authenticate Customer",
+      "source_id": "authenticate-customer",
+      "width_hint": 160.0,
+      "height_hint": 72.0,
+      "source_pointer": "/nodes/5"
+    },
+    {
+      "id": "apply-discount",
+      "label": "Apply Discount",
+      "source_id": "apply-discount",
+      "width_hint": 160.0,
+      "height_hint": 72.0,
+      "source_pointer": "/nodes/6"
+    },
+    {
+      "id": "cancel-order",
+      "label": "Cancel Order",
+      "source_id": "cancel-order",
+      "width_hint": 160.0,
+      "height_hint": 72.0,
+      "source_pointer": "/nodes/7"
+    },
+    {
+      "id": "payment-extension",
+      "label": "payment authorized",
+      "source_id": "payment-extension",
+      "width_hint": 140.0,
+      "height_hint": 40.0,
+      "source_pointer": "/nodes/8"
+    }
+  ],
+  "edges": [
+    {
+      "id": "customer-place-order",
+      "source": "customer",
+      "target": "place-order",
+      "label": "",
+      "source_id": "customer-place-order",
+      "relationship_type": "Association",
+      "source_pointer": "/relationships/0"
+    },
+    {
+      "id": "customer-track-order",
+      "source": "customer",
+      "target": "track-order",
+      "label": "",
+      "source_id": "customer-track-order",
+      "relationship_type": "Association",
+      "source_pointer": "/relationships/1"
+    },
+    {
+      "id": "support-cancel-order",
+      "source": "support-agent",
+      "target": "cancel-order",
+      "label": "",
+      "source_id": "support-cancel-order",
+      "relationship_type": "Association",
+      "source_pointer": "/relationships/2"
+    },
+    {
+      "id": "include-authentication",
+      "source": "place-order",
+      "target": "authenticate-customer",
+      "label": "include",
+      "source_id": "include-authentication",
+      "relationship_type": "Include",
+      "source_pointer": "/relationships/3"
+    },
+    {
+      "id": "extend-discount",
+      "source": "apply-discount",
+      "target": "place-order",
+      "label": "extend",
+      "source_id": "extend-discount",
+      "relationship_type": "Extend",
+      "source_pointer": "/relationships/4"
+    }
+  ],
+  "groups": [
+    {
+      "id": "order-service-boundary",
+      "label": "Order Service",
+      "members": [
+        "place-order",
+        "track-order",
+        "authenticate-customer",
+        "apply-discount",
+        "cancel-order",
+        "payment-extension"
+      ],
+      "provenance": {
+        "semantic_backed": {
+          "source_id": "order-service"
+        }
+      }
+    }
+  ],
+  "constraints": [],
+  "layout_preferences": {
+    "direction": "right",
+    "density": "readable",
+    "routing": {
+      "style": "orthogonal",
+      "endpoint_merging": "off"
+    }
+  }
+}

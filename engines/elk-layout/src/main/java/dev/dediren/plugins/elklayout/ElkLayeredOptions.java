@@ -197,6 +197,9 @@ final class ElkLayeredOptions {
 
   static void configureGroup(ElkNode group, Direction direction, LayoutPreferences preferences) {
     configureRoot(group, direction, preferences, false);
+    // Cross-hierarchy sweeps let external actors and internal label dummies influence each
+    // other's order; bottom-up child ordering can otherwise freeze an avoidable crossing.
+    group.setProperty(LayeredOptions.CROSSING_MINIMIZATION_HIERARCHICAL_SWEEPINESS, 1.0);
     group.setProperty(CoreOptions.HIERARCHY_HANDLING, HierarchyHandling.INCLUDE_CHILDREN);
     group.setProperty(CoreOptions.PADDING, new ElkPadding(groupPadding(preferences)));
   }

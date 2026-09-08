@@ -112,7 +112,7 @@ final class PortPlan {
     }
     Map<String, EndpointMerge> merges = flatEndpointMerges(edges, nodes, preferences, direction);
     BinaryCorridors corridors = binaryCorridors(edges, nodes);
-    Set<String> fixedNodes = compactControlNodes(edges, corridors);
+    Set<String> fixedNodes = compactControlNodes(edges, nodes, corridors);
     Map<String, EndpointSides> sides =
         flatEndpointSides(edges, nodes, merges, corridors, direction);
     return new PortPlan(
@@ -388,8 +388,23 @@ final class PortPlan {
   }
 
   private static Set<String> compactControlNodes(
-      List<LayoutEdge> edges, BinaryCorridors corridors) {
+      List<LayoutEdge> edges, Map<String, LayoutNode> requestNodes, BinaryCorridors corridors) {
     Set<String> nodes = new HashSet<>();
+    Map<String, Integer> outgoingControls = new HashMap<>();
+    Map<String, Integer> incomingControls = new HashMap<>();
+    for (LayoutEdge edge : edges) {
+      if ("ControlFlow".equals(relationshipType(edge)) && !edge.source().equals(edge.target())) {
+        outgoingControls.merge(edge.source(), 1, Integer::sum);
+        incomingControls.merge(edge.target(), 1, Integer::sum);
+      }
+    }
+    for (LayoutNode node : requestNodes.values()) {
+      if (isConnectorSized(node)
+          && (outgoingControls.getOrDefault(node.id(), 0) == 2
+              || incomingControls.getOrDefault(node.id(), 0) == 2)) {
+        nodes.add(node.id());
+      }
+    }
     for (LayoutEdge edge : edges) {
       if (corridors.sourceBranches().containsKey(edge.id())) {
         nodes.add(edge.source());

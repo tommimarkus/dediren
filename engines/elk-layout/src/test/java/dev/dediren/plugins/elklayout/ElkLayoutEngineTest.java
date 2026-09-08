@@ -997,6 +997,9 @@ class ElkLayoutEngineTest {
 
     LaidOutNode decision = nodeById(result, "check-cache");
 
+    assertEquals(32.0, decision.width(), GEOMETRY_EPSILON, "compact decision keeps its width");
+    assertEquals(32.0, decision.height(), GEOMETRY_EPSILON, "compact decision keeps its height");
+
     assertRouteEndpointOnSide(result, "check-cache-cached", "check-cache", true, PortSide.EAST);
     assertRouteEndpointOnSide(result, "check-cache-stale", "check-cache", true, PortSide.EAST);
     assertEquals(

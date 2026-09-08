@@ -52,6 +52,19 @@ class ElkNativeRoutingTest {
   private static final double NODE_BODY_INSET = 1.5;
 
   @Test
+  void groupedUseCaseCrossHierarchyRoutesRemainUncrossedWithReservedLabels() throws Exception {
+    var path =
+        dev.dediren.testsupport.TestSupport.workspaceRoot()
+            .resolve("fixtures/layout-request/uml-use-case-basic.json");
+    try (var input = java.nio.file.Files.newInputStream(path)) {
+      LayoutResult result = new ElkLayoutEngine().layout(LayoutJson.readLayoutRequest(input));
+      assertTrue(
+          properRouteCrossings(result).isEmpty(),
+          () -> "cross-hierarchy crossings: " + properRouteCrossings(result));
+    }
+  }
+
+  @Test
   void groupedRootLeavesFeedbackCyclesToNativeElkRouting() {
     ElkNode root = ElkGraphUtil.createGraph();
 
