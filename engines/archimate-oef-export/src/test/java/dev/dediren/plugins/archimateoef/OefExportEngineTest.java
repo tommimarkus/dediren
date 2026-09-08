@@ -142,6 +142,32 @@ class OefExportEngineTest {
   }
 
   @Test
+  void cubicRouteExportsOrderedAttachmentsAndFlattenedIntermediateGeometry() throws Exception {
+    JsonNode inputJson = exportInputJson();
+    ObjectNode route = (ObjectNode) inputJson.at("/layout_result/edges/0/route");
+    route.removeAll();
+    route.put("kind", "cubic_bezier");
+    route.putObject("start").put("x", 173.0).put("y", 52.0);
+    ArrayNode segments = route.putArray("segments");
+    ObjectNode segment = segments.addObject();
+    segment.putObject("control1").put("x", 195.0).put("y", 0.0);
+    segment.putObject("control2").put("x", 230.0).put("y", 0.0);
+    segment.putObject("end").put("x", 253.0).put("y", 52.0);
+
+    String content = exportContent(inputJson);
+
+    int source = content.indexOf("<sourceAttachment x=\"173\" y=\"52\"/>");
+    int bend = content.indexOf("<bendpoint", source);
+    int target = content.indexOf("<targetAttachment x=\"253\" y=\"52\"/>");
+    assertThat(source).isGreaterThanOrEqualTo(0);
+    assertThat(bend).isGreaterThan(source);
+    assertThat(target).isGreaterThan(bend);
+    // The cubic's analytically known midpoint is (212.625, 13), so this distinguishes evaluated
+    // intermediate route geometry from serializing either control point at y=0.
+    assertThat(content.substring(source, target)).contains("y=\"13\"");
+  }
+
+  @Test
   void exportRejectsInvalidPolicyWithPolicyInvalidCode() throws Exception {
     JsonNode inputJson = exportInputJson();
     ((ObjectNode) inputJson.get("policy")).remove("model_identifier");

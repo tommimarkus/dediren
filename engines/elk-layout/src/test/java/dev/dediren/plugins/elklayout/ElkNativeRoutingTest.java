@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.dediren.contracts.ContractVersions;
 import dev.dediren.contracts.layout.CubicBezierRoute;
+import dev.dediren.contracts.layout.CubicBezierSegment;
 import dev.dediren.contracts.layout.EdgeRoute;
 import dev.dediren.contracts.layout.GroupProvenance;
 import dev.dediren.contracts.layout.LaidOutEdge;
@@ -420,7 +421,7 @@ class ElkNativeRoutingTest {
   private static List<String> nodeBodyHits(LayoutResult result) {
     List<String> hits = new ArrayList<>();
     for (LaidOutEdge edge : result.edges()) {
-      List<Point> points = flatten(edge.route());
+      List<Point> points = oraclePoints(edge.route());
       for (int segment = 0; segment < points.size() - 1; segment++) {
         Point start = points.get(segment);
         Point end = points.get(segment + 1);
@@ -450,10 +451,10 @@ class ElkNativeRoutingTest {
     List<String> crossings = new ArrayList<>();
     for (int leftIndex = 0; leftIndex < result.edges().size(); leftIndex++) {
       LaidOutEdge left = result.edges().get(leftIndex);
-      List<Point> leftPoints = flatten(left.route());
+      List<Point> leftPoints = oraclePoints(left.route());
       for (int rightIndex = leftIndex + 1; rightIndex < result.edges().size(); rightIndex++) {
         LaidOutEdge right = result.edges().get(rightIndex);
-        List<Point> rightPoints = flatten(right.route());
+        List<Point> rightPoints = oraclePoints(right.route());
         for (int leftSegment = 0; leftSegment < leftPoints.size() - 1; leftSegment++) {
           for (int rightSegment = 0; rightSegment < rightPoints.size() - 1; rightSegment++) {
             if (properlyCrosses(
@@ -481,5 +482,39 @@ class ElkNativeRoutingTest {
 
   private static double cross(Point a, Point b, Point point) {
     return (b.x() - a.x()) * (point.y() - a.y()) - (b.y() - a.y()) * (point.x() - a.x());
+  }
+
+  /**
+   * Fixed, test-local sampling keeps the native-route oracle independent from production
+   * flattening.
+   */
+  private static List<Point> oraclePoints(EdgeRoute route) {
+    if (route instanceof PolylineRoute polyline) {
+      return polyline.points();
+    }
+    CubicBezierRoute cubic = (CubicBezierRoute) route;
+    List<Point> points = new ArrayList<>();
+    Point start = cubic.start();
+    points.add(start);
+    for (CubicBezierSegment segment : cubic.segments()) {
+      for (int sample = 1; sample <= 128; sample++) {
+        points.add(cubicPoint(start, segment, sample / 128.0));
+      }
+      start = segment.end();
+    }
+    return points;
+  }
+
+  private static Point cubicPoint(Point start, CubicBezierSegment segment, double t) {
+    double u = 1.0 - t;
+    return new Point(
+        u * u * u * start.x()
+            + 3.0 * u * u * t * segment.control1().x()
+            + 3.0 * u * t * t * segment.control2().x()
+            + t * t * t * segment.end().x(),
+        u * u * u * start.y()
+            + 3.0 * u * u * t * segment.control1().y()
+            + 3.0 * u * t * t * segment.control2().y()
+            + t * t * t * segment.end().y());
   }
 }
