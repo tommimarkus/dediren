@@ -52,13 +52,13 @@ class LabelInjectionTest {
 
     ArrayNode nodes = layout.putArray("nodes");
     addNode(nodes, "n1", 40, 40, 220, 80, NODE_LABEL);
-    addNode(nodes, "n2", 360, 40, 180, 80, "Target");
+    addNode(nodes, "n2", 560, 40, 180, 80, "Target");
 
     ArrayNode edges = layout.putArray("edges");
-    addEdge(edges, "e1", "n1", "n2", EDGE_LABEL, 260, 80, 360, 80);
+    addEdge(edges, "e1", "n1", "n2", EDGE_LABEL, 260, 80, 560, 80);
 
     ArrayNode groups = layout.putArray("groups");
-    addGroup(groups, "g1", 16, 16, 540, 140, List.of("n1", "n2"), GROUP_LABEL);
+    addGroup(groups, "g1", 16, 16, 740, 140, List.of("n1", "n2"), GROUP_LABEL);
 
     layout.putArray("warnings");
     input.set("policy", RenderTestSupport.fixtureJson("fixtures/render-policy/default-svg.json"));

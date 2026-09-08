@@ -24,8 +24,9 @@ import static dev.dediren.plugins.render.svg.EdgeRenderer.edgeMarker;
 import static dev.dediren.plugins.render.svg.EdgeRenderer.edgePath;
 import static dev.dediren.plugins.render.svg.EdgeRenderer.lineJumpMasks;
 import static dev.dediren.plugins.render.svg.EdgeRenderer.lineJumps;
+import static dev.dediren.plugins.render.svg.EdgeRenderer.markerInkBoxes;
+import static dev.dediren.plugins.render.svg.EdgeRenderer.placeLabel;
 import static dev.dediren.plugins.render.svg.Geometry.labelBox;
-import static dev.dediren.plugins.render.svg.Geometry.labelObstacleBoxesForEdge;
 import static dev.dediren.plugins.render.svg.Svg.dashArrayValue;
 import static dev.dediren.plugins.render.svg.Svg.f1;
 import static dev.dediren.plugins.render.svg.Svg.opacity;
@@ -58,6 +59,7 @@ import dev.dediren.plugins.render.style.ResolvedStyle;
 import dev.dediren.plugins.render.style.StyleResolver;
 import dev.dediren.plugins.render.svg.EdgeEndAdornments;
 import dev.dediren.plugins.render.svg.EdgeLabel;
+import dev.dediren.plugins.render.svg.Geometry;
 import dev.dediren.plugins.render.svg.LabelBox;
 import dev.dediren.plugins.render.svg.LineJump;
 import dev.dediren.plugins.render.svg.MaskedLineJump;
@@ -122,17 +124,31 @@ public final class SvgDocument {
   static PlacedScene resolve(LayoutResult result, RenderMetadata metadata, RenderPolicy policy) {
     ResolvedStyle base = StyleResolver.baseStyle(policy);
     List<PlacedGroup> groups = new ArrayList<>();
+    List<LabelBox> groupTitleObstacles = Geometry.nodeObstacleBoxes(result);
+    groupTitleObstacles.addAll(Geometry.edgeRouteObstacleBoxes(result.edges()));
     for (LaidOutGroup group : result.groups()) {
       ResolvedGroupStyle groupStyle = StyleResolver.groupStyle(policy, metadata, group.id(), base);
+      PlacedGroupTitle title = placeGroupTitle(group, groupStyle, groupTitleObstacles);
       groups.add(
           new PlacedGroup(
               group,
               groupStyle,
               metadata == null ? null : metadata.groups().get(group.id()),
-              placeGroupTitle(group, groupStyle)));
+              title));
+      if (title.visibleBox() != null) {
+        groupTitleObstacles.add(title.visibleBox());
+      }
     }
     List<PlacedNode> nodes = new ArrayList<>();
     List<LabelBox> placedLabelBoxes = new ArrayList<>();
+    // Group titles are visible paint just like node and prior edge labels. Keep the exact placed
+    // boxes — including the resolved font and anchor — in the obstacle list so a route label does
+    // not sit across a heading merely because the layout group itself is otherwise clear.
+    for (PlacedGroup group : groups) {
+      if (group.title().visibleBox() != null) {
+        placedLabelBoxes.add(group.title().visibleBox());
+      }
+    }
     for (LaidOutNode node : result.nodes()) {
       ResolvedNodeStyle style = StyleResolver.nodeStyle(policy, metadata, node.id(), base);
       PlacedNode placed =
@@ -152,24 +168,6 @@ public final class SvgDocument {
     for (int edgeIndex = 0; edgeIndex < result.edges().size(); edgeIndex++) {
       LaidOutEdge edge = result.edges().get(edgeIndex);
       ResolvedEdgeStyle style = StyleResolver.edgeStyle(policy, metadata, edge.id(), base);
-      List<MaskedLineJump> maskedJumps = new ArrayList<>();
-      for (LineJump jump : lineJumps(edge, routedEdges)) {
-        maskedJumps.add(
-            new MaskedLineJump(
-                jump, backdropFillAt(jump.x(), jump.y(), result, metadata, policy, base)));
-      }
-      PlacedEdgeLabel label = null;
-      if (edge.label() != null && !edge.label().isEmpty()) {
-        EdgeLabel placedLabel =
-            edgeLabel(
-                edge,
-                style,
-                labelObstacleBoxesForEdge(result, edgeIndex, placedLabelBoxes),
-                edgeLabelFontSize(base.fontSize()));
-        LabelBox visibleBox = edgeLabelVisibleBox(placedLabel, style.labelPresentation());
-        label = new PlacedEdgeLabel(placedLabel, edge.label(), visibleBox);
-        placedLabelBoxes.add(visibleBox);
-      }
       // Same profile-gated call the emission pass used to make, so markup and bounds can never
       // disagree about whether an edge has end adornments — now because there is only one call.
       List<PlacedAdornment> adornments = new ArrayList<>();
@@ -177,6 +175,45 @@ public final class SvgDocument {
           EdgeEndAdornments.adornments(edge, metadata, base.fontSize())) {
         LabelBox visibleBox = EdgeEndAdornments.visibleBox(adornment, style);
         adornments.add(new PlacedAdornment(adornment, visibleBox));
+        placedLabelBoxes.add(visibleBox);
+      }
+      List<LabelBox> endpointPaint = new ArrayList<>(markerInkBoxes(edge, style));
+      for (PlacedAdornment adornment : adornments) {
+        endpointPaint.add(adornment.visibleBox());
+      }
+      List<MaskedLineJump> maskedJumps = new ArrayList<>();
+      for (LineJump jump : lineJumps(edge, routedEdges, endpointPaint)) {
+        maskedJumps.add(
+            new MaskedLineJump(
+                jump, backdropFillAt(jump.x(), jump.y(), result, metadata, policy, base)));
+      }
+      PlacedEdgeLabel label = null;
+      if (edge.label() != null && !edge.label().isEmpty()) {
+        List<LabelBox> obstacles = Geometry.nodeObstacleBoxes(result);
+        for (PlacedGroup placedGroup : groups) {
+          LaidOutGroup group = placedGroup.group();
+          // A relationship entering its endpoint's container can legitimately label that entry.
+          // The actual placed title remains an obstacle through placedLabelBoxes.
+          if (group.members().contains(edge.source()) || group.members().contains(edge.target())) {
+            continue;
+          }
+          double x = group.x(),
+              y = group.y(),
+              right = x + group.width(),
+              bottom = y + group.height();
+          obstacles.add(new LabelBox(x, y, right, y).expanded(4.0, 4.0));
+          obstacles.add(new LabelBox(x, bottom, right, bottom).expanded(4.0, 4.0));
+          obstacles.add(new LabelBox(x, y, x, bottom).expanded(4.0, 4.0));
+          obstacles.add(new LabelBox(right, y, right, bottom).expanded(4.0, 4.0));
+        }
+        obstacles.addAll(placedLabelBoxes);
+        List<LaidOutEdge> competingRoutes = new ArrayList<>(result.edges());
+        competingRoutes.remove(edgeIndex);
+        var placement =
+            placeLabel(edge, style, obstacles, competingRoutes, edgeLabelFontSize(base.fontSize()));
+        EdgeLabel placedLabel = placement.label();
+        LabelBox visibleBox = edgeLabelVisibleBox(placedLabel, style.labelPresentation());
+        label = new PlacedEdgeLabel(placedLabel, edge.label(), visibleBox, placement.constrained());
         placedLabelBoxes.add(visibleBox);
       }
       edges.add(new PlacedEdge(edge, style, maskedJumps, label, adornments));
@@ -191,7 +228,8 @@ public final class SvgDocument {
    * company. A {@code label_size} may be anything up to 96, which is a title wide enough to run a
    * long way off the right of its own group.
    */
-  private static PlacedGroupTitle placeGroupTitle(LaidOutGroup group, ResolvedGroupStyle style) {
+  private static PlacedGroupTitle placeGroupTitle(
+      LaidOutGroup group, ResolvedGroupStyle style, List<LabelBox> obstacles) {
     double x = group.x() + GROUP_TITLE_INSET;
     String anchor = null;
     if (style.labelAlign() == SvgLabelAlign.MIDDLE) {
@@ -209,8 +247,33 @@ public final class SvgDocument {
     // Measured against the anchor that is emitted, resolving the null that means "attribute
     // omitted" to the SVG default it stands for — rather than assuming a centred title, which is
     // the shape the label_align drift in the node lane took.
-    LabelBox visibleBox =
-        labelBox(x, y, anchor == null ? "start" : anchor, text, style.labelSize());
+    String effectiveAnchor = anchor == null ? "start" : anchor;
+    LabelBox visibleBox = labelBox(x, y, effectiveAnchor, text, style.labelSize());
+    // The title band belongs to the group layout; move only the text anchor inside that already
+    // reserved band when a route or node crosses the default inset.
+    if (visibleBox.width() <= group.width() - 2.0 * GROUP_TITLE_INSET
+        && obstacles.stream().anyMatch(visibleBox::overlaps)) {
+      double preferredX = x;
+      double anchorOffset = x - visibleBox.minX();
+      double minX = group.x() + GROUP_TITLE_INSET + anchorOffset;
+      double maxX =
+          group.x() + group.width() - GROUP_TITLE_INSET - visibleBox.width() + anchorOffset;
+      List<Double> candidateAnchors = new ArrayList<>();
+      for (double candidateX = minX; candidateX <= maxX; candidateX += 24.0) {
+        candidateAnchors.add(candidateX);
+      }
+      candidateAnchors.add(maxX);
+      candidateAnchors.sort(
+          java.util.Comparator.comparingDouble(value -> Math.abs(value - preferredX)));
+      for (double candidateX : candidateAnchors) {
+        LabelBox candidate = labelBox(candidateX, y, effectiveAnchor, text, style.labelSize());
+        if (obstacles.stream().noneMatch(candidate::overlaps)) {
+          x = candidateX;
+          visibleBox = candidate;
+          break;
+        }
+      }
+    }
     return new PlacedGroupTitle(x, y, anchor, visibleBox);
   }
 

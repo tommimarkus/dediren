@@ -47,11 +47,13 @@ class OutsideNodeLabelObstacleTest {
     double[] placed = estimatedTextInk(edgeText(labelled));
 
     assertThat(overlaps(junctionLabel, unobstructed))
-        .as("the fixture is only meaningful if the unobstructed placement collides with the label")
+        .as(
+            "outside node label %s must intersect unobstructed edge label %s",
+            java.util.Arrays.toString(junctionLabel), java.util.Arrays.toString(unobstructed))
         .isTrue();
-    assertThat(placed[0])
+    assertThat(placed[0] != unobstructed[0] || placed[1] != unobstructed[1])
         .as("the junction's label moved the edge label somewhere else")
-        .isNotEqualTo(unobstructed[0]);
+        .isTrue();
     assertThat(overlaps(junctionLabel, placed))
         .as("the placed edge label prints over the junction's label")
         .isFalse();

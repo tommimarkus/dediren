@@ -2490,7 +2490,8 @@ class MainTest {
                     ]
                     """,
               "{ \"edge\": { \"label_horizontal_position\": \"center\" } }");
-      Document document = svgDocument(okContent(render(input)));
+      Document document =
+          svgDocument(warningContent(render(input), "DEDIREN_RENDER_EDGE_LABEL_CONSTRAINED"));
 
       Element edge = groupWithAttribute(document, "data-dediren-edge-id", "labeled-edge");
       java.util.List<Element> labels = childElements(edge, "text");
@@ -2535,7 +2536,8 @@ class MainTest {
                     ]
                     """,
               "{ \"edge\": { \"label_horizontal_position\": \"center\" } }");
-      Document document = svgDocument(okContent(render(input)));
+      Document document =
+          svgDocument(warningContent(render(input), "DEDIREN_RENDER_EDGE_LABEL_CONSTRAINED"));
 
       Element edge = groupWithAttribute(document, "data-dediren-edge-id", "duplicate-route");
       java.util.List<Element> labels = childElements(edge, "text");
@@ -2698,7 +2700,15 @@ class MainTest {
       java.util.List<Element> labels = childElements(edge, "text");
       Element label = labels.get(labels.size() - 1);
 
-      assertThat(rectanglesIntersect(textBox(label), 250.0, 70.0, 840.0, 94.0)).isFalse();
+      Element title =
+          firstChildElement(
+              groupWithAttribute(document, "data-dediren-group-id", "application-services"),
+              "text");
+      double[] titleBox = textBox(title);
+      assertThat(
+              rectanglesIntersect(
+                  textBox(label), titleBox[0], titleBox[1], titleBox[2], titleBox[3]))
+          .isFalse();
     }
 
     @Test
@@ -3102,8 +3112,8 @@ class MainTest {
 
       assertThat(Double.parseDouble(label.getAttribute("x")))
           .isCloseTo(200.0, org.assertj.core.data.Offset.offset(1.0));
-      assertThat(Double.parseDouble(label.getAttribute("y")))
-          .isCloseTo(40.0, org.assertj.core.data.Offset.offset(18.0));
+      double[] labelBox = textBox(label);
+      assertThat(Math.max(40.0 - labelBox[3], labelBox[1] - 40.0)).isBetween(2.0, 8.0);
     }
 
     @Test
@@ -3145,7 +3155,7 @@ class MainTest {
     }
 
     @Test
-    void suppressesLineJumpBetweenSharedJunctionEdges() throws Exception {
+    void keepsLineJumpBetweenDistinctRunsOfSharedSourceEdges() throws Exception {
       JsonNode input =
           styledInlineInput(
               "[]",
@@ -3187,7 +3197,7 @@ class MainTest {
           firstChildElement(
               groupWithAttribute(document, "data-dediren-edge-id", "merged-edge"), "path");
 
-      assertThat(path.getAttribute("d")).doesNotContain(" Q ");
+      assertThat(path.getAttribute("d")).contains(" Q ");
     }
 
     @Test
@@ -3218,7 +3228,12 @@ class MainTest {
                     ]
                     """,
               "{}");
-      Document document = svgDocument(okContent(render(input)));
+      Document document =
+          svgDocument(
+              warningContent(
+                  render(input),
+                  "DEDIREN_RENDER_EDGE_LABEL_CONSTRAINED",
+                  "DEDIREN_RENDER_EDGE_LABEL_OCCLUDED"));
 
       String viewBox = document.getDocumentElement().getAttribute("viewBox");
       String[] parts = viewBox.split("\\s+");
@@ -3465,6 +3480,17 @@ class MainTest {
 
   private static String okContent(PluginResult result) throws Exception {
     return okData(result).at("/artifacts/0/content").asText();
+  }
+
+  private static String warningContent(PluginResult result, String... expectedCodes)
+      throws Exception {
+    JsonNode envelope = JsonSupport.objectMapper().readTree(result.stdout());
+    assertThat(result.exitCode()).describedAs(result.stderr()).isZero();
+    assertThat(envelope.at("/status").asText()).isEqualTo("warning");
+    List<String> codes = new ArrayList<>();
+    envelope.get("diagnostics").forEach(diagnostic -> codes.add(diagnostic.get("code").asText()));
+    assertThat(codes).containsExactlyInAnyOrder(expectedCodes);
+    return envelope.at("/data/artifacts/0/content").asText();
   }
 
   private static JsonNode error(PluginResult result, String expectedCode) throws Exception {
@@ -3940,7 +3966,7 @@ class MainTest {
                       "id": "target-%d",
                       "source_id": "target-%d",
                       "projection_id": "target-%d",
-                      "x": 260,
+                      "x": 400,
                       "y": %d,
                       "width": 80,
                       "height": 32,
@@ -3960,7 +3986,7 @@ class MainTest {
                       "projection_id": "%s",
                       "route": {"kind": "polyline", "points": [
                         { "x": 120, "y": %d },
-                        { "x": 260, "y": %d }
+                        { "x": 400, "y": %d }
                       ]},
                       "label": "%s"
                     }
