@@ -30,32 +30,49 @@ final class EdgeLabelPlacer {
     }
 
     int bestLen = -1;
-    int bestIndex = -1;
+    int[] bestStart = null;
+    int[] bestEnd = null;
     boolean bestHorizontal = false;
-    for (int i = 0; i < cells.size() - 1; i++) {
-      int[] a = cells.get(i);
-      int[] b = cells.get(i + 1);
-      boolean horizontal = a[0] == b[0];
+    int runStart = 0;
+    int rowStep = Integer.compare(cells.get(1)[0], cells.get(0)[0]);
+    int colStep = Integer.compare(cells.get(1)[1], cells.get(0)[1]);
+    for (int i = 1; i < cells.size(); i++) {
+      int nextRowStep =
+          i == cells.size() - 1
+              ? Integer.MIN_VALUE
+              : Integer.compare(cells.get(i + 1)[0], cells.get(i)[0]);
+      int nextColStep =
+          i == cells.size() - 1
+              ? Integer.MIN_VALUE
+              : Integer.compare(cells.get(i + 1)[1], cells.get(i)[1]);
+      if (rowStep == nextRowStep && colStep == nextColStep) {
+        continue;
+      }
+      int[] a = cells.get(runStart);
+      int[] b = cells.get(i);
+      boolean horizontal = rowStep == 0;
       int len = horizontal ? Math.abs(b[1] - a[1]) : Math.abs(b[0] - a[0]);
       if (len > bestLen) {
         bestLen = len;
-        bestIndex = i;
+        bestStart = a;
+        bestEnd = b;
         bestHorizontal = horizontal;
       }
+      runStart = i;
+      rowStep = nextRowStep;
+      colStep = nextColStep;
     }
-    int[] a = cells.get(bestIndex);
-    int[] b = cells.get(bestIndex + 1);
 
     boolean placed;
     if (bestHorizontal) {
-      int row = a[0];
-      int midCol = (a[1] + b[1]) / 2;
+      int row = bestStart[0];
+      int midCol = (bestStart[1] + bestEnd[1]) / 2;
       int startCol = midCol - label.length() / 2;
       placed =
           tryWrite(canvas, row - 1, startCol, label) || tryWrite(canvas, row + 1, startCol, label);
     } else {
-      int col = a[1];
-      int midRow = (a[0] + b[0]) / 2;
+      int col = bestStart[1];
+      int midRow = (bestStart[0] + bestEnd[0]) / 2;
       placed =
           tryWrite(canvas, midRow, col + 1, label)
               || tryWrite(canvas, midRow, col - label.length(), label);

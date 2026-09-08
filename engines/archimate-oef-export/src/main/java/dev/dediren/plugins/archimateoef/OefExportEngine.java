@@ -536,6 +536,7 @@ public final class OefExportEngine implements ExportEngine {
         relationshipIds,
         sourceNodesById,
         geometry);
+    validateRoundedRouteObstacles(request.layoutResult(), sourceNodesById, geometry);
     xml.append("</diagrams></views></model>\n");
     var disclosures = new ArrayList<>(geometry.diagnostics());
     disclosures.addAll(properties.diagnostics());
@@ -546,6 +547,124 @@ public final class OefExportEngine implements ExportEngine {
             ? "policy.views." + viewId + ".viewpoint"
             : "policy.viewpoint");
     return new OefDocument(xml.toString(), disclosures);
+  }
+
+  /**
+   * OEF's integer-only diagram geometry can move a route across a shape boundary. Check the
+   * rendered exchange geometry after rounding, but disclose only crossings absent from the source
+   * layout so ordinary endpoint attachments and pre-existing route defects do not become export
+   * warnings.
+   */
+  private static void validateRoundedRouteObstacles(
+      LayoutResult layout, Map<String, SourceNode> sourceNodesById, OefGeometry geometry) {
+    List<ViewObstacle> obstacles = new ArrayList<>();
+    layout
+        .nodes()
+        .forEach(
+            node ->
+                obstacles.add(
+                    ViewObstacle.node(
+                        node.id(), node.x(), node.y(), node.width(), node.height(), geometry)));
+    for (LaidOutGroup group : layout.groups()) {
+      String sourceId = semanticGroupSourceId(group);
+      SourceNode source = sourceId == null ? null : sourceNodesById.get(sourceId);
+      if (source != null && source.type().equals("Grouping")) {
+        obstacles.add(
+            ViewObstacle.group(
+                group.id(), group.x(), group.y(), group.width(), group.height(), geometry));
+      }
+    }
+    for (int index = 0; index < layout.edges().size(); index++) {
+      var edge = layout.edges().get(index);
+      List<Point> sourceSamples = flatten(edge.route());
+      List<Point> exchangeSamples = sourceSamples.stream().map(geometry::roundedPoint).toList();
+      for (ViewObstacle obstacle : obstacles) {
+        if (obstacle.node()
+            && (obstacle.id().equals(edge.source()) || obstacle.id().equals(edge.target()))) {
+          continue;
+        }
+        if (!routeIntersects(exchangeSamples, obstacle.exchangeBounds())
+            || routeIntersects(sourceSamples, obstacle.sourceBounds())) {
+          continue;
+        }
+        geometry.reportRoundedObstacle("$.layout_result.edges[" + index + "].route", obstacle.id());
+      }
+    }
+  }
+
+  private static boolean routeIntersects(List<Point> samples, Bounds bounds) {
+    for (int index = 1; index < samples.size(); index++) {
+      if (segmentIntersectsBounds(samples.get(index - 1), samples.get(index), bounds)) {
+        return true;
+      }
+    }
+    return samples.size() == 1 && bounds.contains(samples.getFirst());
+  }
+
+  private static boolean segmentIntersectsBounds(Point start, Point end, Bounds bounds) {
+    if (bounds.contains(start) || bounds.contains(end)) {
+      return true;
+    }
+    double dx = end.x() - start.x();
+    double dy = end.y() - start.y();
+    double[] interval = {0.0, 1.0};
+    return clip(-dx, start.x() - bounds.left(), interval)
+        && clip(dx, bounds.right() - start.x(), interval)
+        && clip(-dy, start.y() - bounds.top(), interval)
+        && clip(dy, bounds.bottom() - start.y(), interval);
+  }
+
+  private static boolean clip(double p, double q, double[] interval) {
+    if (p == 0.0) {
+      return q >= 0.0;
+    }
+    double ratio = q / p;
+    if (p < 0.0) {
+      if (ratio > interval[1]) {
+        return false;
+      }
+      interval[0] = Math.max(interval[0], ratio);
+    } else {
+      if (ratio < interval[0]) {
+        return false;
+      }
+      interval[1] = Math.min(interval[1], ratio);
+    }
+    return true;
+  }
+
+  private record Bounds(double left, double top, double right, double bottom) {
+    boolean contains(Point point) {
+      return point.x() >= left && point.x() <= right && point.y() >= top && point.y() <= bottom;
+    }
+  }
+
+  private record ViewObstacle(String id, boolean node, Bounds sourceBounds, Bounds exchangeBounds) {
+    static ViewObstacle node(
+        String id, double x, double y, double width, double height, OefGeometry geometry) {
+      return new ViewObstacle(
+          id,
+          true,
+          new Bounds(x, y, x + width, y + height),
+          roundedBounds(x, y, width, height, geometry));
+    }
+
+    static ViewObstacle group(
+        String id, double x, double y, double width, double height, OefGeometry geometry) {
+      return new ViewObstacle(
+          id,
+          false,
+          new Bounds(x, y, x + width, y + height),
+          roundedBounds(x, y, width, height, geometry));
+    }
+
+    private static Bounds roundedBounds(
+        double x, double y, double width, double height, OefGeometry geometry) {
+      long left = geometry.nonNegativeValue(x);
+      long top = geometry.nonNegativeValue(y);
+      return new Bounds(
+          left, top, left + geometry.positiveValue(width), top + geometry.positiveValue(height));
+    }
   }
 
   /**
@@ -635,6 +754,7 @@ public final class OefExportEngine implements ExportEngine {
           relationshipIds,
           sourceNodesById,
           geometry);
+      validateRoundedRouteObstacles(view.layout(), sourceNodesById, geometry);
       addViewpointDiagnostic(
           disclosures,
           identity.viewpoint(),
@@ -980,6 +1100,12 @@ public final class OefExportEngine implements ExportEngine {
       boolean indexedPoints) {
     if (points == null || points.isEmpty()) {
       return;
+    }
+    for (int index = 1; index < points.size(); index++) {
+      if (geometry.collapsedByRounding(points.get(index - 1), points.get(index))) {
+        String pointPath = indexedPoints ? path + "[" + index + "]" : path;
+        geometry.reportRoundedCollapse(pointPath);
+      }
     }
     writeConnectionLocation(
         xml, geometry, "sourceAttachment", points.get(0), path, 0, indexedPoints);

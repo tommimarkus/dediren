@@ -3,6 +3,7 @@ package dev.dediren.plugins.archimateoef;
 import dev.dediren.contracts.Diagnostic;
 import dev.dediren.contracts.DiagnosticCode;
 import dev.dediren.contracts.DiagnosticSeverity;
+import dev.dediren.contracts.layout.Point;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -40,9 +41,50 @@ final class OefGeometry {
     return List.copyOf(clamps);
   }
 
+  boolean collapsedByRounding(Point left, Point right) {
+    boolean distinct =
+        Double.compare(left.x(), right.x()) != 0 || Double.compare(left.y(), right.y()) != 0;
+    return distinct
+        && Math.max(0L, Math.round(left.x())) == Math.max(0L, Math.round(right.x()))
+        && Math.max(0L, Math.round(left.y())) == Math.max(0L, Math.round(right.y()));
+  }
+
+  void reportRoundedCollapse(String path) {
+    clamps.add(
+        new Diagnostic(
+            DiagnosticCode.OEF_GEOMETRY_CLAMPED.code(),
+            DiagnosticSeverity.WARNING,
+            "route geometry collapsed onto the preceding exchange location after integer rounding;"
+                + " the exported route loses a distinct sample",
+            path));
+  }
+
+  void reportRoundedObstacle(String path, String obstacleId) {
+    clamps.add(
+        new Diagnostic(
+            DiagnosticCode.OEF_GEOMETRY_CLAMPED.code(),
+            DiagnosticSeverity.WARNING,
+            "route geometry intersects obstacle '"
+                + obstacleId
+                + "' after OEF integer rounding or clamping; the exported route differs from the layout result",
+            path));
+  }
+
+  Point roundedPoint(Point point) {
+    return new Point(nonNegativeValue(point.x()), nonNegativeValue(point.y()));
+  }
+
+  long nonNegativeValue(double value) {
+    return Math.max(0L, Math.round(value));
+  }
+
+  long positiveValue(double value) {
+    return Math.max(1L, Math.round(value));
+  }
+
   private String clamp(double value, long floor, String schemaType, String path) {
     long rounded = Math.round(value);
-    if (rounded >= floor) {
+    if (value >= floor && rounded >= floor) {
       return Long.toString(rounded);
     }
     clamps.add(

@@ -420,6 +420,74 @@ class OefExportEngineTest {
   }
 
   @Test
+  void negativeFractionalRouteGeometryIsClampedAndDisclosedBeforeRounding() throws Exception {
+    // A negative fractional coordinate happens to round to zero, but it is still outside OEF's
+    // non-negative-integer domain and must not become an undisclosed position change.
+    JsonNode inputJson = exportInputJson();
+    ((ObjectNode) inputJson.at("/layout_result/edges/0/route/points/0")).put("y", -0.25);
+
+    EngineResult<ExportResult> result = exportResult(inputJson);
+
+    assertThat(result.value().content()).contains("<sourceAttachment x=\"173\" y=\"0\"/>");
+    assertThat(result.diagnostics())
+        .anySatisfy(
+            diagnostic -> {
+              assertThat(diagnostic.code()).isEqualTo("DEDIREN_OEF_GEOMETRY_CLAMPED");
+              assertThat(diagnostic.path()).isEqualTo("$.layout_result.edges[0].route.points[0].y");
+            });
+  }
+
+  @Test
+  void routeSamplesThatCollapseAfterExchangeRoundingAreDisclosed() throws Exception {
+    JsonNode inputJson = exportInputJson();
+    ArrayNode points = (ArrayNode) inputJson.at("/layout_result/edges/0/route/points");
+    points.insertObject(1).put("x", 173.2).put("y", 52.2);
+
+    EngineResult<ExportResult> result = exportResult(inputJson);
+
+    assertThat(result.value().content())
+        .contains("<sourceAttachment x=\"173\" y=\"52\"/><bendpoint x=\"173\" y=\"52\"/>");
+    assertThat(result.diagnostics())
+        .anySatisfy(
+            diagnostic -> {
+              assertThat(diagnostic.code()).isEqualTo("DEDIREN_OEF_GEOMETRY_CLAMPED");
+              assertThat(diagnostic.path()).isEqualTo("$.layout_result.edges[0].route.points[1]");
+              assertThat(diagnostic.message()).contains("collapsed");
+            });
+  }
+
+  @Test
+  void roundedCurveEnteringASemanticObstacleIsDisclosed() throws Exception {
+    JsonNode inputJson = exportInputJson();
+    ((ArrayNode) inputJson.at("/source/nodes"))
+        .addObject()
+        .put("id", "obstacle")
+        .put("type", "Grouping")
+        .put("label", "Obstacle")
+        .putObject("properties");
+    ArrayNode groups = (ArrayNode) inputJson.at("/layout_result/groups");
+    ObjectNode group = groups.addObject();
+    group.put("id", "obstacle").put("source_id", "obstacle").put("projection_id", "obstacle");
+    group.putObject("provenance").putObject("semantic_backed").put("source_id", "obstacle");
+    group.put("x", 173.4).put("y", 51.4).put("width", 1.0).put("height", 1.0);
+    group.putArray("members");
+    group.put("label", "Obstacle");
+    ArrayNode points = (ArrayNode) inputJson.at("/layout_result/edges/0/route/points");
+    // The source samples stay left/above the fractional group. Integer exchange coordinates move
+    // the sample onto the group's rounded bounds.
+    points.insertObject(1).put("x", 173.2).put("y", 51.2);
+
+    EngineResult<ExportResult> result = exportResult(inputJson);
+
+    assertThat(result.diagnostics())
+        .anySatisfy(
+            diagnostic -> {
+              assertThat(diagnostic.code()).isEqualTo("DEDIREN_OEF_GEOMETRY_CLAMPED");
+              assertThat(diagnostic.message()).contains("obstacle");
+            });
+  }
+
+  @Test
   void inRangeGeometryIsNeverReportedAsClamped() throws Exception {
     // The clamp must stay quiet on the ordinary case, or the disclosure is noise.
     EngineResult<ExportResult> result = exportResult(exportInputJson());

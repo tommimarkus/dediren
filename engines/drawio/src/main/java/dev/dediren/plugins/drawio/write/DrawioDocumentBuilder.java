@@ -714,11 +714,11 @@ public final class DrawioDocumentBuilder {
    * table.
    */
   private String edgeStyle(LaidOutEdge edge, String relationshipType) {
+    String style;
     if (relationshipType == null) {
       // The missing source relationship was already declared.
-      return DrawioEdgeStyles.styleFor(notation(), null);
-    }
-    if (!DrawioEdgeStyles.isMapped(notation(), relationshipType)) {
+      style = DrawioEdgeStyles.styleFor(notation(), null);
+    } else if (!DrawioEdgeStyles.isMapped(notation(), relationshipType)) {
       diagnostics.add(
           new Diagnostic(
               DiagnosticCode.DRAWIO_SHAPE_UNMAPPED.code(),
@@ -732,8 +732,67 @@ public final class DrawioDocumentBuilder {
                   + " still records the exact type, so re-importing this file is lossless"
                   + " regardless of the notation it was drawn with.",
               "layout_result.edges"));
+      style = DrawioEdgeStyles.styleFor(notation(), relationshipType);
+    } else {
+      style = DrawioEdgeStyles.styleFor(notation(), relationshipType);
     }
-    return DrawioEdgeStyles.styleFor(notation(), relationshipType);
+    return style + endpointAnchors(edge);
+  }
+
+  /**
+   * Maps the route endpoints onto draw.io's relative entry and exit anchors.
+   *
+   * <p>The relative pair belongs in the edge style, rather than in the edge geometry: mxGraph keeps
+   * it attached to the shape when a user moves that shape, while an absolute endpoint would leave a
+   * stale bend. Each endpoint is clamped to its attached shape because ELK may leave its perimeter
+   * point a small fraction outside the nominal box.
+   */
+  private String endpointAnchors(LaidOutEdge edge) {
+    List<Point> route = flatten(edge.route());
+    if (route.isEmpty()) {
+      return "";
+    }
+    return endpointAnchor("exit", edge.source(), route.getFirst())
+        + endpointAnchor("entry", edge.target(), route.getLast());
+  }
+
+  private String endpointAnchor(String prefix, String endpoint, Point point) {
+    if (endpoint == null || !cellIdByDedirenId.containsKey(endpoint)) {
+      // A floating endpoint retains its absolute mxGeometry point and has no shape-relative port.
+      return "";
+    }
+    for (LaidOutNode node : layout.nodes()) {
+      if (endpoint.equals(node.id())) {
+        return relativeAnchor(prefix, point, node.x(), node.y(), node.width(), node.height());
+      }
+    }
+    for (LaidOutGroup group : layout.groups()) {
+      if (endpoint.equals(group.id())) {
+        return relativeAnchor(prefix, point, group.x(), group.y(), group.width(), group.height());
+      }
+    }
+    return "";
+  }
+
+  private static String relativeAnchor(
+      String prefix, Point point, double x, double y, double width, double height) {
+    if (!(width > 0.0) || !(height > 0.0)) {
+      return "";
+    }
+    double relativeX = Math.clamp((point.x() - x) / width, 0.0, 1.0);
+    double relativeY = Math.clamp((point.y() - y) / height, 0.0, 1.0);
+    return prefix
+        + "X="
+        + formatAnchor(relativeX)
+        + ";"
+        + prefix
+        + "Y="
+        + formatAnchor(relativeY)
+        + ";";
+  }
+
+  private static String formatAnchor(double value) {
+    return value == Math.rint(value) ? Long.toString((long) value) : Double.toString(value);
   }
 
   /**
