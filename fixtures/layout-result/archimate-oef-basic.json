@@ -15,7 +15,7 @@
     "id" : "orders-service",
     "source_id" : "orders-service",
     "projection_id" : "orders-service",
-    "x" : 254.0,
+    "x" : 317.0530090332031,
     "y" : 12.0,
     "width" : 160.0,
     "height" : 80.0,
@@ -35,7 +35,7 @@
         "x" : 173.0,
         "y" : 52.0
       }, {
-        "x" : 253.0,
+        "x" : 316.0530090332031,
         "y" : 52.0
       } ]
     },

@@ -58,9 +58,7 @@ class LayoutQualityFixtureSweepTest {
         .as("edge-label-dissociation count in %s", fixtureName)
         .isZero();
     assertThat(report.warningCount()).as("warning count in %s", fixtureName).isZero();
-    assertThat(report.edgeCrossingCount())
-        .as("edge crossing count in %s", fixtureName)
-        .isZero();
+    assertThat(report.edgeCrossingCount()).as("edge crossing count in %s", fixtureName).isZero();
   }
 
   static Stream<Path> layoutResultFixtures() throws IOException {

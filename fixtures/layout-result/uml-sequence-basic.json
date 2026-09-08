@@ -7,7 +7,7 @@
     "projection_id" : "interaction-place-order",
     "x" : 141.0,
     "y" : 292.0,
-    "width" : 424.0,
+    "width" : 524.721435546875,
     "height" : 152.0,
     "label" : "Place Order",
     "role" : "interaction",
@@ -27,7 +27,7 @@
     "id" : "service",
     "source_id" : "service",
     "projection_id" : "service",
-    "x" : 425.0,
+    "x" : 525.721435546875,
     "y" : 292.0,
     "width" : 140.0,
     "height" : 64.0,
@@ -48,7 +48,7 @@
         "x" : 211.0,
         "y" : 380.0
       }, {
-        "x" : 495.0,
+        "x" : 595.721435546875,
         "y" : 380.0
       } ]
     },
@@ -64,7 +64,7 @@
     "route" : {
       "kind" : "polyline",
       "points" : [ {
-        "x" : 495.0,
+        "x" : 595.721435546875,
         "y" : 412.0
       }, {
         "x" : 211.0,
@@ -83,7 +83,7 @@
     "route" : {
       "kind" : "polyline",
       "points" : [ {
-        "x" : 495.0,
+        "x" : 595.721435546875,
         "y" : 444.0
       }, {
         "x" : 211.0,

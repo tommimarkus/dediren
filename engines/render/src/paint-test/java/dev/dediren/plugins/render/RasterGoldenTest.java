@@ -318,12 +318,12 @@ class RasterGoldenTest {
             "uml-sequence-fragments"),
         scenario(
             "uml-compact-side-return",
-            "compact-side-return",
+            "uml-compact-side-return",
             "uml-svg",
             "uml-compact-side-return"),
         scenario(
             "uml-compact-sibling-fan-out",
-            "compact-sibling-fan-out",
+            "uml-compact-sibling-fan-out",
             "uml-svg",
             "uml-compact-sibling-fan-out"),
         scenario(

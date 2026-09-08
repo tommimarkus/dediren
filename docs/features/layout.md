@@ -41,7 +41,9 @@ The default route style remains orthogonal with Brandes–Koepf placement and
 straightness improvement. Redundant collinear hierarchy-boundary points are
 disabled: a route point must describe an endpoint or a visible turn. Input and
 port order remain stable where the ordinary layered graph can preserve them.
-ELK natively owns free ports and cycle routing. The default requests high
+ELK natively owns free ports and cycle routing. Group children use cross-hierarchy
+sweeps so outside endpoints and internal label reservations participate in the
+same crossing-minimization pass. The default requests high
 thoroughness (21); `thoroughness: normal` is an explicit, preserved lower-cost
 request (7). For every nonempty edge label, layout supplies ELK a centred
 canonical label reservation using shared text advances: 15.4px text width plus
@@ -80,14 +82,14 @@ is zero**.
 | `overlap_count` | Overlapping node boxes. |
 | `connector_through_node_count` | Edges routed through a node box. |
 | `invalid_route_count` | Malformed/invalid routes. |
-| `route_detour_count` | Routes taking an avoidable detour. |
+| `route_detour_count` | Advisory length/bend detour risk; obstacle-required detours need a fixture-specific review. |
 | `route_close_parallel_count` | Routes running too close in parallel. |
-| `group_boundary_issue_count` | Members escaping their group boundary. |
-| `group_label_band_issue_count` | Members overlapping a labeled group's title band. |
+| `group_boundary_issue_count` | Members or internal routes escaping their group boundary. |
+| `group_label_band_issue_count` | Members or routes entering a labeled group's reserved title band; actual placed title paint is checked in render. |
 | `label_space_issue_count` | Node labels that clearly cannot fit their box (icon-sized nodes are exempt). |
-| `edge_label_dissociation_count` | Labeled edges trapped in a dense band of parallel labeled edges, where a centered edge label cannot stay on its own route and drifts toward a neighbour (edges sharing an endpoint node are exempt). |
+| `edge_label_dissociation_count` | Advisory risk from labeled runs with nearby unrelated labeled neighbours on both sides; actual attachment is checked in render. |
 | `edge_crossing_count` | Proper route-interior intersections, including between edges that share an endpoint node; endpoint touches and collinear overlaps are excluded. **Informational only**; crossings can be unavoidable, so this never degrades `status`. |
-| `route_node_clearance_issue_count` | Routes within 24 units of unrelated nodes, own-node re-entry, and group containment/title-band risks after bounded terminal-contact exemptions. |
+| `route_node_clearance_issue_count` | Route/node pairs violating the 24-unit clearance floor, including own-node re-entry after bounded terminal-contact exemptions. |
 | `route_overlap_count` | Accidental coincident route lengths; only intentional contiguous shared prefixes/suffixes are exempt. |
 | `warning_count` | Aggregate warning count. |
 

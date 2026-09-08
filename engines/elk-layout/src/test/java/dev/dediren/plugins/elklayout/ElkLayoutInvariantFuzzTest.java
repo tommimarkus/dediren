@@ -81,90 +81,12 @@ class ElkLayoutInvariantFuzzTest {
   // never sub-pixel endpoint contact.
   private static final double MAX_OUTLINE_RIDE = 8.0;
 
-  // Invariant 2 (outline rides) previously carried a KNOWN, PRE-EXISTING, UNFIXED ELK defect
-  // ceiling
-  // here, distinct from the one this test class was written to catch: ELK's hierarchy-crossing
-  // routing inside a compound node emitting segments ~1px off a member's face. This constant is a
-  // CEILING, not a target: it exists only so a ride defect cannot silently get worse, and a future
-  // reader must not read it as "this many failures is fine". Follows the pinned-map precedent in
-  // core's LayoutQualityFixtureSweepTest#EXPECTED_EDGE_CROSSING_COUNTS, adapted to one count
-  // because
-  // a fuzz sweep has no stable per-fixture key to pin against.
-  //
-  // RE-PINNED 16 -> 0 on 2026-08-17 (pivot-measure-and-fix): OrthogonalRouteNormalizer's
-  // source-boundary pivot ("start IS the port, 1px outside the source's own face") was the actual
-  // producer of every ride in this seeded corpus, not the ELK hierarchy defect the old comment
-  // attributed it to -- that ELK defect may still exist on other corpora, but it was never what
-  // this
-  // particular 100-case sweep measured. A guard added to OrthogonalRouteNormalizer now rejects a
-  // pivot replacement whose emitted segment would ride its own source/target node's face (measured
-  // 57 of 60 firings rode it across this module's own test suite before the guard). With the guard
-  // in place, this sweep measures 0 outline-ride failing cases. A DROP is good news -- re-pinning
-  // it
-  // here, not left at the old ceiling. A RISE needs a human decision before re-pinning, not a
-  // silent
-  // bump.
+  // The native FREE-port/root-direction routing cutover removes the former 5 boundary-edge
+  // and 2 grouped-interior failing-case allowances in this 100-case seeded corpus. Each bucket
+  // is independently zero-gated so a failure cannot be hidden by an earlier assertion.
   private static final int MAX_OUTLINE_RIDE_FAILING_CASES = 0;
-
-  // CEILING for invariant 1 (body-interior crossings), scoped to BOUNDARY-CROSSING edges only -- an
-  // edge with exactly one endpoint claimed by a group and the other unclaimed by any group. This is
-  // the generator gap a node-ranking regression hid in: every grouped case used to claim every
-  // node, so no case ever produced a boundary-crossing edge, and the fuzz suite stayed green while
-  // a ranking change reversed grouped->unclaimed edges and mirrored two published diagrams. Root
-  // cause per the engine author: ELK interleaves a root-level (unclaimed) node into a compound
-  // group's layer span, the same ELK hierarchy-routing defect family as the outline-ride ceiling
-  // above (see docs/architecture-guidelines.md §12, "ELK compound-node face-spacing") -- NOT a
-  // ranking fault and NOT something port planning can fix. Non-boundary-crossing edges are judged
-  // separately, by their own ceiling; see MAX_PERPENDICULAR_AXIS_INTERIOR_FAILING_CASES below.
-  //
-  // This is a CEILING, not a target: a DROP is good news -- re-pin it lower, do not leave the old
-  // ceiling in place. A RISE needs a human decision before re-pinning, exactly like
-  // MAX_OUTLINE_RIDE_FAILING_CASES above.
-  //
-  // MEASURED at 0 of the 100 seeded cases on seed SEED above, in the same
-  // `./mvnw -pl engines/elk-layout -am test` run that measured
-  // MAX_PERPENDICULAR_AXIS_INTERIOR_FAILING_CASES below -- this generator extension's boundary
-  // crossings did not exercise this defect in this corpus. The engine author's separate 1500-case
-  // sweep of cyclic grouped graphs with unclaimed nodes saw 141 boundary-crossing interior
-  // crossings total (not a failing-case count, and not this corpus size), for calibration only; it
-  // does not contradict this file's 0, since it is a different, much larger sample.
-  //
-  // MEASURED at 5 of 100, and the earlier "0" was never a measurement. The four ceiling asserts
-  // run in sequence, so while invariant-1 findings still landed in the strict `hard` bucket that
-  // gate threw first and every assert after it was unreachable. Splitting the buckets is what let
-  // this one evaluate at all. Treat a ceiling that has never actually been reached with suspicion:
-  // an assert downstream of a failing assert reports nothing, not zero.
-  private static final int MAX_BOUNDARY_CROSSING_INTERIOR_FAILING_CASES = 5;
-
-  // CEILING for invariant 1 (body-interior crossings), scoped to the REMAINING edges -- every edge
-  // that is NOT boundary-crossing (see MAX_BOUNDARY_CROSSING_INTERIOR_FAILING_CASES above). Adding
-  // unclaimed nodes to the generator widened the sampled graph space enough to surface a second,
-  // already-known residual: two seeded cases (fuzz-59, fuzz-72; both fully grouped, zero unclaimed
-  // nodes) route a segment through a node body when a group's internal axis lands PERPENDICULAR to
-  // the root direction (direction LEFT or UP with two groups). This is the exact residual class
-  // recorded in docs/architecture-guidelines.md §12, "Residual perpendicular-group-axis body
-  // crossings -- trialled and rejected 2026-08-17": a wider 600-case sweep found 28 such crossings,
-  // and a variant that pins the intra-group port axis to the root direction unconditionally removes
-  // them but fails two tests pinning deliberate reading-direction intent
-  // (ElkLayoutEngineTest#groupedConnectorEdgesKeepHorizontalFlowInsideVerticalGroups,
-  // #groupedPipelineKeepsReadableLeftToRightFlow) and is worse on ride metrics. The maintainer's
-  // recorded decision was to keep the current variant, so this is NOT a regression from the
-  // generator change above -- it is sample-dependent exposure of an already-accepted gap: the old
-  // 100-case sample never happened to draw a perpendicular-axis root, the new one does.
-  //
-  // This is a CEILING, not a target, with the same discipline as the two ceilings above: a DROP is
-  // good news -- re-pin it lower. A RISE needs a human decision before re-pinning, not a silent
-  // bump.
-  //
-  // KNOWN WEAKNESS of a count-based ceiling: it counts FAILING CASES, not distinct crossings, and
-  // it has no per-shape key. A genuinely new perpendicular-axis crossing could displace an accepted
-  // one and hide under the same ceiling number. §12's row above, not this integer, is the actual
-  // record of what is accepted and why; this constant only stops the count from silently climbing
-  // while that acceptance stands.
-  //
-  // MEASURED at 2 of the 100 seeded cases on seed SEED above
-  // (`./mvnw -pl engines/elk-layout -am test`).
-  private static final int MAX_PERPENDICULAR_AXIS_INTERIOR_FAILING_CASES = 2;
+  private static final int MAX_BOUNDARY_CROSSING_INTERIOR_FAILING_CASES = 0;
+  private static final int MAX_PERPENDICULAR_AXIS_INTERIOR_FAILING_CASES = 0;
 
   // Routing style is pinned ORTHOGONAL for the whole sweep. POLYLINE and SPLINE legitimately cut
   // across a node's bounding box, so the interior invariant simply does not apply to them; mixing
