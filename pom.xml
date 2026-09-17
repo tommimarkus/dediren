@@ -96,8 +96,8 @@
     <proguard.version>7.10.0</proguard.version>
     <!-- Transitive-only, build-time only: convergence pins inside proguard-base's tree. -->
     <log4j.version>2.26.1</log4j.version>
-    <kotlin-stdlib.version>2.4.10</kotlin-stdlib.version>
-    <slf4j.version>2.0.18</slf4j.version>
+    <kotlin-stdlib.version>2.4.20</kotlin-stdlib.version>
+    <slf4j.version>2.0.19</slf4j.version>
     <xmlunit.version>2.13.0</xmlunit.version>
     <xtext-xbase.version>2.44.0</xtext-xbase.version>
     <appassembler-maven-plugin.version>2.1.0</appassembler-maven-plugin.version>
@@ -113,8 +113,8 @@
     <pitest-maven-plugin.version>1.30.0</pitest-maven-plugin.version>
     <pitest-junit5-plugin.version>1.2.3</pitest-junit5-plugin.version>
     <jacoco-maven-plugin.version>0.8.15</jacoco-maven-plugin.version>
-    <spotless-maven-plugin.version>3.10.1</spotless-maven-plugin.version>
-    <spotbugs-maven-plugin.version>4.10.4.0</spotbugs-maven-plugin.version>
+    <spotless-maven-plugin.version>3.10.2</spotless-maven-plugin.version>
+    <spotbugs-maven-plugin.version>4.10.4.1</spotbugs-maven-plugin.version>
   </properties>
 
   <dependencyManagement>
