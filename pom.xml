@@ -74,9 +74,9 @@
     <archunit.version>1.5.1</archunit.version>
     <assertj.version>3.27.7</assertj.version>
     <eclipse-elk.version>0.12.0</eclipse-elk.version>
-    <error-prone-annotations.version>2.50.0</error-prone-annotations.version>
+    <error-prone-annotations.version>2.51.0</error-prone-annotations.version>
     <guava.version>33.7.2-jre</guava.version>
-    <jackson.version>3.2.3</jackson.version>
+    <jackson.version>3.2.4</jackson.version>
     <!-- Jackson 3 keeps its annotation package at com.fasterxml.jackson.annotation by
          design; contracts compiles against it directly, so it is declared and pinned. -->
     <jackson-annotations.version>2.22</jackson-annotations.version>
@@ -91,7 +91,7 @@
          -Dincludes=io.projectreactor:reactor-core`). Pinned explicitly, rather than left to
          whatever the SDK's own pom declares, so a reactor-core CVE can be patched ahead of the
          next SDK release instead of waiting on it. -->
-    <reactor-core.version>3.8.7</reactor-core.version>
+    <reactor-core.version>3.8.8</reactor-core.version>
     <picocli.version>4.7.7</picocli.version>
     <proguard.version>7.10.0</proguard.version>
     <!-- Transitive-only, build-time only: convergence pins inside proguard-base's tree. -->
@@ -109,7 +109,7 @@
     <maven-compiler-plugin.version>3.16.0</maven-compiler-plugin.version>
     <maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>
     <maven-resources-plugin.version>3.5.0</maven-resources-plugin.version>
-    <maven-surefire-plugin.version>3.6.0</maven-surefire-plugin.version>
+    <maven-surefire-plugin.version>3.6.1</maven-surefire-plugin.version>
     <pitest-maven-plugin.version>1.30.1</pitest-maven-plugin.version>
     <pitest-junit5-plugin.version>1.2.3</pitest-junit5-plugin.version>
     <jacoco-maven-plugin.version>0.8.15</jacoco-maven-plugin.version>
