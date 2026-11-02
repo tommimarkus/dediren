@@ -73,7 +73,7 @@
     <dediren.launcher.jvmArgs>-XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Djava.awt.headless=true -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -Dfile.encoding=UTF-8</dediren.launcher.jvmArgs>
     <archunit.version>1.5.1</archunit.version>
     <assertj.version>3.27.7</assertj.version>
-    <eclipse-elk.version>0.12.0</eclipse-elk.version>
+    <eclipse-elk.version>0.12.1</eclipse-elk.version>
     <error-prone-annotations.version>2.51.0</error-prone-annotations.version>
     <guava.version>33.7.2-jre</guava.version>
     <jackson.version>3.2.4</jackson.version>
@@ -107,12 +107,12 @@
     <license-maven-plugin.version>2.7.1</license-maven-plugin.version>
     <maven-clean-plugin.version>3.5.0</maven-clean-plugin.version>
     <maven-compiler-plugin.version>3.16.0</maven-compiler-plugin.version>
-    <maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>
+    <maven-enforcer-plugin.version>3.7.0</maven-enforcer-plugin.version>
     <maven-resources-plugin.version>3.5.0</maven-resources-plugin.version>
     <maven-surefire-plugin.version>3.6.1</maven-surefire-plugin.version>
     <pitest-maven-plugin.version>1.30.1</pitest-maven-plugin.version>
     <pitest-junit5-plugin.version>1.2.3</pitest-junit5-plugin.version>
-    <jacoco-maven-plugin.version>0.8.15</jacoco-maven-plugin.version>
+    <jacoco-maven-plugin.version>0.8.16</jacoco-maven-plugin.version>
     <spotless-maven-plugin.version>3.10.4</spotless-maven-plugin.version>
     <spotbugs-maven-plugin.version>4.10.5.0</spotbugs-maven-plugin.version>
   </properties>
