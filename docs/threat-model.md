@@ -15,6 +15,46 @@ security-posture questions (audit finding F8).
 
 ## Trust Boundaries
 
+### Java runtime and Base64 decoding
+
+[Java4Shell (CVE-2026-114938)](https://access.redhat.com/security/vulnerabilities/RHSB-2026-018),
+disclosed on 2026-11-17, affects the HotSpot Base64 decoding intrinsic on
+x86-64 CPUs supporting AVX-512 VBMI. Malformed Base64 can cause memory
+corruption when decoded through the affected optimized path. Compressed draw.io
+input reaches `Base64.getDecoder().decode` in `MxDeflate`; catching Java
+exceptions does not guard against native memory corruption.
+
+The root pom adds the vendor-recommended `-XX:-UseBASE64Intrinsics` mitigation
+to the packaged launcher's JVM arguments and the shared test-JVM arguments.
+`.mvn/jvm.config` applies it to the Maven host, including in-process
+`exec:java` distribution commands. The existing C1-only setting already avoids
+the affected C2 path for the launcher/tests, but the explicit flag keeps this
+control independent of that performance choice. The launcher places its fixed
+JVM arguments after `JAVA_OPTS`, so an earlier conflicting Base64 option does
+not re-enable the intrinsic.
+
+`JvmSecurityOptionsTest` observes the effective test-JVM setting and starts
+real JVMs with the Maven/launcher options after a conflicting enable option.
+The distribution smoke gate requires the mitigation in the generated launcher.
+For a built bundle, inspect the effective setting with:
+
+```bash
+JAVA_OPTS='-XX:+UseBASE64Intrinsics -XX:+PrintFlagsFinal' \
+  "$BUNDLE/bin/dediren" --version | rg 'UseBASE64Intrinsics'
+```
+
+The result must show `UseBASE64Intrinsics = false`. This diagnostic probe
+deliberately prints JVM flags; do not use it on an MCP stdio session.
+
+Dediren ships no JVM. Operators must apply their vendor's Java security update
+and restart running processes; this mitigation does not patch the host or other
+Java applications. Older bundles and direct `java`/embedded-library entry
+points must receive the flag explicitly until patched. JVM options supplied
+through other operator-controlled mechanisms can override startup policy and
+remain the operator's responsibility. Dependency SBOM scanning does not verify
+the separately installed Java runtime. These checks observe the mitigation,
+not exploit execution or proof of safety on every vendor/CPU combination.
+
 ### Envelope JSON stdin/stdout (agents -> CLI)
 
 Parsing goes through `contracts/src/main/java/dev/dediren/contracts/json/JsonSupport.java`'s

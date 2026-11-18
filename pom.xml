@@ -65,12 +65,14 @@
          concurrent module forks for cores. -->
     <!-- Explicitly permit the existing fuzz-test agent. This also suppresses the JDK attach
          warning that triggers Surefire 3.6.0's null-context-classloader reporting failure. -->
-    <dediren.test.jvmArgs>-Dfile.encoding=UTF-8 -Djava.awt.headless=true -XX:TieredStopAtLevel=1 -XX:+EnableDynamicAgentLoading</dediren.test.jvmArgs>
+    <!-- Java4Shell (CVE-2026-114938): disable Base64 intrinsics independently of the C1 setting.
+         Keep the Maven host (.mvn/jvm.config) and packaged launcher protected too. -->
+    <dediren.test.jvmArgs>-Dfile.encoding=UTF-8 -Djava.awt.headless=true -XX:TieredStopAtLevel=1 -XX:+EnableDynamicAgentLoading -XX:-UseBASE64Intrinsics</dediren.test.jvmArgs>
     <argLine>${dediren.test.jvmArgs} ${dediren.test.tmpdir.arg}</argLine>
     <!-- Force UTF-8 on the single packaged dediren launcher's JVM streams. If the ambient locale
          drives native.encoding to US-ASCII, an unset stdout.encoding would mangle all non-ASCII
          output to '?' (issue #47), so the launcher pins UTF-8 for stdout/stderr and file I/O. -->
-    <dediren.launcher.jvmArgs>-XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Djava.awt.headless=true -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -Dfile.encoding=UTF-8</dediren.launcher.jvmArgs>
+    <dediren.launcher.jvmArgs>-XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Djava.awt.headless=true -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -Dfile.encoding=UTF-8 -XX:-UseBASE64Intrinsics</dediren.launcher.jvmArgs>
     <archunit.version>1.5.1</archunit.version>
     <assertj.version>3.27.7</assertj.version>
     <eclipse-elk.version>0.12.1</eclipse-elk.version>

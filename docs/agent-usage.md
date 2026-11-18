@@ -1348,6 +1348,13 @@ deployment slots, and UMLDI.
 
 ## Runtime Probes
 
+Use vendor-patched Java 21+ for Java4Shell (CVE-2026-114938). The packaged
+launcher disables the affected Base64 intrinsics with
+`-XX:-UseBASE64Intrinsics`; this also applies to `dediren mcp`. Older bundles,
+direct `java` invocations, and embedded library use need that JVM startup
+option until the runtime is patched. Restart processes after changing the JVM
+or its options. The bundle does not include or update Java itself.
+
 ```bash
 VERSION=2026.10.0
 BUNDLE=/tmp/dediren-dist/dediren-agent-bundle-${VERSION}
