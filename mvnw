@@ -201,6 +201,11 @@ MAVEN_PROJECTBASEDIR=${MAVEN_BASEDIR:-"$BASE_DIR"}
 export MAVEN_PROJECTBASEDIR
 log "$MAVEN_PROJECTBASEDIR"
 
+if [ -z "$MAVEN_USER_HOME" ]; then
+  MAVEN_USER_HOME="$MAVEN_PROJECTBASEDIR/.cache/maven/user-home"
+  export MAVEN_USER_HOME
+fi
+
 trim() {
   # MWRAPPER-139:
   #   Trims trailing and leading whitespace, carriage returns, tabs, and linefeeds.
