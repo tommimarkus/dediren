@@ -55,6 +55,14 @@ remain the operator's responsibility. Dependency SBOM scanning does not verify
 the separately installed Java runtime. These checks observe the mitigation,
 not exploit execution or proof of safety on every vendor/CPU combination.
 
+The CI, CodeQL, release, and render-paint workflows build on Eclipse Temurin 25
+with `check-latest: true`, so each run resolves the newest vendor build instead
+of the runner's cached JDK or a hand-pinned patch level; the upstream fix first
+shipped in Temurin 25.0.5.1 and 21.0.13.1. `DistModuleTest` fails the build if
+a `setup-java` step drops either setting. Bytecode still targets Java 21
+(`maven.compiler.release`), and the JVM flag stays in place as defence in depth
+because CI does not exercise a Java 21 runtime and operators choose their own.
+
 ### Envelope JSON stdin/stdout (agents -> CLI)
 
 Parsing goes through `contracts/src/main/java/dev/dediren/contracts/json/JsonSupport.java`'s

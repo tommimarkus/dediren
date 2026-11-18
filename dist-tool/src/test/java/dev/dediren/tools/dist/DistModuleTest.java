@@ -8,6 +8,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.jackson.databind.JsonNode;
@@ -402,6 +404,37 @@ class DistModuleTest {
         .as("ci.yml test job must run the packaged -Pdist-smoke gate on the dist-tool module")
         .contains("-Pdist-smoke")
         .contains("dist-tool");
+  }
+
+  @Test
+  void everyWorkflowJavaSetupTracksTheLatestPatchedJdk() throws Exception {
+    // Java4Shell (CVE-2026-114938) is fixed in the JDK itself, and a bare major version resolves
+    // from the runner's tool cache, which can trail a security release by an image refresh. Every
+    // setup-java step therefore asks for the current LTS line with check-latest, so CI/CD builds on
+    // the newest vendor build rather than a cached or hand-pinned one.
+    List<Path> workflows;
+    try (Stream<Path> files = Files.list(workspaceRoot().resolve(".github/workflows"))) {
+      workflows = files.filter(file -> file.toString().endsWith(".yml")).sorted().toList();
+    }
+    int javaSetupSteps = 0;
+    for (Path workflowFile : workflows) {
+      String[] lines = Files.readString(workflowFile).split("\\R", -1);
+      for (int index = 0; index < lines.length; index++) {
+        if (!lines[index].startsWith("      - ")) {
+          continue;
+        }
+        String step = yamlBlock(lines, index);
+        if (!hasTrimmedLineStartingWith(step, "uses: actions/setup-java@")) {
+          continue;
+        }
+        javaSetupSteps++;
+        assertThat(step)
+            .as("%s setup-java step", workflowFile.getFileName())
+            .contains("java-version: \"25\"")
+            .contains("check-latest: true");
+      }
+    }
+    assertThat(javaSetupSteps).as("setup-java steps found across workflows").isGreaterThan(0);
   }
 
   private static Path workspaceRoot() {

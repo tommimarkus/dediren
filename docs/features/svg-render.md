@@ -244,9 +244,10 @@ then review every tracked PNG and manifest change. A failed
 comparison writes the actual image, changed-pixel mask, and overlay under
 `.test-output/render-paint/`. Equal dimensions are required; RGBA channel
 differences of 8 or less are ignored, and every remaining changed pixel fails.
-The manifest pins Playwright, Chromium, the CI container digest, Eclipse
-Temurin 21.0.10+7, viewport rules, DPR, font digest, scenarios, and comparator
-threshold.
+The manifest pins Playwright, Chromium, the CI container digest, viewport
+rules, DPR, font digest, scenarios, and comparator threshold. The JDK is not
+pinned: the scheduled job runs on the latest Eclipse Temurin 25 so it picks up
+Java security releases, and the JVM does not rasterize.
 
 Regeneration is gated on a **calibration probe**, not on the environment's
 identity: before writing any golden, the lane rasterizes the static
