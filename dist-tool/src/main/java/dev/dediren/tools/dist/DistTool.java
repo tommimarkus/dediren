@@ -982,13 +982,13 @@ public final class DistTool {
   }
 
   /**
-   * Ceiling between the routing-v3 shipped size (~3.411 MB: shrunk + attribute-stripped + STORED
-   * repack + xz -9e) and the regression shapes above it — the attribute strip silently going inert
-   * (~3.49 MB; it depends on ProGuard's obfuscation phase running, see bundle-shrink.pro), the
-   * archive degrading back to gzip (~4.94 MB), and STORED-to-deflated or shrink-to-pass-through
-   * regressions far above that. Trips on any of those, not ordinary growth.
+   * Ceiling between the shipped size (~3.48 MB with Jackson 3.3.0: shrunk + attribute-stripped +
+   * STORED repack + xz -9e) and the regression shapes above it — the attribute strip silently going
+   * inert (roughly +80 kB; it depends on ProGuard's obfuscation phase running, see
+   * bundle-shrink.pro), the archive degrading back to gzip (~4.94 MB), and STORED-to-deflated or
+   * shrink-to-pass-through regressions far above that. Trips on any of those, not ordinary growth.
    */
-  private static final long MAX_ARCHIVE_BYTES = 3_450_000L;
+  private static final long MAX_ARCHIVE_BYTES = 3_500_000L;
 
   /**
    * The packaged lib/ must hold exactly the shrunk bundle jar — anything else means the CLASSPATH
@@ -1873,63 +1873,63 @@ public final class DistTool {
     Files.createDirectories(schemaDir);
     String schema =
         """
-            <?xml version="1.0" encoding="UTF-8"?>
-            <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
-              targetNamespace="http://www.opengroup.org/xsd/archimate/3.0/"
-              xmlns="http://www.opengroup.org/xsd/archimate/3.0/"
-              elementFormDefault="qualified"
-              attributeFormDefault="unqualified">
-              <xs:element name="model">
-                <xs:complexType>
-                  <xs:sequence>
-                    <xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/>
-                  </xs:sequence>
-                  <xs:attribute name="identifier" type="xs:ID" use="required"/>
-                  <xs:anyAttribute namespace="##any" processContents="lax"/>
-                </xs:complexType>
-              </xs:element>
-              <xs:complexType name="ApplicationComponent" mixed="true">
-                <xs:sequence><xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/></xs:sequence>
-                <xs:anyAttribute namespace="##any" processContents="lax"/>
-              </xs:complexType>
-              <xs:complexType name="ApplicationService" mixed="true">
-                <xs:sequence><xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/></xs:sequence>
-                <xs:anyAttribute namespace="##any" processContents="lax"/>
-              </xs:complexType>
-              <xs:complexType name="Grouping" mixed="true">
-                <xs:sequence><xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/></xs:sequence>
-                <xs:anyAttribute namespace="##any" processContents="lax"/>
-              </xs:complexType>
-              <xs:complexType name="AndJunction" mixed="true">
-                <xs:sequence><xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/></xs:sequence>
-                <xs:anyAttribute namespace="##any" processContents="lax"/>
-              </xs:complexType>
-              <xs:complexType name="Realization" mixed="true">
-                <xs:sequence><xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/></xs:sequence>
-                <xs:anyAttribute namespace="##any" processContents="lax"/>
-              </xs:complexType>
-              <xs:complexType name="Flow" mixed="true">
-                <xs:sequence><xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/></xs:sequence>
-                <xs:anyAttribute namespace="##any" processContents="lax"/>
-              </xs:complexType>
-              <xs:complexType name="Composition" mixed="true">
-                <xs:sequence><xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/></xs:sequence>
-                <xs:anyAttribute namespace="##any" processContents="lax"/>
-              </xs:complexType>
-              <xs:complexType name="Element" mixed="true">
-                <xs:sequence><xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/></xs:sequence>
-                <xs:anyAttribute namespace="##any" processContents="lax"/>
-              </xs:complexType>
-              <xs:complexType name="Relationship" mixed="true">
-                <xs:sequence><xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/></xs:sequence>
-                <xs:anyAttribute namespace="##any" processContents="lax"/>
-              </xs:complexType>
-              <xs:complexType name="Diagram" mixed="true">
-                <xs:sequence><xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/></xs:sequence>
-                <xs:anyAttribute namespace="##any" processContents="lax"/>
-              </xs:complexType>
-            </xs:schema>
-            """;
+        <?xml version="1.0" encoding="UTF-8"?>
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+          targetNamespace="http://www.opengroup.org/xsd/archimate/3.0/"
+          xmlns="http://www.opengroup.org/xsd/archimate/3.0/"
+          elementFormDefault="qualified"
+          attributeFormDefault="unqualified">
+          <xs:element name="model">
+            <xs:complexType>
+              <xs:sequence>
+                <xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/>
+              </xs:sequence>
+              <xs:attribute name="identifier" type="xs:ID" use="required"/>
+              <xs:anyAttribute namespace="##any" processContents="lax"/>
+            </xs:complexType>
+          </xs:element>
+          <xs:complexType name="ApplicationComponent" mixed="true">
+            <xs:sequence><xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/></xs:sequence>
+            <xs:anyAttribute namespace="##any" processContents="lax"/>
+          </xs:complexType>
+          <xs:complexType name="ApplicationService" mixed="true">
+            <xs:sequence><xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/></xs:sequence>
+            <xs:anyAttribute namespace="##any" processContents="lax"/>
+          </xs:complexType>
+          <xs:complexType name="Grouping" mixed="true">
+            <xs:sequence><xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/></xs:sequence>
+            <xs:anyAttribute namespace="##any" processContents="lax"/>
+          </xs:complexType>
+          <xs:complexType name="AndJunction" mixed="true">
+            <xs:sequence><xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/></xs:sequence>
+            <xs:anyAttribute namespace="##any" processContents="lax"/>
+          </xs:complexType>
+          <xs:complexType name="Realization" mixed="true">
+            <xs:sequence><xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/></xs:sequence>
+            <xs:anyAttribute namespace="##any" processContents="lax"/>
+          </xs:complexType>
+          <xs:complexType name="Flow" mixed="true">
+            <xs:sequence><xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/></xs:sequence>
+            <xs:anyAttribute namespace="##any" processContents="lax"/>
+          </xs:complexType>
+          <xs:complexType name="Composition" mixed="true">
+            <xs:sequence><xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/></xs:sequence>
+            <xs:anyAttribute namespace="##any" processContents="lax"/>
+          </xs:complexType>
+          <xs:complexType name="Element" mixed="true">
+            <xs:sequence><xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/></xs:sequence>
+            <xs:anyAttribute namespace="##any" processContents="lax"/>
+          </xs:complexType>
+          <xs:complexType name="Relationship" mixed="true">
+            <xs:sequence><xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/></xs:sequence>
+            <xs:anyAttribute namespace="##any" processContents="lax"/>
+          </xs:complexType>
+          <xs:complexType name="Diagram" mixed="true">
+            <xs:sequence><xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/></xs:sequence>
+            <xs:anyAttribute namespace="##any" processContents="lax"/>
+          </xs:complexType>
+        </xs:schema>
+        """;
     for (String fileName :
         List.of("archimate3_Model.xsd", "archimate3_View.xsd", "archimate3_Diagram.xsd")) {
       Files.writeString(schemaDir.resolve(fileName), schema, StandardCharsets.UTF_8);
@@ -1941,21 +1941,21 @@ public final class DistTool {
     Files.writeString(
         schemaPath,
         """
-            <?xml version="1.0" encoding="UTF-8"?>
-            <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
-                        targetNamespace="http://www.omg.org/spec/XMI/20131001"
-                        xmlns="http://www.omg.org/spec/XMI/20131001"
-                        elementFormDefault="qualified">
-              <xsd:element name="XMI">
-                <xsd:complexType>
-                  <xsd:choice minOccurs="0" maxOccurs="unbounded">
-                    <xsd:any processContents="lax"/>
-                  </xsd:choice>
-                  <xsd:anyAttribute processContents="lax"/>
-                </xsd:complexType>
-              </xsd:element>
-            </xsd:schema>
-            """,
+        <?xml version="1.0" encoding="UTF-8"?>
+        <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+                    targetNamespace="http://www.omg.org/spec/XMI/20131001"
+                    xmlns="http://www.omg.org/spec/XMI/20131001"
+                    elementFormDefault="qualified">
+          <xsd:element name="XMI">
+            <xsd:complexType>
+              <xsd:choice minOccurs="0" maxOccurs="unbounded">
+                <xsd:any processContents="lax"/>
+              </xsd:choice>
+              <xsd:anyAttribute processContents="lax"/>
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:schema>
+        """,
         StandardCharsets.UTF_8);
     return schemaPath;
   }
