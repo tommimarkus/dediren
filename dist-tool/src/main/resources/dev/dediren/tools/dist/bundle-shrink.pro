@@ -67,4 +67,10 @@
 # MethodHandle.invokeExact is signature-polymorphic; ProGuard's library-member resolution
 # flags those call sites as missing members. False positive, not a real unresolved reference.
 -dontwarn tools.jackson.databind.**
+# Same false positive in jackson-core 3.3.0, whose buffer recycling and XJB writer call the
+# signature-polymorphic VarHandle accessors and MethodHandle.invokeExact. Named per class so
+# any other unresolved jackson-core reference still fails the dist build.
+-dontwarn tools.jackson.core.util.BufferRecycler
+-dontwarn tools.jackson.core.util.RecyclerPool$HybridPoolBase
+-dontwarn tools.jackson.core.io.xjb.XJBWriter
 -dontnote **

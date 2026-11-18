@@ -733,6 +733,10 @@
                     <include>src/paint-test/java/**/*.java</include>
                   </includes>
                   <googleJavaFormat>
+                    <!-- Pinned: the plugin's default formatter moves with plugin bumps, and
+                         google-java-format 2.x reformats the whole tree. Adopting a new formatter
+                         is a deliberate repo-wide reformat, not a side effect of a plugin update. -->
+                    <version>1.36.1</version>
                     <style>GOOGLE</style>
                   </googleJavaFormat>
                   <removeUnusedImports/>
