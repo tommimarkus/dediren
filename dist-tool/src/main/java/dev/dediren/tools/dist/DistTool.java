@@ -42,6 +42,7 @@ public final class DistTool {
       List.of(
           "-XX:TieredStopAtLevel=1",
           "-XX:+UseSerialGC",
+          "-XX:-UseBASE64Intrinsics",
           // UTF-8 stream encoding: the launcher itself must force UTF-8 or non-ASCII output is
           // mangled to '?' regardless of the invoking shell's locale (issue #47).
           "-Dstdout.encoding=UTF-8",

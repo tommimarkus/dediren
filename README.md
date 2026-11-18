@@ -126,6 +126,17 @@ the architecturally significant compile edges, with the full edge set in
   MIT OR Apache-2.0 and, because it is not distributed with Dediren, has no
   entry in Dediren's `THIRD-PARTY-NOTICES.md`.
 
+Use a vendor-patched Java runtime for
+[Java4Shell (CVE-2026-114938)](https://access.redhat.com/security/vulnerabilities/RHSB-2026-018).
+The packaged launcher, Maven host, and forked test JVMs also disable Base64
+intrinsics with `-XX:-UseBASE64Intrinsics`. This mitigates the vulnerable JVM
+code path used when decoding inputs such as compressed draw.io diagrams.
+Existing installations need a rebuilt bundle or the same JVM option at startup;
+direct `java` invocations and embedded library use must supply it themselves
+until their Java runtime is patched. Restart running processes after updating
+Java or their startup options. See the [threat model](docs/threat-model.md#java-runtime-and-base64-decoding)
+for scope and verification.
+
 ## Build And Test
 
 ```bash
