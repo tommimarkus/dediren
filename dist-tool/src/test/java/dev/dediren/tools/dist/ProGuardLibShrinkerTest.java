@@ -13,7 +13,8 @@ class ProGuardLibShrinkerTest {
     List<Path> staged = List.of(Path.of("/lib/dep-alpha-1.0.0.jar"), Path.of("/lib/cli-1.jar"));
 
     List<String> args =
-        ProGuardLibShrinker.proGuardArgs(staged, Path.of("/out/merged.jar"), Path.of("/keep.pro"));
+        ProGuardLibShrinker.proGuardArgs(
+            staged, Path.of("/out/merged.jar"), Path.of("/keep.pro"), "/jdk/classes.jar");
 
     // Exhaustive: an extra or duplicated ProGuard argument silently changes shrink behavior,
     // so the full argument vector is pinned, not just the relative order.
@@ -26,7 +27,7 @@ class ProGuardLibShrinkerTest {
             "-outjars",
             "/out/merged.jar",
             "-libraryjars",
-            "<java.home>/jmods(!**.jar;!module-info.class)",
+            "/jdk/classes.jar",
             "@/keep.pro");
   }
 

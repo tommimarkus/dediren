@@ -58,14 +58,19 @@ final class ProGuardLibShrinker implements LibShrinker {
   @Override
   public void shrink(List<Path> stagedJars, Path mergedJar) throws IOException {
     Path keepRules = Files.createTempFile("bundle-shrink", ".pro");
+    Path jdkClasses = Files.createTempFile("bundle-shrink-jdk", ".jar");
     try {
+      Files.delete(jdkClasses);
+      String libraryJars =
+          JdkLibraryClasses.libraryJarsArg(Path.of(System.getProperty("java.home")), jdkClasses);
       try (var in = ProGuardLibShrinker.class.getResourceAsStream(KEEP_RULES_RESOURCE)) {
         if (in == null) {
           throw new IllegalStateException("missing keep-rules resource: " + KEEP_RULES_RESOURCE);
         }
         Files.copy(in, keepRules, StandardCopyOption.REPLACE_EXISTING);
       }
-      String[] args = proGuardArgs(stagedJars, mergedJar, keepRules).toArray(String[]::new);
+      String[] args =
+          proGuardArgs(stagedJars, mergedJar, keepRules, libraryJars).toArray(String[]::new);
       Configuration configuration = new Configuration();
       try (ConfigurationParser parser = new ConfigurationParser(args, System.getProperties())) {
         parser.parse(configuration);
@@ -77,6 +82,7 @@ final class ProGuardLibShrinker implements LibShrinker {
       throw new IOException("ProGuard shrink failed for " + mergedJar, error);
     } finally {
       Files.deleteIfExists(keepRules);
+      Files.deleteIfExists(jdkClasses);
     }
     if (!Files.isRegularFile(mergedJar)) {
       throw new IOException("ProGuard reported success but wrote no jar at " + mergedJar);
@@ -85,7 +91,8 @@ final class ProGuardLibShrinker implements LibShrinker {
   }
 
   /** Package-private for tests: full argument list, injars in launcher classpath order. */
-  static List<String> proGuardArgs(List<Path> stagedJars, Path mergedJar, Path keepRules) {
+  static List<String> proGuardArgs(
+      List<Path> stagedJars, Path mergedJar, Path keepRules, String libraryJars) {
     List<String> args = new ArrayList<>();
     for (Path jar : stagedJars) {
       args.add("-injars");
@@ -94,7 +101,7 @@ final class ProGuardLibShrinker implements LibShrinker {
     args.add("-outjars");
     args.add(mergedJar.toString());
     args.add("-libraryjars");
-    args.add("<java.home>/jmods(!**.jar;!module-info.class)");
+    args.add(libraryJars);
     args.add("@" + keepRules);
     return args;
   }

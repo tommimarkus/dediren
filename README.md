@@ -211,7 +211,7 @@ gradients or compositions that cannot be resolved report `not_measurable`.
 Maven state stays under `.cache/maven`, while the wrapper installs only the
 pinned Chromium headless shell under `.cache/playwright`; neither cache is
 committed or shipped. The scheduled lane uses the digest-pinned Playwright Java
-1.61.0 Noble container and Eclipse Temurin 21.0.10+7. The image name, browser
+1.62.0 Noble container and the latest Eclipse Temurin 25. The image name, browser
 name, and version strings are upstream tool identification, not bundled marks
 or product branding. References to the retired paint implementation remain
 only in historical plans/reviews under `docs/superpowers` and in threat-model
